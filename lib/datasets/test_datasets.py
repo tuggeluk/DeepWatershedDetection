@@ -4,6 +4,23 @@
 
 
 from datasets.factory import get_imdb, list_imdbs
+from roi_data_layer.layer import RoIDataLayer
+import roi_data_layer.roidb as rdl_roidb
+from model.config import cfg
+
+
+def get_training_roidb(imdb):
+  """Returns a roidb (Region of Interest database) for use in training."""
+  if cfg.TRAIN.USE_FLIPPED:
+    print('Appending horizontally-flipped training examples...')
+    imdb.append_flipped_images()
+    print('done')
+
+  print('Preparing training data...')
+  rdl_roidb.prepare_roidb(imdb)
+  print('done')
+
+  return imdb.roidb
 
 
 if __name__ == '__main__':
@@ -14,9 +31,12 @@ if __name__ == '__main__':
     #print("looking for voc 2012")
     #get_imdb("voc_2012_train")
     ds_imdb = get_imdb("deep_scores_2017_train")
+    print('Loaded dataset `{:s}` for training'.format(ds_imdb.name))
 
-    for db in list_imdbs():
-        imdb = get_imdb(db)
+    roidb = get_training_roidb(ds_imdb)
 
+    data_layer = RoIDataLayer(roidb, ds_imdb.num_classes)
+
+    blobs = data_layer.forward()
 
     print("asdf")

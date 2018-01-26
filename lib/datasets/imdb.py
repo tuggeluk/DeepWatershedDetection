@@ -242,6 +242,9 @@ class imdb(object):
       })
     return roidb
 
+  def build_dwd_groundtruth_from_roi_db(self):
+    print("asdf")
+
   @staticmethod
   def merge_roidbs(a, b):
     assert len(a) == len(b)

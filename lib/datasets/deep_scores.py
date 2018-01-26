@@ -25,11 +25,6 @@ from model.config import cfg
 import random
 
 
-# export this to cfg later
-max_images = 2000
-val_percentage = 0.2
-split_seed = 444
-
 
 class deep_scores(imdb):
   def __init__(self, image_set, year, devkit_path=None):
@@ -72,7 +67,7 @@ class deep_scores(imdb):
     """
     Construct an image path from the image's "index" identifier.
     """
-    image_path = os.path.join(self._data_path, 'JPEGImages',
+    image_path = os.path.join(self._data_path, 'images_png',
                               index + self._image_ext)
     assert os.path.exists(image_path), \
       'Path does not exist: {}'.format(image_path)
@@ -90,18 +85,18 @@ class deep_scores(imdb):
 
     images = os.listdir(images_path)
 
-    if max_images is not None:
-        images = images[0:max_images]
+    if cfg.DEEPSCORES.MAX_IMAGES is not None:
+        images = images[0:cfg.DEEPSCORES.MAX_IMAGES]
 
     # make train or val set
     # keep consistent do not temper with seed set from outside --> use own prg
-    prg = random.Random(split_seed)
+    prg = random.Random(cfg.DEEPSCORES.SPLIT_SEED)
     prg.shuffle(images)
 
     if self._image_set == 'train':
-      images = images[int(len(images)*val_percentage):len(images)]
+      images = images[int(len(images)*cfg.DEEPSCORES.VAL_PERCENTAGE):len(images)]
     else:
-      images = images[0:int(len(images) * val_percentage)]
+      images = images[0:int(len(images) * cfg.DEEPSCORES.VAL_PERCENTAGE)]
 
     #images = images[0:200]
     image_index = [x[:-4] for x in images]
