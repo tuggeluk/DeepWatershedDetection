@@ -27,7 +27,7 @@ def get_minibatch(roidb, num_classes):
     format(num_images, cfg.TRAIN.BATCH_SIZE)
 
   # Get the input image blob, formatted for caffe
-  im_blob, im_scales, im_crop_boxes = _get_image_blob(roidb, random_scale_inds)
+  im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
 
   blobs = {'data': im_blob}
 
@@ -58,19 +58,17 @@ def _get_image_blob(roidb, scale_inds):
   num_images = len(roidb)
   processed_ims = []
   im_scales = []
-  crop_boxes = []
   for i in range(num_images):
     im = cv2.imread(roidb[i]['image'])
     if roidb[i]['flipped']:
       im = im[:, ::-1, :]
     target_size = cfg.TRAIN.SCALES[scale_inds[i]]
-    im, im_scale, crop_box = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
+    im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
                     cfg.TRAIN.MAX_SIZE, cfg.TRAIN.CROP)
-    crop_boxes.append(crop_box)
     im_scales.append(im_scale)
     processed_ims.append(im)
 
   # Create a blob to hold the input images
   blob = im_list_to_blob(processed_ims)
 
-  return blob, im_scales, crop_boxes
+  return blob, im_scales

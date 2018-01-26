@@ -167,14 +167,17 @@ class deep_scores(imdb):
     # "Seg" area for pascal is just the box area
     seg_areas = np.zeros((num_objs), dtype=np.float32)
 
+    size = tree.find("size")
+    height = float(size.find("height").text)
+    width = float(size.find("width").text)
     # Load object bounding boxes into a data frame.
     for ix, obj in enumerate(objs):
       bbox = obj.find('bndbox')
       # Pixel indexes should already be 0 bases
-      x1 = float(bbox.find('xmin').text)
-      y1 = float(bbox.find('ymin').text)
-      x2 = float(bbox.find('xmax').text)
-      y2 = float(bbox.find('ymax').text)
+      x1 = np.floor(float(bbox.find('xmin').text)*width)
+      y1 = np.floor(float(bbox.find('ymin').text)*height)
+      x2 = np.floor(float(bbox.find('xmax').text)*width)
+      y2 = np.floor(float(bbox.find('ymax').text)*height)
       cls = self._class_to_ind[obj.find('name').text]#.lower().strip()]
       boxes[ix, :] = [x1, y1, x2, y2]
       gt_classes[ix] = cls
