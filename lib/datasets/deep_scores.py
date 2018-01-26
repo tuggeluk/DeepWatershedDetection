@@ -22,10 +22,13 @@ import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
 from model.config import cfg
+import random
 
 
 # export this to cfg later
 max_images = 2000
+val_percentage = 0.2
+split_seed = 444
 
 
 class deep_scores(imdb):
@@ -89,6 +92,16 @@ class deep_scores(imdb):
 
     if max_images is not None:
         images = images[0:max_images]
+
+    # make train or val set
+    # keep consistent do not temper with seed set from outside --> use own prg
+    prg = random.Random(split_seed)
+    prg.shuffle(images)
+
+    if self._image_set == 'train':
+      images = images[int(len(images)*val_percentage):len(images)]
+    else:
+      images = images[0:int(len(images) * val_percentage)]
 
     #images = images[0:200]
     image_index = [x[:-4] for x in images]

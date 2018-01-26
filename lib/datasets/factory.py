@@ -13,9 +13,8 @@ from __future__ import print_function
 __sets = {}
 from datasets.pascal_voc import pascal_voc
 from datasets.coco import coco
-from datasets.musical import musical
+from datasets.deep_scores import deep_scores
 
-import numpy as np
 
 # Set up voc_<year>_<split> 
 for year in ['2007', '2012']:
@@ -25,9 +24,9 @@ for year in ['2007', '2012']:
 
 # Set up musical dataset
 for year in ['2017']:
-  for split in ['train', 'test']:
-    name = 'musical_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: musical(split, year))
+  for split in ['train', 'val']:
+    name = 'deep_scores_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: deep_scores(split, year))
 
 # Set up coco_2014_<split>
 for year in ['2014']:
@@ -40,6 +39,14 @@ for year in ['2015']:
   for split in ['test', 'test-dev']:
     name = 'coco_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: coco(split, year))
+
+
+# Set up coco_2014_<split>
+for year in ['2017']:
+  for split in ['train', 'val']:
+    name = 'coco_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: coco(split, year))
+
 
 
 def get_imdb(name):
