@@ -67,4 +67,5 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size, crop):
 
 
 
-  return im, im_scale
+  return im, im_scale, crop_box
+

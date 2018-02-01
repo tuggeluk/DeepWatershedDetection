@@ -13,7 +13,7 @@ from Cython.Distutils import build_ext
 cmdclass = {}
 ext_modules = [
     Extension(
-        "utils.cython_bbox",
+        "utils.bbox",
         ["utils/bbox.pyx"],
         extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
     ),

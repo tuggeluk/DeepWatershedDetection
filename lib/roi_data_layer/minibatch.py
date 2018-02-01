@@ -15,6 +15,7 @@ import numpy.random as npr
 import cv2
 from model.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
+from datasets.fcn_groundtruth import objectness_energy
 
 def get_minibatch(roidb, num_classes):
   """Given a roidb, construct a minibatch sampled from it."""
@@ -27,7 +28,7 @@ def get_minibatch(roidb, num_classes):
     format(num_images, cfg.TRAIN.BATCH_SIZE)
 
   # Get the input image blob, formatted for caffe
-  im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
+  im_blob, im_scales, crop_box = _get_image_blob(roidb, random_scale_inds)
 
   blobs = {'data': im_blob}
 
@@ -42,8 +43,27 @@ def get_minibatch(roidb, num_classes):
     # For the COCO ground truth boxes, exclude the  ones that are ''iscrowd''
     gt_inds = np.where(roidb[0]['gt_classes'] != 0 & np.all(roidb[0]['gt_overlaps'].toarray() > -1.0, axis=1))[0]
   gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
-  gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
+  bad_coords = np.zeros(len(gt_inds), dtype=np.bool)
+  if cfg.TRAIN.CROP:
+    gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] - [crop_box[0][0], crop_box[0][1], crop_box[0][0], crop_box[0][1]]
+
+                 # lower coords above 0
+    bad_coords = np.sum(gt_boxes[:, 0:4][:, [0, 1]] >= 0, 1) + np.sum(gt_boxes[:, 0:4][:, [2, 3]] < cfg.TRAIN.MAX_SIZE, 1) < 4
+
+
+  else:
+    gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
+
+
   gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
+  gt_boxes = gt_boxes[bad_coords==False]
+
+  # build additional gt for FCN
+  if cfg.TRAIN.BUILD_FCN:
+    print("test")
+    objectness_energy(im_blob,gt_boxes)
+
+
   blobs['gt_boxes'] = gt_boxes
   blobs['im_info'] = np.array(
     [[im_blob.shape[1], im_blob.shape[2], im_scales[0]]],
@@ -58,17 +78,21 @@ def _get_image_blob(roidb, scale_inds):
   num_images = len(roidb)
   processed_ims = []
   im_scales = []
+  crop_box = []
+
   for i in range(num_images):
     im = cv2.imread(roidb[i]['image'])
     if roidb[i]['flipped']:
       im = im[:, ::-1, :]
     target_size = cfg.TRAIN.SCALES[scale_inds[i]]
-    im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
+    im, im_scale, im_crop_box = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
                     cfg.TRAIN.MAX_SIZE, cfg.TRAIN.CROP)
+
+    crop_box.append(im_crop_box)
     im_scales.append(im_scale)
     processed_ims.append(im)
 
   # Create a blob to hold the input images
   blob = im_list_to_blob(processed_ims)
 
-  return blob, im_scales
+  return blob, im_scales, crop_box

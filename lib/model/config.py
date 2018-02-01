@@ -105,6 +105,9 @@ __C.TRAIN.BBOX_NORMALIZE_TARGETS = True
 # For COCO, setting USE_ALL_GT to False will exclude boxes that are flagged as ''iscrowd''
 __C.TRAIN.USE_ALL_GT = True
 
+# Whether to build FCN groundtruth
+__C.TRAIN.BUILD_FCN = True
+
 #
 # Testing options
 #
