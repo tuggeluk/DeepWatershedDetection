@@ -31,10 +31,10 @@ def im_list_to_blob(ims):
   return blob
 
 
-def prep_im_for_blob(im, pixel_means, target_size, max_size, crop):
+def prep_im_for_blob(im, pixel_means, target_size, max_size, crop, crop_scale):
   """Mean subtract and scale an image for use in a blob."""
-  im = im.astype(np.float32, copy=False)
-  im -= pixel_means
+  # im = im.astype(np.float32, copy=False)
+  # im -= pixel_means
   im_shape = im.shape
 
   if not crop:
@@ -50,8 +50,13 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size, crop):
     crop_box = [0,0,im_shape[0],im_shape[1]]
 
   else:
+    # scale using pre-crop scaling factor
+    im_scale = crop_scale
+    im = cv2.resize(im, None, None, fx=crop_scale, fy=crop_scale,
+                    interpolation=cv2.INTER_LINEAR)
+
+    im_shape = im.shape
     # crop to max size if necessary
-    im_scale = 1
     if im_shape[0] < max_size:
       crop_0 = 0
     else:

@@ -15,7 +15,7 @@ import numpy.random as npr
 import cv2
 from model.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
-from datasets.fcn_groundtruth import objectness_energy
+from datasets.fcn_groundtruth import objectness_energy, show_image, objectness_energy_high_dym
 
 def get_minibatch(roidb, num_classes):
   """Given a roidb, construct a minibatch sampled from it."""
@@ -45,7 +45,11 @@ def get_minibatch(roidb, num_classes):
   gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
   bad_coords = np.zeros(len(gt_inds), dtype=np.bool)
   if cfg.TRAIN.CROP:
-    gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] - [crop_box[0][0], crop_box[0][1], crop_box[0][0], crop_box[0][1]]
+
+    #scale Coords
+    gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
+
+    gt_boxes[:, 0:4] = gt_boxes[:, 0:4] - [crop_box[0][1], crop_box[0][0], crop_box[0][1], crop_box[0][0]]
 
                  # lower coords above 0
     bad_coords = np.sum(gt_boxes[:, 0:4][:, [0, 1]] >= 0, 1) + np.sum(gt_boxes[:, 0:4][:, [2, 3]] < cfg.TRAIN.MAX_SIZE, 1) < 4
@@ -60,8 +64,10 @@ def get_minibatch(roidb, num_classes):
 
   # build additional gt for FCN
   if cfg.TRAIN.BUILD_FCN:
-    print("test")
-    objectness_energy(im_blob,gt_boxes)
+    #show_image(im_blob, gt_boxes, gt=True)
+    #objectness_energy(im_blob, gt_boxes)
+
+    objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
 
 
   blobs['gt_boxes'] = gt_boxes
@@ -86,7 +92,7 @@ def _get_image_blob(roidb, scale_inds):
       im = im[:, ::-1, :]
     target_size = cfg.TRAIN.SCALES[scale_inds[i]]
     im, im_scale, im_crop_box = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
-                    cfg.TRAIN.MAX_SIZE, cfg.TRAIN.CROP)
+                    cfg.TRAIN.MAX_SIZE, cfg.TRAIN.CROP, cfg.TRAIN.CROP_SCALE)
 
     crop_box.append(im_crop_box)
     im_scales.append(im_scale)

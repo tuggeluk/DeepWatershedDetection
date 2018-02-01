@@ -69,6 +69,9 @@ __C.TRAIN.MAX_SIZE = 1000
 # Instead of rescaling - Crop out a MAX_SIZExMAX_SIZE Portion out of the image
 __C.TRAIN.CROP = True
 
+# Rescale before crop by this Factor
+__C.TRAIN.CROP_SCALE = 0.5
+
 # Images to use per minibatch
 __C.TRAIN.IMS_PER_BATCH = 1
 
