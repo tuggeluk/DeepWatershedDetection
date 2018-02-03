@@ -13,7 +13,7 @@ from __future__ import print_function
 import numpy as np
 import numpy.random as npr
 import cv2
-from model.config import cfg
+from main.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 from datasets.fcn_groundtruth import objectness_energy, show_image, objectness_energy_high_dym
 
@@ -65,9 +65,8 @@ def get_minibatch(roidb, num_classes):
   # build additional gt for FCN
   if cfg.TRAIN.BUILD_FCN:
     #show_image(im_blob, gt_boxes, gt=True)
-    #objectness_energy(im_blob, gt_boxes)
-
-    objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
+    blobs['gt_fcn'] = objectness_energy(im_blob, gt_boxes)
+    #objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
 
 
   blobs['gt_boxes'] = gt_boxes

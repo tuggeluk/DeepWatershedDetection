@@ -11,8 +11,8 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-from model.config import cfg
-from model.bbox_transform import bbox_transform
+from main.config import cfg
+from main.bbox_transform import bbox_transform
 from utils.bbox import bbox_overlaps
 import PIL
 

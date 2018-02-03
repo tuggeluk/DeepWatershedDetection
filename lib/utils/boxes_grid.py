@@ -10,7 +10,7 @@ from __future__ import print_function
 
 import numpy as np
 import math
-from model.config import cfg
+from main.config import cfg
 
 
 def get_boxes_grid(image_height, image_width):

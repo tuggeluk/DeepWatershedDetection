@@ -21,7 +21,7 @@ import pickle
 import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
-from model.config import cfg
+from main.config import cfg
 import random
 
 

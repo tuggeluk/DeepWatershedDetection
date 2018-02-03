@@ -6,7 +6,7 @@
 from datasets.factory import get_imdb, list_imdbs
 from roi_data_layer.layer import RoIDataLayer
 import roi_data_layer.roidb as rdl_roidb
-from model.config import cfg
+from main.config import cfg
 
 
 def get_training_roidb(imdb):
