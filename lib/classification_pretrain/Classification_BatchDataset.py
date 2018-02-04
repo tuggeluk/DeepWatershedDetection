@@ -17,7 +17,7 @@ class class_dataset_reader:
     batch_offset = 0
     epochs_completed = 0
 
-    def __init__(self, records_list, seed = 444, split = 0.2, min_nr = 2, one_hot=True):
+    def __init__(self, records_list,pad_to=None,max_per_class=None, seed = 444, split = 0.2, min_nr = 2, one_hot=True):
         """
         Initialize a file reader for the DeepScores classification data
         :param records_list: path to the dataset
@@ -40,6 +40,8 @@ class class_dataset_reader:
         self.min_nr = min_nr
         self.split = split
         self.one_hot = one_hot
+        self.pad_to = pad_to
+        self.max_per_class = max_per_class
 
         # show image
         # from PIL import Image
@@ -114,9 +116,13 @@ class class_dataset_reader:
         # print (self.annotations.shape)
 
     def load_class(self, folder, class_index):
+        in_size = len(self.images)
         # move trough images in folder
         for image in os.listdir(self.path +"/"+folder):
             self.load_image(folder, image, class_index)
+            if self.max_per_class is not None:
+                if len(self.images) - in_size > self.max_per_class:
+                    return None
         return None
 
     def load_image(self,folder,image, class_index):
@@ -126,7 +132,17 @@ class class_dataset_reader:
 
         for x_i in xrange(0, nr_x):
             for y_i in xrange(0, nr_y):
-                self.images.append(image[y_i*self.tile_size[0]:(y_i+1)*self.tile_size[0], x_i*self.tile_size[1]:(x_i+1)*self.tile_size[1]])
+                sub_img = image[y_i*self.tile_size[0]:(y_i+1)*self.tile_size[0], x_i*self.tile_size[1]:(x_i+1)*self.tile_size[1]]
+                if self.pad_to is not None:
+
+                    canvas = np.ones(self.pad_to, dtype=np.uint8)*255
+                    offset_0 = (canvas.shape[0] - sub_img.shape[0])/2
+                    offset_1 = (canvas.shape[1] - sub_img.shape[1])/2
+
+                    canvas[offset_0:(sub_img.shape[0]+offset_0),offset_1:(sub_img.shape[1]+offset_1)]=sub_img
+                    sub_img = canvas
+
+                self.images.append(sub_img)
                 self.annotations.append(class_index)
                 # if self.images[len(self.images)-1].shape != (self.tile_size[0],self.tile_size[1]):
                 #     print("sadf")

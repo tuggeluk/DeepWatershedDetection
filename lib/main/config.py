@@ -175,6 +175,9 @@ __C.ROOT_DIR = osp.abspath(osp.join(osp.dirname(__file__), '..', '..'))
 # Data directory
 __C.DATA_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'data'))
 
+# Pretrain directory
+__C.PRETRAINED_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'pretrained'))
+
 # Place outputs under an experiments directory
 __C.EXP_DIR = 'default'
 
