@@ -44,7 +44,7 @@ def parse_args():
                       default=True, type=bool)
   parser.add_argument('--batch_size', dest='batch_size',
                       help="batchsize",
-                      default=50, type=int)
+                      default=200, type=int)
   parser.add_argument('--set', dest='set_cfgs',
                       help='set config keys', default=None,
                       nargs=argparse.REMAINDER)
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     # train set
     print("Setting up image reader...")
-    data_reader = Classification_BatchDataset.class_dataset_reader(cfg.DATA_DIR+"/DeepScores_2017/DeepScores_classification", pad_to=[img_size, img_size], max_per_class = 300)
+    data_reader = Classification_BatchDataset.class_dataset_reader(cfg.DATA_DIR+"/DeepScores_2017/DeepScores_classification", pad_to=[img_size, img_size])
 
 
     imdb = imdb("DeepScores_2017")
@@ -167,14 +167,13 @@ if __name__ == '__main__':
     #           max_iters=args.max_iters)
 
     for iter in range(0, args.max_iters):
-        print("asdfsfd")
         batch = data_reader.next_batch(args.batch_size)
         # undo one-hot
         #un_onehot = [np.where(r==1)[0][0] for r in batch[1]]
         train_op.run(session=sess, feed_dict={input: batch[0], label: batch[1]})
-        if iter % 2 == 0:
+        if iter % 1000 == 0:
             _, loss_act = sess.run([train_op, loss], feed_dict={input: batch[0], label: batch[1]})
             print(loss_act)
 
-        if iter % 101 == 0:
+        if iter % 68000 == 0:
             save_path = saver.save(sess, model_checkpoint_name)
