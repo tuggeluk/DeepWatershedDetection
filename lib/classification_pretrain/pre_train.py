@@ -23,7 +23,7 @@ def parse_args():
   """
   Parse input arguments
   """
-  parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
+  parser = argparse.ArgumentParser(description='Train ResNets on DeepScores-classification')
   parser.add_argument('--cfg', dest='cfg_file',
                       help='optional config file',
                       default=None, type=str)
@@ -45,6 +45,9 @@ def parse_args():
   parser.add_argument('--batch_size', dest='batch_size',
                       help="batchsize",
                       default=200, type=int)
+  parser.add_argument('--save_iters', dest='save_iters',
+                      help="after how many iterations do we save the model",
+                      default=1000, type=int)
   parser.add_argument('--set', dest='set_cfgs',
                       help='set config keys', default=None,
                       nargs=argparse.REMAINDER)
@@ -120,12 +123,12 @@ if __name__ == '__main__':
             init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_50.ckpt'), slim.get_model_variables('resnet_v1_50'))
     elif args.net == 'res101':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=cfg.TRAIN.WEIGHT_DECAY)):
-            out, end_points = resnet_v1.resnet_v1_101(input, is_training=args.train, scope='resnet_v1_101')
+            out, end_points = resnet_v1.resnet_v1_101(input, is_training=args.train, scope='resnet_v1_101', num_classes=num_classes)
             # RefineNet requires pre-trained ResNet weights
             init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_101.ckpt'), slim.get_model_variables('resnet_v1_101'))
     elif args.net == 'res152':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=cfg.TRAIN.WEIGHT_DECAY)):
-            out, end_points = resnet_v1.resnet_v1_152(input, is_training=args.train, scope='resnet_v1_152')
+            out, end_points = resnet_v1.resnet_v1_152(input, is_training=args.train, scope='resnet_v1_152', num_classes=num_classes)
             # RefineNet requires pre-trained ResNet weights
             init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_152.ckpt'), slim.get_model_variables('resnet_v1_152'))
     else:
@@ -156,7 +159,7 @@ if __name__ == '__main__':
     sess.run(tf.global_variables_initializer())
 
     # potentioally load weights
-    model_checkpoint_name = cfg.PRETRAINED_DIR + "/" + args.net + "_" + "DeepScores" + ".ckpt"
+    model_checkpoint_name = cfg.PRETRAINED_DIR +"/DeepScores/" + args.net + "_"  + ".ckpt"
     if args.weight:
         if args.continue_training or not args.is_training:
             print('Loaded latest model checkpoint')
@@ -171,9 +174,9 @@ if __name__ == '__main__':
         # undo one-hot
         #un_onehot = [np.where(r==1)[0][0] for r in batch[1]]
         train_op.run(session=sess, feed_dict={input: batch[0], label: batch[1]})
-        if iter % 1000 == 0:
+        if iter % 10 == 0:
             _, loss_act = sess.run([train_op, loss], feed_dict={input: batch[0], label: batch[1]})
             print(loss_act)
 
-        if iter % 68000 == 0:
+        if iter % args.save_iters == 0:
             save_path = saver.save(sess, model_checkpoint_name)
