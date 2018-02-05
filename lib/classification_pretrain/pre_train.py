@@ -29,7 +29,7 @@ def parse_args():
                       default=None, type=str)
   parser.add_argument('--weight', dest='weight',
                       help='initialize with pretrained model weights if possible',
-                      default=False, type=bool)
+                      default=True, type=bool)
   parser.add_argument('--iters', dest='max_iters',
                       help='number of iterations to train',
                       default=70000, type=int)
@@ -48,6 +48,9 @@ def parse_args():
   parser.add_argument('--save_iters', dest='save_iters',
                       help="after how many iterations do we save the model",
                       default=1000, type=int)
+  parser.add_argument('--continue', dest='continue_training',
+                      help="continue training",
+                      default=True, type=bool)
   parser.add_argument('--set', dest='set_cfgs',
                       help='set config keys', default=None,
                       nargs=argparse.REMAINDER)
@@ -151,9 +154,6 @@ if __name__ == '__main__':
     accuracy = tf.reduce_mean(correct_prediction)
 
 
-    # load data into memory
-    data_reader.read_images()
-
     # init variables and savers
     saver = tf.train.Saver()
     sess.run(tf.global_variables_initializer())
@@ -168,6 +168,9 @@ if __name__ == '__main__':
     # pre_train_net("asdf", data_reader, output_dir, tb_dir,
     #           pretrained_model=args.weight,
     #           max_iters=args.max_iters)
+
+    # load data into memory
+    data_reader.read_images()
 
     for iter in range(0, args.max_iters):
         batch = data_reader.next_batch(args.batch_size)
