@@ -5,7 +5,7 @@ import argparse
 from main.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, get_output_tb_dir
 import pprint
 import numpy as np
-import Classification_BatchDataset
+import deepscores_classification_datareader
 from datasets.imdb import imdb
 import tensorflow as tf
 
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
     # train set
     print("Setting up image reader...")
-    data_reader = Classification_BatchDataset.class_dataset_reader(cfg.DATA_DIR+"/DeepScores_2017/DeepScores_classification", pad_to=[img_size, img_size])
+    data_reader = deepscores_classification_datareader.class_dataset_reader(cfg.DATA_DIR + "/DeepScores_2017/DeepScores_classification", pad_to=[img_size, img_size])
 
 
     imdb = imdb("DeepScores_2017")
