@@ -6,8 +6,9 @@ import scipy.misc as misc
 import os
 import glob
 from random import shuffle, randint
+import cv2
 
-class seg_dataset_reader:
+class ds_semseg_datareader:
     path = ""
     class_mappings = ""
     files = []
@@ -18,7 +19,7 @@ class seg_dataset_reader:
     batch_offset = 0
     epochs_completed = 0
 
-    def __init__(self, deepscores_path, max_pages=40, crop=True, crop_size=[1000,1000], test_size=20):
+    def __init__(self, deepscores_path, max_pages=None, crop=True, crop_size=[1000,1000], test_size=200, scale=0.5):
         """
         Initialize a file reader for the DeepScores classification data
         :param records_list: path to the dataset
@@ -30,6 +31,7 @@ class seg_dataset_reader:
         self.crop = crop
         self.crop_size = crop_size
         self.test_size = test_size
+        self.scale = scale
 
         images_list = []
         images_glob = os.path.join(self.path, "images_png", '*.' + 'png')
@@ -88,7 +90,6 @@ class seg_dataset_reader:
     def _transform(self, filename):
         image = misc.imread(filename)
         annotation = misc.imread(filename.replace("/images_png/", "/pix_annotations_png/"))
-        print("im working!" + str(randint(0,10)))
         if not image.shape[0:2] == annotation.shape[0:2]:
             print("input and annotation have different sizes!")
             import sys
@@ -99,6 +100,10 @@ class seg_dataset_reader:
         if image.shape[-1] != 1:
             # take mean over color channels, image BW anyways --> fix in dataset creation
             image = np.mean(image, -1)
+
+        if self.scale !=0:
+            image = cv2.resize(image, None, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_LINEAR)
+            annotation = cv2.resize(annotation, None, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_LINEAR)
 
         if self.crop:
             coord_0 = randint(0, (image.shape[0] - self.crop_size[0]))

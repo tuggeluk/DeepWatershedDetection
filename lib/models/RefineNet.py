@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.contrib import slim
 import resnet_v1
+
 import os, sys
 
 def Upsampling(inputs,scale):
@@ -161,7 +162,7 @@ def RefineBlock(high_inputs=None,low_inputs=None):
 
 
 
-def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models"):
+def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True):
     """
     Builds the RefineNet model. 
 
@@ -173,8 +174,8 @@ def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight
     Returns:
       RefineNet model
     """
-
-    inputs = mean_image_subtraction(inputs)
+    if substract_mean:
+        inputs = mean_image_subtraction(inputs)
 
     if preset_model == 'RefineNet-Res50':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
@@ -195,7 +196,7 @@ def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight
     	raise ValueError("Unsupported ResNet model '%s'. This function only supports ResNet 101 and ResNet 152" % (preset_model))
 
     
-
+    net_name = end_points.keys()[0].split("/")[0]
 
     f = [end_points['pool5'], end_points['pool4'],
          end_points['pool3'], end_points['pool2']]
@@ -211,17 +212,17 @@ def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight
     g[2]=RefineBlock(g[1],h[2])
     g[3]=RefineBlock(g[2],h[3])
 
-    # g[3]=Upsampling(g[3],scale=4)
+    g[3]=Upsampling(g[3],scale=4)
 
-    if upscaling_method.lower() == "conv":
-        net = ConvUpscaleBlock(net, 256, kernel_size=[3, 3], scale=2)
-        net = ConvBlock(net, 256)
-        net = ConvUpscaleBlock(net, 128, kernel_size=[3, 3], scale=2)
-        net = ConvBlock(net, 128)
-        net = ConvUpscaleBlock(net, 64, kernel_size=[3, 3], scale=2)
-        net = ConvBlock(net, 64)
-    elif upscaling_method.lower() == "bilinear":
-        net = Upsampling(net, label_size)
+    # if upscaling_method.lower() == "conv":
+    #     net = ConvUpscaleBlock(net, 256, kernel_size=[3, 3], scale=2)
+    #     net = ConvBlock(net, 256)
+    #     net = ConvUpscaleBlock(net, 128, kernel_size=[3, 3], scale=2)
+    #     net = ConvBlock(net, 128)
+    #     net = ConvUpscaleBlock(net, 64, kernel_size=[3, 3], scale=2)
+    #     net = ConvBlock(net, 64)
+    # elif upscaling_method.lower() == "bilinear":
+    #     net = Upsampling(net, label_size)
 
     net = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
 

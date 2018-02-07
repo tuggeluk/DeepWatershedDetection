@@ -7,7 +7,7 @@ import os
 import glob
 from random import shuffle, randint
 
-class seg_dataset_reader:
+class voc_seg_dataset_reader:
     path = ""
     class_mappings = ""
     files = []

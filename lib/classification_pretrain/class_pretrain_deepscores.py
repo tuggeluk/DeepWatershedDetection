@@ -159,7 +159,7 @@ if __name__ == '__main__':
     sess.run(tf.global_variables_initializer())
 
     # potentioally load weights
-    model_checkpoint_name = cfg.PRETRAINED_DIR +"/DeepScores/" + args.net + "_"  + ".ckpt"
+    model_checkpoint_name = cfg.PRETRAINED_DIR +"/DeepScores/resnet_v1" + args.net.split("res")[1] + ".ckpt"
     if args.weight:
         if args.continue_training or not args.is_training:
             print('Loaded latest model checkpoint')
