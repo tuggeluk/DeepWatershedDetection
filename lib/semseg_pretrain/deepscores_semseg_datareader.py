@@ -55,13 +55,14 @@ class ds_semseg_datareader:
             sys.exit(1)
 
         print("Splitting dataset, train: "+str(max_pages-test_size)+" images, test: "+str(test_size)+ " images")
-        test_image_list = images_list[0:test_size]
-        train_image_list = images_list[test_size:max_pages]
+        self.test_image_list = images_list[0:test_size]
+        self.train_image_list = images_list[test_size:max_pages]
 
         # test_annotation_list = [image_file.replace("/images_png/", "/pix_annotations_png/") for image_file in test_image_list]
         # train_annotation_list = [image_file.replace("/images_png/", "/pix_annotations_png/") for image_file in train_image_list]
 
-        self._read_images(test_image_list,train_image_list)
+        #do lazy loading
+        #self._read_images(test_image_list,train_image_list)
 
     def _read_images(self,test_image_list,train_image_list):
 
@@ -129,9 +130,10 @@ class ds_semseg_datareader:
         self.batch_offset = offset
 
     def get_test_records(self):
-        return self.test_images, self.test_annotations
+        images, annotations = self.load_batch(self.test_image_list)
+        return images, annotations
 
-    def next_batch(self, batch_size):
+    def next_batch_preloaded(self, batch_size):
         start = self.batch_offset
         self.batch_offset += batch_size
         if self.batch_offset > self.images.shape[0]:
@@ -150,11 +152,51 @@ class ds_semseg_datareader:
         end = self.batch_offset
         return self.images[start:end], self.annotations[start:end]
 
-    def get_random_batch(self, batch_size):
+    def get_random_batch_preloaded(self, batch_size):
         indexes = np.random.randint(0, self.images.shape[0], size=[batch_size]).tolist()
         return self.images[indexes], self.annotations[indexes]
 
+    def load_batch(self, img_names):
+        try:
+            images = []
+            annotations = []
+            dat_train = [self._transform(filename) for filename in img_names]
+            for dat in dat_train:
+                images.append(dat[0])
+                annotations.append(dat[1])
+            images = np.array(images)
+            images = np.expand_dims(images, -1)
 
+            annotations = np.array(annotations)
+            annotations = np.expand_dims(annotations, -1)
+            return images, annotations
+        except:
+            print("there was a problem when loading this batch")
+            print("Filename: "+ filename)
+            print("try and return the next batch")
+            return None, None
+
+
+    def next_batch(self, batch_size):
+        images = None
+        annotations = None
+
+        while images is None or annotations is None:
+            start = self.batch_offset
+            self.batch_offset += batch_size
+            if self.batch_offset > len(self.train_image_list):
+                # Finished epoch
+                self.epochs_completed += 1
+                print("****************** Epochs completed: " + str(self.epochs_completed) + "******************")
+                # Shuffle the data
+                shuffle(self.train_image_list)
+                # Start next epoch
+                start = 0
+                self.batch_offset = batch_size
+            end = self.batch_offset
+            images, annotations = self.load_batch(self.train_image_list[start:end])
+
+        return images, annotations
 
 if __name__ == "__main__":
-    data_reader = seg_dataset_reader("/Users/tugg/datasets/DeepScores")
+    data_reader = ds_semseg_datareader("/Users/tugg/datasets/DeepScores")

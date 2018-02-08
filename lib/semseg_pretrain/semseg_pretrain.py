@@ -35,6 +35,7 @@ def main(unused_argv):
         print("Unknown dataset")
         sys.exit(1)
 
+    #train_images, train_annotations = data_reader.next_batch(20)
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
