@@ -17,8 +17,11 @@ class voc_seg_dataset_reader:
     test_annotations = []
     batch_offset = 0
     epochs_completed = 0
+    # voc images mean
+    VOC_IMG_MEAN = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
 
-    def __init__(self, vocdevkit_path, max_pages=40, crop=True, crop_size=[1000,1000], test_size=20):
+
+    def __init__(self, vocdevkit_path, max_pages=40, crop=False, crop_size=[1000,1000], test_size=20, divisor_32= True):
         """
         Initialize a file reader for the DeepScores classification data
         :param records_list: path to the dataset
@@ -30,10 +33,12 @@ class voc_seg_dataset_reader:
         self.crop = crop
         self.crop_size = crop_size
         self.test_size = test_size
+        self.divisor_32 = divisor_32
 
         images_list = []
-        images_glob = os.path.join(self.path, "images_png", '*.' + 'png')
-        images_list.extend(glob.glob(images_glob))
+        with open(self.path + "/ImageSets/Segmentation/trainval.txt") as f:
+            images_list = f.read().splitlines()
+
 
         #shuffle image list
         shuffle(images_list)
@@ -67,10 +72,8 @@ class voc_seg_dataset_reader:
             self.images.append(dat[0])
             self.annotations.append(dat[1])
         self.images = np.array(self.images)
-        self.images = np.expand_dims(self.images, -1)
 
         self.annotations = np.array(self.annotations)
-        self.annotations = np.expand_dims(self.annotations, -1)
 
         print("Training set done")
         dat_test = [self._transform(filename) for filename in test_image_list]
@@ -78,17 +81,19 @@ class voc_seg_dataset_reader:
             self.test_images.append(dat[0])
             self.test_annotations.append(dat[1])
         self.test_images = np.array(self.test_images)
-        self.test_images = np.expand_dims(self.test_images, -1)
 
         self.test_annotations = np.array(self.test_annotations)
-        self.test_annotations = np.expand_dims(self.test_annotations, -1)
+
         print("Test set done")
 
+    # def translate_voc(self, a):
+    #     return [np.where(np.sum(self.colours_list == a, axis=1) == 3)[0][0]]
 
     def _transform(self, filename):
-        image = misc.imread(filename)
-        annotation = misc.imread(filename.replace("/images_png/", "/pix_annotations_png/"))
-        print("im working!" + str(randint(0,10)))
+        image = misc.imread(self.path+"/JPEGImages/"+filename+".jpg")
+        image = image - self.VOC_IMG_MEAN
+        annotation = misc.imread(self.path+"/SegmentationClass/pre_encoded/"+filename+".png")
+        annotation = np.expand_dims(annotation,-1)
         if not image.shape[0:2] == annotation.shape[0:2]:
             print("input and annotation have different sizes!")
             import sys
@@ -96,16 +101,22 @@ class voc_seg_dataset_reader:
             pdb.set_trace()
             sys.exit(1)
 
-        if image.shape[-1] != 1:
-            # take mean over color channels, image BW anyways --> fix in dataset creation
-            image = np.mean(image, -1)
-
         if self.crop:
             coord_0 = randint(0, (image.shape[0] - self.crop_size[0]))
             coord_1 = randint(0, (image.shape[1] - self.crop_size[1]))
 
             image = image[coord_0:(coord_0+self.crop_size[0]),coord_1:(coord_1+self.crop_size[1])]
             annotation = annotation[coord_0:(coord_0 + self.crop_size[0]), coord_1:(coord_1 + self.crop_size[1])]
+
+        if self.divisor_32:
+            # pad image such that 32 is a divisor of height and with
+            h = int(np.ceil(image.shape[0] / 32.0))
+            w = int(np.ceil(image.shape[1] / 32.0))
+            img_canv = np.zeros((h*32,w*32,image.shape[2]), dtype=image.dtype)
+            ann_canv = np.zeros((h * 32, w * 32, annotation.shape[2]), dtype=annotation.dtype)
+            img_canv[0:image.shape[0], 0:image.shape[1]] = image
+            ann_canv[0:image.shape[0], 0:image.shape[1]] = annotation
+            return[img_canv, ann_canv]
 
         return [image, annotation]
 
@@ -151,4 +162,4 @@ class voc_seg_dataset_reader:
 
 
 if __name__ == "__main__":
-    data_reader = seg_dataset_reader("/Users/tugg/datasets/DeepScores")
+    data_reader = voc_seg_dataset_reader("/Users/tugg/datasets/DeepScores")

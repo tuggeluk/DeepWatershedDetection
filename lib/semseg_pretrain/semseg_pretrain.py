@@ -11,8 +11,8 @@ import deepscores_semseg_datareader
 from main.config import cfg
 from models.RefineNet import build_refinenet
 
-# voc images mean
-VOC_IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
+
+
 
 
 def main(unused_argv):
@@ -25,10 +25,10 @@ def main(unused_argv):
         input = tf.placeholder(tf.float32, shape=[None, args.crop_size[0], args.crop_size[1], 1])
         substract_mean = False
     elif args.dataset == "VOC2012":
-        data_reader = pascalvoc_semseg_datareader.voc_seg_dataset_reader(cfg.DATA_DIR+"/VOCdevkit2012", VOC_IMG_MEAN)
+        data_reader = pascalvoc_semseg_datareader.voc_seg_dataset_reader(cfg.DATA_DIR+"/VOC2012")
         resnet_dir = cfg.PRETRAINED_DIR+"/ImageNet/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/VOC2012/"
-        num_classes = 12
+        num_classes = 21
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         substract_mean = True
     else:
@@ -72,8 +72,25 @@ def main(unused_argv):
     for itr in range(1,(args.iterations+1)):
 
         train_images, train_annotations = data_reader.next_batch(args.batch_size)
+        # VOC only works with batchsize 1
+        if args.dataset == "VOC2012":
+            train_images = np.expand_dims(train_images[0],0)
+            train_annotations = np.expand_dims(train_annotations[0],0)
+
+        # for i in range(0,train_images.shape[0]):
+        #     train_annotations[i] = np.eye(num_classes)[train_annotations[i][:,:,-1]]
+
         # convert annotation to one-hot enc
         train_annotations = np.eye(num_classes)[train_annotations[:,:,:,-1]]
+
+        # size test
+        # h = 400
+        # w = 500
+        # train_images = np.zeros((1,h,w,3))
+        # train_annotations = np.zeros((1,h,w,21))
+        # h and w has to be a multiple of 32!!
+        # gets taken care of by data loaders
+
         _,current = sess.run([opt,loss], feed_dict={input: train_images, output: train_annotations})
 
         print(itr)
