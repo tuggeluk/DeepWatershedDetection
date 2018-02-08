@@ -54,6 +54,7 @@ class voc_seg_dataset_reader:
 
         if test_size >= max_pages:
             print("Test set too big ("+str(test_size)+"), max_pages is: "+str(max_pages))
+            print(" At " + self.path)
             import sys
             sys.exit(1)
 
