@@ -25,7 +25,7 @@ class ds_semseg_datareader:
         :param records_list: path to the dataset
         sample record: {'image': f, 'annotation': annotation_file, 'filename': filename}
         """
-        print("Initializing DeepScores Classification Batch Dataset Reader...")
+        print("Initializing DeepScores segmentation Batch Dataset Reader...")
         self.path = deepscores_path
         self.max_pages = max_pages
         self.crop = crop
@@ -42,8 +42,7 @@ class ds_semseg_datareader:
 
         if max_pages is None:
             max_pages = len(images_list)
-            import sys
-            sys.exit(1)
+            print("max pages: "+str(max_pages))
 
         if max_pages > len(images_list):
             print("Not enough data, only " + str(len(images_list)) + " available")
