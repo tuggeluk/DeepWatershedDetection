@@ -93,7 +93,6 @@ def main(unused_argv):
 
         _,current = sess.run([opt,loss], feed_dict={input: train_images, output: train_annotations})
 
-        print(itr)
 
         if itr % 21 == 0:
             print("loss of current batch:"+str(current))
