@@ -51,7 +51,7 @@ def main(unused_argv):
     # Compute your (unweighted) softmax cross entropy loss
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=network, labels=output))
 
-    opt = tf.train.RMSPropOptimizer(learning_rate=0.001, decay=0.995).minimize(loss, var_list=[var for var in
+    opt = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=[var for var in
                                                                                                tf.trainable_variables()])
 
     saver = tf.train.Saver(max_to_keep=1000)
@@ -60,8 +60,10 @@ def main(unused_argv):
     # load classification weights or continue training from older checkpoint
     # If a pre-trained ResNet is required, load the weights. --> depends on path tiven to build_refinenet
     # This must be done AFTER the variables are initialized with sess.run(tf.global_variables_initializer())
+    print("loading resnet-weights")
     if init_fn is not None:
         init_fn(sess)
+
 
     # Load a previous checkpoint if desired
     model_checkpoint_name = refinenet_dir + args.model + ".ckpt"
@@ -69,6 +71,7 @@ def main(unused_argv):
         print('Loaded latest model checkpoint')
         saver.restore(sess, model_checkpoint_name)
 
+    print("start training")
     # Train for a fixed number of batches
     for itr in range(1,(args.iterations+1)):
 
@@ -93,7 +96,11 @@ def main(unused_argv):
         # gets taken care of by data loaders
 
         _,current = sess.run([opt,loss], feed_dict={input: train_images, output: train_annotations})
+        print(str(itr))
+        print(str(current))
 
+        if itr == 1:
+            print("initial loss" + str(current))
 
         if itr % 21 == 0:
             print("loss of current batch:"+str(current))
@@ -123,7 +130,7 @@ if __name__ == '__main__':
   parser.add_argument("--batch_size", type=int, default=1, help="batch size for training")
   parser.add_argument("--crop", type=bool, default=True, help="should images be cropped")
   parser.add_argument("--continue_training", type=bool, default=False, help="load checkpoint")
-  parser.add_argument("--crop_size", type=bytearray, default=[768,768], help="batch size for training")
+  parser.add_argument("--crop_size", type=bytearray, default=[320,320], help="batch size for training")
   parser.add_argument("--iterations", type=int, default=50000, help="path to logs directory")
   parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
   parser.add_argument("--dataset", type=str, default="DeepScores", help="DeepScores or VOC2012")
