@@ -19,7 +19,7 @@ class ds_semseg_datareader:
     batch_offset = 0
     epochs_completed = 0
 
-    def __init__(self, deepscores_path, max_pages=4, crop=True, crop_size=[1000,1000], test_size=2, scale=0.5):
+    def __init__(self, deepscores_path, max_pages=None, crop=True, crop_size=[1000,1000], test_size=200, scale=0.5):
         """
         Initialize a file reader for the DeepScores classification data
         :param records_list: path to the dataset
