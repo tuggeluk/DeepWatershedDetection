@@ -50,6 +50,7 @@ class voc_seg_dataset_reader:
 
         if max_pages > len(images_list):
             print("Not enough data, only " + str(len(images_list)) + " available")
+            print(" At " + self.path)
 
         if test_size >= max_pages:
             print("Test set too big ("+str(test_size)+"), max_pages is: "+str(max_pages))
