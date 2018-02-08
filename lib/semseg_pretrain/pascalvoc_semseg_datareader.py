@@ -21,7 +21,7 @@ class voc_seg_dataset_reader:
     VOC_IMG_MEAN = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
 
 
-    def __init__(self, vocdevkit_path, max_pages=1000, crop=False, crop_size=[1000,1000], test_size=20, divisor_32= True):
+    def __init__(self, vocdevkit_path, max_pages=None, crop=False, crop_size=[1000,1000], test_size=20, divisor_32= True):
         """
         Initialize a file reader for the DeepScores classification data
         :param records_list: path to the dataset

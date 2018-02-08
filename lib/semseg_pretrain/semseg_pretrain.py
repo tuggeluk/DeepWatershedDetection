@@ -130,7 +130,7 @@ if __name__ == '__main__':
   parser.add_argument("--batch_size", type=int, default=1, help="batch size for training")
   parser.add_argument("--crop", type=bool, default=True, help="should images be cropped")
   parser.add_argument("--continue_training", type=bool, default=False, help="load checkpoint")
-  parser.add_argument("--crop_size", type=bytearray, default=[320,320], help="batch size for training")
+  parser.add_argument("--crop_size", type=bytearray, default=[640,640], help="batch size for training")
   parser.add_argument("--iterations", type=int, default=50000, help="path to logs directory")
   parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
   parser.add_argument("--dataset", type=str, default="DeepScores", help="DeepScores or VOC2012")
