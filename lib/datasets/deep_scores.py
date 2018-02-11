@@ -34,7 +34,7 @@ class deep_scores(imdb):
     self._devkit_path = self._get_default_path() if devkit_path is None \
       else devkit_path
     self._data_path = os.path.join(self._devkit_path, 'segmentation_detection')
-
+    self._split_path = os.path.join(self._devkit_path, 'train_val_test')
     self._classes = list(pa.read_csv(self._devkit_path + "/DeepScores_classification/class_names.csv", header=None)[1])
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
@@ -56,6 +56,8 @@ class deep_scores(imdb):
       'VOCdevkit path does not exist: {}'.format(self._devkit_path)
     assert os.path.exists(self._data_path), \
       'Path does not exist: {}'.format(self._data_path)
+    assert os.path.exists(self._data_path), \
+      'Path does not exist: {}'.format(self._split_path)
 
   def image_path_at(self, i):
     """
@@ -85,21 +87,18 @@ class deep_scores(imdb):
 
     images = os.listdir(images_path)
 
-    if cfg.DEEPSCORES.MAX_IMAGES is not None:
-        images = images[0:cfg.DEEPSCORES.MAX_IMAGES]
+    #read according file
+    with open(self._split_path+"/"+self._image_set+".txt") as f:
+      allowed_names = f.readlines()
 
-    # make train or val set
-    # keep consistent do not temper with seed set from outside --> use own prg
-    prg = random.Random(cfg.DEEPSCORES.SPLIT_SEED)
-    prg.shuffle(images)
+    allowed_names = [x.strip() for x in allowed_names]
 
-    if self._image_set == 'train':
-      images = images[int(len(images)*cfg.DEEPSCORES.VAL_PERCENTAGE):len(images)]
-    else:
-      images = images[0:int(len(images) * cfg.DEEPSCORES.VAL_PERCENTAGE)]
+    # strip extension
+    images = [x[:-4] for x in images]
 
-    #images = images[0:200]
-    image_index = [x[:-4] for x in images]
+    # intersection of existing and allowed files
+    image_index = list(set(allowed_names).intersection(images))
+
     return image_index
 
   def _get_default_path(self):

@@ -1,7 +1,6 @@
 # pretrain fully-conv networks on semantic segmentation tasks
 # training-code adapted from https://github.com/DrSleep/tensorflow-deeplab-resnet
 
-import os
 import tensorflow as tf
 import numpy as np
 import argparse
