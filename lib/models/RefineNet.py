@@ -162,7 +162,7 @@ def RefineBlock(high_inputs=None,low_inputs=None):
 
 
 
-def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True):
+def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True):
     """
     Builds the RefineNet model. 
 
@@ -224,9 +224,11 @@ def build_refinenet(inputs, num_classes, preset_model='RefineNet-Res101', weight
     # elif upscaling_method.lower() == "bilinear":
     #     net = Upsampling(net, label_size)
 
-    net = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
-
-    return net, init_fn
+    if num_classes is not None:
+        net = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
+        return net, init_fn
+    else:
+        return g, init_fn
 
 
 def mean_image_subtraction(inputs, means=[123.68, 116.78, 103.94]):
