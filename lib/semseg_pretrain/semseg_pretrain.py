@@ -95,8 +95,6 @@ def main(unused_argv):
         # gets taken care of by data loaders
 
         _,current = sess.run([opt,loss], feed_dict={input: train_images, output: train_annotations})
-        print(str(itr))
-        print(str(current))
 
         if itr == 1:
             print("initial loss" + str(current))

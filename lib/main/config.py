@@ -72,12 +72,6 @@ __C.TRAIN.CROP = True
 # Rescale before crop by this Factor
 __C.TRAIN.CROP_SCALE = 0.5
 
-# Images to use per minibatch
-__C.TRAIN.IMS_PER_BATCH = 1
-
-# Minibatch size (number of regions of interest [ROIs])
-__C.TRAIN.BATCH_SIZE = 128
-
 # Overlap threshold for a ROI to be considered foreground (if >= FG_THRESH)
 __C.TRAIN.FG_THRESH = 0.5
 
@@ -179,7 +173,7 @@ __C.DATA_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'data'))
 __C.PRETRAINED_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'pretrained'))
 
 # Place outputs under an experiments directory
-__C.EXP_DIR = 'default'
+__C.EXP_DIR = 'experiments'
 
 # Use GPU implementation of non-maximum suppression
 __C.USE_GPU_NMS = True

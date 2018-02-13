@@ -7,10 +7,11 @@
 from PIL import Image, ImageDraw
 import numpy as np
 
+marker_size = [4,4]
 
 def objectness_energy(data, gt_boxes):
     objectness = np.zeros(data[0].shape[0:2], dtype=np.int16)-10
-    mark = objectness_marker(4, 4, func_nothing)
+    mark = objectness_marker(marker_size[0], marker_size[1], func_nothing)
 
     for row in gt_boxes:
         center_1 = np.round((row[2]-row[0])/2 + row[0])
@@ -20,6 +21,37 @@ def objectness_energy(data, gt_boxes):
         int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
 
     return objectness
+
+
+def fcn_class_labels(data, gt_boxes):
+    fcn_class = np.zeros(data[0].shape[0:2], dtype=np.int16)
+    for row in gt_boxes:
+        center_1 = np.round((row[2]-row[0])/2 + row[0])
+        center_0 = np.round((row[3] - row[1]) / 2 + row[1])
+
+        mark = np.ones((marker_size[0]*2+1, marker_size[1]*2+1))*row[4]
+
+        fcn_class[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
+        int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
+
+    return fcn_class
+
+
+def fcn_bbox_labels(data, gt_boxes):
+    fcn_bbox = np.zeros(data[0].shape[0:2]+(2,), dtype=np.int16)
+    for row in gt_boxes:
+        center_1 = np.round((row[2]-row[0])/2 + row[0])
+        center_0 = np.round((row[3] - row[1]) / 2 + row[1])
+
+        mark = np.ones((marker_size[0]*2+1, marker_size[1]*2+1,2))
+        mark[:, :, 0]*(row[2]-row[0])
+        mark[:, :, 1]*(row[3] - row[1])
+
+        fcn_bbox[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
+        int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
+    return fcn_bbox
+
+
 
 def objectness_energy_high_dym(data, gt_boxes, num_classes):
     objectness = np.zeros([data[0].shape[0],data[0].shape[1],num_classes], dtype=np.int16) - 10

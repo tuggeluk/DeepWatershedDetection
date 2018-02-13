@@ -61,28 +61,28 @@ class RoIDataLayer(object):
       
     self._cur = 0
 
-  def _get_next_minibatch_inds(self):
+  def _get_next_minibatch_inds(self,batch_size):
     """Return the roidb indices for the next minibatch."""
     
-    if self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
+    if self._cur + batch_size >= len(self._roidb):
       self._shuffle_roidb_inds()
 
-    db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.IMS_PER_BATCH]
-    self._cur += cfg.TRAIN.IMS_PER_BATCH
+    db_inds = self._perm[self._cur:self._cur + batch_size]
+    self._cur += batch_size
 
     return db_inds
 
-  def _get_next_minibatch(self):
+  def _get_next_minibatch(self, batch_size):
     """Return the blobs to be used for the next minibatch.
 
     If cfg.TRAIN.USE_PREFETCH is True, then blobs will be computed in a
     separate process and made available through self._blob_queue.
     """
-    db_inds = self._get_next_minibatch_inds()
+    db_inds = self._get_next_minibatch_inds(batch_size)
     minibatch_db = [self._roidb[i] for i in db_inds]
-    return get_minibatch(minibatch_db, self._num_classes)
+    return get_minibatch(minibatch_db, self._num_classes, batch_size)
       
-  def forward(self):
+  def forward(self, batch_size):
     """Get blobs and copy them into this layer's top blob vector."""
-    blobs = self._get_next_minibatch()
+    blobs = self._get_next_minibatch(batch_size)
     return blobs
