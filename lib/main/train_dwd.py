@@ -59,7 +59,7 @@ def main(unused_argv):
     num_classes = len(imdb._classes)
 
     if "DeepScores" in args.dataset:
-        input = tf.placeholder(tf.float32, shape=[None, None, None , 1])
+        input = tf.placeholder(tf.float32, shape=[None, args.crop_size[0], args.crop_size[1] , 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
 
@@ -107,11 +107,11 @@ def main(unused_argv):
         opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=[var for var in
                                                                                                    tf.trainable_variables()])
 
-        opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=[var for var in
-                                                                                                   tf.trainable_variables()])
-
-        tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=[var for var in
-                                                                                                   tf.trainable_variables()])
+        # opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=[var for var in
+        #                                                                                            tf.trainable_variables()])
+        #
+        # tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=[var for var in
+        #                                                                                            tf.trainable_variables()])
 
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
@@ -166,14 +166,14 @@ def main(unused_argv):
                                                                        label_bbox: blob["bbox_fcn"],
                                                                        label_orig: blob["gt_boxes"] })
 
-            if itr % 7 == 0:
-                _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
-                    [tot_loss, energy_loss, class_loss, box_loss],
-                    feed_dict={input: blob["data"],
-                               label_dws_energy: blob["dws_energy"],
-                               label_class: blob["class_map"],
-                               label_bbox: blob["bbox_fcn"],
-                               label_orig: blob["gt_boxes"]})
+            # if itr % 7 == 0:
+            #     _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
+            #         [tot_loss, energy_loss, class_loss, box_loss],
+            #         feed_dict={input: blob["data"],
+            #                    label_dws_energy: blob["dws_energy"],
+            #                    label_class: blob["class_map"],
+            #                    label_bbox: blob["bbox_fcn"],
+            #                    label_orig: blob["gt_boxes"]})
 
             if itr == 1:
                 print("initial losses:")
