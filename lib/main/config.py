@@ -64,7 +64,7 @@ __C.TRAIN.SUMMARY_INTERVAL = 180
 __C.TRAIN.SCALES = (600,)
 
 # Max pixel size of the longest side of a scaled input image
-__C.TRAIN.MAX_SIZE = 1000
+__C.TRAIN.MAX_SIZE = 640
 
 # Instead of rescaling - Crop out a MAX_SIZExMAX_SIZE Portion out of the image
 __C.TRAIN.CROP = True

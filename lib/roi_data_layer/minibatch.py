@@ -71,7 +71,7 @@ def get_minibatch(roidb, num_classes, batch_size):
     blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
 
 
-  blobs['gt_boxes'] = gt_boxes
+  blobs['gt_boxes'] = np.expand_dims(gt_boxes,0)
   blobs['im_info'] = np.array(
     [[im_blob.shape[1], im_blob.shape[2], im_scales[0]]],
     dtype=np.float32)

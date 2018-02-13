@@ -49,7 +49,7 @@ def main(unused_argv):
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
-
+    data_layer.forward(1)
     # tensorflow session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -75,7 +75,7 @@ def main(unused_argv):
     label_bbox = tf.placeholder(tf.float32, shape=[None, None, None, 2])
 
     # original bbox label
-    label_orig = tf.placeholder(tf.float32, shape=[None, None, None, 2])
+    label_orig = tf.placeholder(tf.float32, shape=[None, None, 5])
 
     print("Initializing Model:" + args.model)
     g, init_fn = build_refinenet(input, preset_model = args.model, num_classes=None, pretrained_dir=resnet_dir, substract_mean=False)
@@ -152,27 +152,40 @@ def main(unused_argv):
             # img.show()
             # img_gt = Image.fromarray((blob["gt_fcn"]+10).astype(np.uint8)*10)
             # img_gt.show()
+            if "DeepScores" in args.dataset:
+                blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
+                #one-hot class labels
+                blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+
 
             # train step
-            _, energy_loss, class_loss, box_loss = sess.run([opt_energy, energy_loss,class_loss,box_loss],
+            _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run([opt_energy, energy_loss,class_loss,box_loss],
                                                             feed_dict={input: blob["data"],
                                                                        label_dws_energy: blob["dws_energy"],
                                                                        label_class: blob["class_map"],
                                                                        label_bbox: blob["bbox_fcn"],
                                                                        label_orig: blob["gt_boxes"] })
 
+            if itr % 7 == 0:
+                _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
+                    [tot_loss, energy_loss, class_loss, box_loss],
+                    feed_dict={input: blob["data"],
+                               label_dws_energy: blob["dws_energy"],
+                               label_class: blob["class_map"],
+                               label_bbox: blob["bbox_fcn"],
+                               label_orig: blob["gt_boxes"]})
 
             if itr == 1:
                 print("initial losses:")
-                print("energy_loss: " + str(energy_loss))
-                print("class_loss: " + str(class_loss))
-                print("box_loss: " + str(box_loss))
+                print("energy_loss: " + str(energy_loss_fetch))
+                print("class_loss: " + str(class_loss_fetch))
+                print("box_loss: " + str(box_loss_fetch))
 
             if itr % 21 == 0:
                 print("loss at itr: " + str(itr))
-                print("energy_loss: " + str(energy_loss))
-                print("class_loss: " + str(class_loss))
-                print("box_loss: " + str(box_loss))
+                print("energy_loss: " + str(energy_loss_fetch))
+                print("class_loss: " + str(class_loss_fetch))
+                print("box_loss: " + str(box_loss_fetch))
 
             if itr % 2001 == 0:
                 print("saving weights")

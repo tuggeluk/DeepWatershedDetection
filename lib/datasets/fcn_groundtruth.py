@@ -20,7 +20,7 @@ def objectness_energy(data, gt_boxes):
         objectness[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
         int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
 
-    return objectness
+    return np.expand_dims(np.expand_dims(objectness,-1),0)
 
 
 def fcn_class_labels(data, gt_boxes):
@@ -34,7 +34,8 @@ def fcn_class_labels(data, gt_boxes):
         fcn_class[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
         int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
 
-    return fcn_class
+    return np.expand_dims(np.expand_dims(fcn_class,-1),0)
+
 
 
 def fcn_bbox_labels(data, gt_boxes):
@@ -49,7 +50,8 @@ def fcn_bbox_labels(data, gt_boxes):
 
         fcn_bbox[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
         int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
-    return fcn_bbox
+    return np.expand_dims(fcn_bbox,0)
+
 
 
 
