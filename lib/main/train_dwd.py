@@ -83,7 +83,7 @@ def main(unused_argv):
 
     print("Using loss: " + args.loss)
     with tf.variable_scope('deep_watershed'):
-        dws_energy = slim.conv2d(g[3], 1, [1, 1], activation_fn=tf.nn.relu, scope='dws_energy')
+        dws_energy = slim.conv2d(g[3], 1, [1, 1], activation_fn=None, scope='dws_energy')
         energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
 
         dws_mask = tf.squeeze(label_dws_energy >= 0,-1)
@@ -94,7 +94,7 @@ def main(unused_argv):
         class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
 
 
-        bbox_size = slim.conv2d(g[3], 2, [1, 1], activation_fn=tf.nn.relu, scope='dws_size')
+        bbox_size = slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='dws_size')
         bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
         class_masked_labels =  tf.boolean_mask(label_bbox,dws_mask)
         box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
@@ -116,10 +116,11 @@ def main(unused_argv):
     sess.run(tf.global_variables_initializer())
 
     # set up saver path
-    model_checkpoint_name = cfg.EXP_DIR + "/" + args.dataset+ "/" + args.model
+    checkpoint_dir = cfg.EXP_DIR + "/" + args.dataset
+    checkpoint_name =  args.model
     if args.continue_training or not args.is_training:
         print("Loading checkpoint")
-        saver.restore(sess, model_checkpoint_name)
+        saver.restore(sess, checkpoint_dir + "/" + checkpoint_name)
     else:
         if args.pretrain_lvl == "semseg":
             #load all variables except the ones in scope "deep_watershed"
@@ -188,7 +189,9 @@ def main(unused_argv):
 
             if itr % 2001 == 0:
                 print("saving weights")
-                saver.save(sess, model_checkpoint_name)
+                if not os.path.exists(checkpoint_dir):
+                    os.makedirs(checkpoint_dir)
+                saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
 
     else:
