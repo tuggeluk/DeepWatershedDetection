@@ -165,7 +165,6 @@ def main(unused_argv):
                                                                        label_bbox: blob["bbox_fcn"],
                                                                        label_orig: blob["gt_boxes"] })
 
-            print(itr)
             if itr % 7 == 0:
                 _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
                     [tot_loss, energy_loss, class_loss, box_loss],
