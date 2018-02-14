@@ -60,8 +60,8 @@ def fcn_bbox_labels(data, gt_boxes):
 
 
 def sanatize_coords(canvas_shape, coords):
-    print("asdf")
-    if coords[0] < 0 or coords[1] < 0 or coords[2] < canvas_shape[0] or coords[3] < canvas_shape[1]:
+
+    if coords[0] < 0 or coords[1] < 0 or coords[2] > canvas_shape[0] or coords[3] > canvas_shape[1]:
         print("skipping marker, coords: " + str(coords) + " img_shape: "+ str(canvas_shape))
         return False
     else:
