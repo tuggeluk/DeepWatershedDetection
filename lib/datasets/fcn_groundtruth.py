@@ -51,8 +51,8 @@ def fcn_bbox_labels(data, gt_boxes):
         center_0 = np.round((row[3] - row[1]) / 2 + row[1])
 
         mark = np.ones((marker_size[0]*2+1, marker_size[1]*2+1,2))
-        mark[:, :, 0]*(row[2]-row[0])
-        mark[:, :, 1]*(row[3] - row[1])
+        mark[:, :, 0] = mark[:, :, 0]*(row[2]-row[0])
+        mark[:, :, 1] = mark[:, :, 1]*(row[3] - row[1])
 
         coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
 

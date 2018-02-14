@@ -32,12 +32,29 @@ def perform_dws(dws_energy, class_map, bbox_map, min_size=6):
         if len(labels_inv[key]) < min_size:
             del labels_inv[key]
 
-    # add additional dict structure to each component
+
+    for key in labels_inv.keys():
+        # add additional dict structure to each component and convert to numpy array
+        labels_inv[key] = dict(pixel_coords=np.asanyarray(labels_inv[key]))
+        # use average over all pixel coordinates
+        labels_inv[key]["center"] = np.average(labels_inv[key]["pixel_coords"],0).astype(int)
+        # mayority vote for class --> transposed
+        labels_inv[key]["class"] = np.bincount(class_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]).argmax()
+        # average for box size --> transposed
+        labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
+
+        # produce bbox element, append to list
+        bbox = []
+        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][0]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][1]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][0]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][1]/2.0), 0)))
+        bbox.append(int(labels_inv[key]["class"]))
+        bbox_list.append(bbox)
 
     return bbox_list
 
-def get_center(component):
-    return None
+
 
 def get_class(component,class_map):
     return None

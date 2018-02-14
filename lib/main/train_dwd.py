@@ -53,7 +53,7 @@ def main(unused_argv):
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
     data = data_layer.forward(1)
-    perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
+    dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
 
     # tensorflow session
     config = tf.ConfigProto()
