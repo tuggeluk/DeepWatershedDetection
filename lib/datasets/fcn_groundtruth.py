@@ -17,8 +17,10 @@ def objectness_energy(data, gt_boxes):
         center_1 = np.round((row[2]-row[0])/2 + row[0])
         center_0 = np.round((row[3] - row[1]) / 2 + row[1])
 
-        objectness[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
-        int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
+        coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
+
+        if sanatize_coords(objectness.shape, coords):
+            objectness[coords[0]:coords[1],coords[2]:coords[3]] = mark
 
     return np.expand_dims(np.expand_dims(objectness,-1),0)
 
@@ -31,8 +33,10 @@ def fcn_class_labels(data, gt_boxes):
 
         mark = np.ones((marker_size[0]*2+1, marker_size[1]*2+1))*row[4]
 
-        fcn_class[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
-        int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
+        coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
+
+        if sanatize_coords(fcn_class.shape, coords):
+            fcn_class[coords[0]:coords[1],coords[2]:coords[3]] = mark
 
     return np.expand_dims(np.expand_dims(fcn_class,-1),0)
 
@@ -48,9 +52,20 @@ def fcn_bbox_labels(data, gt_boxes):
         mark[:, :, 0]*(row[2]-row[0])
         mark[:, :, 1]*(row[3] - row[1])
 
-        fcn_bbox[int(center_0-mark.shape[0]/2):int(center_0+mark.shape[0]/2+1),
-        int(center_1 - mark.shape[1] / 2):int(center_1 + mark.shape[1] / 2)+1] = mark
+        coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
+
+        if sanatize_coords(fcn_bbox.shape, coords):
+            fcn_bbox[coords[0]:coords[1],coords[2]:coords[3]] = mark
     return np.expand_dims(fcn_bbox,0)
+
+
+def sanatize_coords(canvas_shape, coords):
+    print("asdf")
+    if coords[0] < 0 or coords[1] < 0 or coords[2] < canvas_shape[0] or coords[3] < canvas_shape[1]:
+        print("skipping marker, coords: " + coords + " img_shape: "+ canvas_shape)
+        return False
+    else:
+        return True
 
 
 
