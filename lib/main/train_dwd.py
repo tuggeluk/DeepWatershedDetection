@@ -9,6 +9,7 @@ from models.RefineNet import build_refinenet
 from datasets.factory import get_imdb
 from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 from tensorflow.contrib import slim
+from main.dws_transform import perform_dws
 
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
@@ -47,10 +48,13 @@ def main(unused_argv):
 
 
     data_layer = RoIDataLayer(roidb, imdb.num_classes)
+
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
-    data_layer.forward(1)
+    data = data_layer.forward(1)
+    perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
+
     # tensorflow session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True

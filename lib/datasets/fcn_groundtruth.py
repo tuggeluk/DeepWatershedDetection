@@ -6,6 +6,7 @@
 
 from PIL import Image, ImageDraw
 import numpy as np
+import random
 
 marker_size = [4,4]
 
@@ -22,6 +23,7 @@ def objectness_energy(data, gt_boxes):
         if sanatize_coords(objectness.shape, coords):
             objectness[coords[0]:coords[1],coords[2]:coords[3]] = mark
 
+    #debug_energy_maps(data,gt_boxes,objectness)
     return np.expand_dims(np.expand_dims(objectness,-1),0)
 
 
@@ -91,6 +93,39 @@ def func_nothing(grid):
 
 def func_square(grid):
     return np.square(grid)
+
+def debug_energy_maps(data, gt_boxes, orig_object):
+    orig_object = orig_object+10
+    im = Image.fromarray(orig_object.astype("uint8"))
+    im.save("/Users/tugg/cclabel/test_orig.png")
+
+    objectness = np.zeros(data[0].shape[0:2], dtype=np.int16)-10
+    mark = objectness_marker(marker_size[0], marker_size[1], func_nothing)
+    mark1 = objectness_marker(marker_size[0]+2, marker_size[1]+2, func_nothing)
+    mark2 = objectness_marker(marker_size[0]+4, marker_size[1]+4, func_nothing)
+
+    marks = [mark, mark1, mark2]
+
+    for row in gt_boxes:
+        center_1 = np.round((row[2]-row[0])/2 + row[0])
+        center_0 = np.round((row[3] - row[1]) / 2 + row[1])
+
+        mark = random.choice(marks)
+
+        coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
+
+        if sanatize_coords(objectness.shape, coords):
+            objectness[coords[0]:coords[1],coords[2]:coords[3]] = mark
+
+    objectness = objectness+10
+    im = Image.fromarray(objectness.astype("uint8"))
+    im.save("/Users/tugg/cclabel/test_diff.png")
+
+    obj_binary = (objectness < 1)*255
+    im = Image.fromarray(obj_binary.astype("uint8"))
+    im = im.convert("1")
+    im.save("/Users/tugg/cclabel/test_diff_bin.png")
+    return None
 
 
 def objectness_marker(sx=3,sy=3,fnc=func_nothing):
