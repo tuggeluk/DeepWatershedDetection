@@ -7,11 +7,12 @@ import sys
 from main.config import cfg
 from models.RefineNet import build_refinenet
 from datasets.factory import get_imdb
-
+from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 from tensorflow.contrib import slim
 
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
+
 
 # Training regime
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
@@ -90,7 +91,7 @@ def main(unused_argv):
         class_logits = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
         class_masked_logits = tf.boolean_mask(class_logits,dws_mask)
         class_masked_labels =  tf.boolean_mask(label_class,dws_mask)
-        class_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(logits=class_masked_logits, onehot_labels=class_masked_labels))
+        class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
 
 
         bbox_size = slim.conv2d(g[3], 2, [1, 1], activation_fn=tf.nn.relu, scope='dws_size')
@@ -104,14 +105,12 @@ def main(unused_argv):
 
 
         print("Init optimizers")
-        opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=[var for var in
-                                                                                                   tf.trainable_variables()])
+        var_list = [var for var in tf.trainable_variables()]
+        opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list)
 
-        # opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=[var for var in
-        #                                                                                            tf.trainable_variables()])
-        #
-        # tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=[var for var in
-        #                                                                                            tf.trainable_variables()])
+        opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list)
+
+        tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list)
 
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
@@ -166,14 +165,15 @@ def main(unused_argv):
                                                                        label_bbox: blob["bbox_fcn"],
                                                                        label_orig: blob["gt_boxes"] })
 
-            # if itr % 7 == 0:
-            #     _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
-            #         [tot_loss, energy_loss, class_loss, box_loss],
-            #         feed_dict={input: blob["data"],
-            #                    label_dws_energy: blob["dws_energy"],
-            #                    label_class: blob["class_map"],
-            #                    label_bbox: blob["bbox_fcn"],
-            #                    label_orig: blob["gt_boxes"]})
+            print(itr)
+            if itr % 7 == 0:
+                _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
+                    [tot_loss, energy_loss, class_loss, box_loss],
+                    feed_dict={input: blob["data"],
+                               label_dws_energy: blob["dws_energy"],
+                               label_class: blob["class_map"],
+                               label_bbox: blob["bbox_fcn"],
+                               label_orig: blob["gt_boxes"]})
 
             if itr == 1:
                 print("initial losses:")
