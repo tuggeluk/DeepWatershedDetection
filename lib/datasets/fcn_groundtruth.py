@@ -65,6 +65,7 @@ def sanatize_coords(canvas_shape, coords):
         print("skipping marker, coords: " + str(coords) + " img_shape: "+ str(canvas_shape))
         return False
     else:
+        print("ok marker, coords: " + str(coords) + " img_shape: " + str(canvas_shape))
         return True
 
 
