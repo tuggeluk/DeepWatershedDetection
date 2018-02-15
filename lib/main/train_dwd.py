@@ -5,12 +5,13 @@ import numpy as np
 import argparse
 import sys
 from main.config import cfg
-from models.RefineNet import build_refinenet
+
+from models.dwd_net import build_dwd_net
+
 from datasets.factory import get_imdb
-from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 from tensorflow.contrib import slim
 from main.dws_transform import perform_dws
-
+from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
 
@@ -85,37 +86,33 @@ def main(unused_argv):
     label_orig = tf.placeholder(tf.float32, shape=[None, None, 5])
 
     print("Initializing Model:" + args.model)
-    g, init_fn = build_refinenet(input, preset_model = args.model, num_classes=None, pretrained_dir=resnet_dir, substract_mean=False)
+    [dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(
+        input, model=args.model,num_classes=num_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
-    print("Using loss: " + args.loss)
     with tf.variable_scope('deep_watershed'):
-        dws_energy = slim.conv2d(g[3], 1, [1, 1], activation_fn=None, scope='dws_energy')
-        energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
-
-        dws_mask = tf.squeeze(label_dws_energy >= 0,-1)
-
-        class_logits = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
-        class_masked_logits = tf.boolean_mask(class_logits,dws_mask)
-        class_masked_labels =  tf.boolean_mask(label_class,dws_mask)
-        class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
-
-
-        bbox_size = slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='dws_size')
-        bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
-        class_masked_labels =  tf.boolean_mask(label_bbox,dws_mask)
-        box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
-
-        ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
-        tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
-
         if args.is_training:
+            print("Using loss: " + args.loss)
+            energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
+
+            dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
+
+            class_masked_logits = tf.boolean_mask(class_logits, dws_mask)
+            class_masked_labels = tf.boolean_mask(label_class, dws_mask)
+            class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
+
+            bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
+            class_masked_labels = tf.boolean_mask(label_bbox, dws_mask)
+            box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
+
+            ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
+            tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
+
+
             print("Init optimizers")
             var_list = [var for var in tf.trainable_variables()]
             opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
-
             opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
-
-            tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
+            opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
 
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
@@ -173,7 +170,7 @@ def main(unused_argv):
 
 
             _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
-                [tot_loss, energy_loss, class_loss, box_loss],
+                [opt_tot, energy_loss, class_loss, box_loss],
                 feed_dict={input: blob["data"],
                            label_dws_energy: blob["dws_energy"],
                            label_class: blob["class_map"],
@@ -259,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--loss", type=str, default="cross_ent", help="Used loss - cross_ent, regression, bbox")
-    parser.add_argument("--is_training", type=bool, default=False, help="Train or Test mode")
+    parser.add_argument("--is_training", type=bool, default=True, help="Train or Test mode")
     parser.add_argument("--loss_mode", type=str, default="low-dim", help="low-dim or high dim")
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
     args, unparsed = parser.parse_known_args()
