@@ -67,11 +67,13 @@ def main(unused_argv):
         input = tf.placeholder(tf.float32, shape=[None, args.crop_size[0], args.crop_size[1] , 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
+        image_mode = "music"
 
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         resnet_dir = cfg.PRETRAINED_DIR+"/ImageNet/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/VOC2012/"
+        image_mode = "realistic"
 
     # label placeholders
     # dws_labels
@@ -103,24 +105,23 @@ def main(unused_argv):
         class_masked_labels =  tf.boolean_mask(label_bbox,dws_mask)
         box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
 
-
         ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
         tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
 
+        if args.is_training:
+            print("Init optimizers")
+            var_list = [var for var in tf.trainable_variables()]
+            opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
 
-        print("Init optimizers")
-        var_list = [var for var in tf.trainable_variables()]
-        opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
+            opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
 
-        opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
-
-        tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
+            tot_loss = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
 
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
 
     # set up saver path
-    checkpoint_dir = cfg.EXP_DIR + "/" + args.dataset
+    checkpoint_dir = cfg.EXP_DIR + "/" + image_mode
     checkpoint_name =  args.model
     if args.continue_training or not args.is_training:
         print("Loading checkpoint")
@@ -200,7 +201,30 @@ def main(unused_argv):
 
     else:
         print("Start testing")
+        # compute average over whole testset
+        for i in range(len(roidb)):
+            blob = data_layer.forward(1)
 
+
+            if "DeepScores" in args.dataset:
+                blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
+                #one-hot class labels
+                blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+
+            # forward pass only
+            pred_energy,pred_class_logits,pred_bbox,energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run([dws_energy, class_logits, bbox_size, energy_loss, class_loss, box_loss],
+                feed_dict={input: blob["data"],
+                           label_dws_energy: blob["dws_energy"],
+                           label_class: blob["class_map"],
+                           label_bbox: blob["bbox_fcn"],
+                           label_orig: blob["gt_boxes"]})
+            pred_class = np.argmax(pred_class_logits,axis=3)
+
+            dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
+            # dws_list, img = perform_dws(pred_energy, pred_class, pred_bbox, return_ccomp_img=True)
+            # from PIL import Image
+            # img = Image.fromarray(np.squeeze(blob["data"]).astype(np.uint8))
+            # img.show()
 
 
 
@@ -235,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--loss", type=str, default="cross_ent", help="Used loss - cross_ent, regression, bbox")
-    parser.add_argument("--is_training", type=bool, default=True, help="Train or validation mode")
+    parser.add_argument("--is_training", type=bool, default=False, help="Train or Test mode")
     parser.add_argument("--loss_mode", type=str, default="low-dim", help="low-dim or high dim")
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
     args, unparsed = parser.parse_known_args()

@@ -6,7 +6,7 @@ from itertools import product
 from utils.ufarray import *
 import numpy as np
 
-def perform_dws(dws_energy, class_map, bbox_map, min_size=6):
+def perform_dws(dws_energy, class_map, bbox_map, min_size=6, return_ccomp_img = False):
     bbox_list = []
 
     dws_energy = np.squeeze(dws_energy)
@@ -52,6 +52,8 @@ def perform_dws(dws_energy, class_map, bbox_map, min_size=6):
         bbox.append(int(labels_inv[key]["class"]))
         bbox_list.append(bbox)
 
+    if return_ccomp_img:
+        return bbox_list, out_img
     return bbox_list
 
 
