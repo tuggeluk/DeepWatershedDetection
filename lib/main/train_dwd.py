@@ -53,7 +53,7 @@ def main(unused_argv):
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
-    # data = data_layer.forward(1)
+    data = data_layer.forward(1)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
 
     # tensorflow session
@@ -65,7 +65,7 @@ def main(unused_argv):
     num_classes = len(imdb._classes)
 
     if "DeepScores" in args.dataset:
-        input = tf.placeholder(tf.float32, shape=[None, args.crop_size[0], args.crop_size[1] , 1])
+        input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
         image_mode = "music"
