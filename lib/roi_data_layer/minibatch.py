@@ -69,12 +69,13 @@ def get_minibatch(roidb, num_classes, batch_size):
         blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
         blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
 
-    print("crop bboxes - remove if necessary")
     # gt_boxes = gt_boxes[bad_coords == False]
     # crop boxes
     gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
     # remove nones
     gt_boxes = [x for x in gt_boxes if x is not None]
+
+    len(gt_boxes)
 
     blobs['gt_boxes'] = np.expand_dims(gt_boxes, 0)
     blobs['im_info'] = np.array(
