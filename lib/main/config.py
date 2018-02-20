@@ -67,7 +67,7 @@ __C.TRAIN.SCALES = (600,)
 __C.TRAIN.MAX_SIZE = 640
 
 # Instead of rescaling - Crop out a MAX_SIZExMAX_SIZE Portion out of the image
-__C.TRAIN.CROP = True
+__C.TRAIN.CROP = False
 
 # Rescale before crop by this Factor
 __C.TRAIN.CROP_SCALE = 0.5

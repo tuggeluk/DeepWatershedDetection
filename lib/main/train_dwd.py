@@ -53,10 +53,10 @@ def main(unused_argv):
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
-    # batch_not_loaded = True
-    # while batch_not_loaded:
-    #     data = data_layer.forward(1)
-    #     batch_not_loaded = len(data["gt_boxes"].shape) != 3
+    batch_not_loaded = True
+    while batch_not_loaded:
+        data = data_layer.forward(1)
+        batch_not_loaded = len(data["gt_boxes"].shape) != 3
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
 
     # tensorflow session
@@ -163,6 +163,10 @@ def main(unused_argv):
             # img_gt.show()
             if "DeepScores" in args.dataset:
                 blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
+                #one-hot class labels
+                blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+
+            if "voc" in args.dataset:
                 #one-hot class labels
                 blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
 
