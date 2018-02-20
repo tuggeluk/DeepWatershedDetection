@@ -53,7 +53,10 @@ def main(unused_argv):
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
-    data = data_layer.forward(1)
+    # batch_not_loaded = True
+    # while batch_not_loaded:
+    #     data = data_layer.forward(1)
+    #     batch_not_loaded = len(data["gt_boxes"].shape) != 3
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
 
     # tensorflow session
@@ -146,8 +149,12 @@ def main(unused_argv):
         print("Start training")
         for itr in range(1, (args.iterations + 1)):
 
-            # load batch
-            blob = data_layer.forward(args.batch_size)
+            # load batch - only use batches with content
+            batch_not_loaded = True
+            while batch_not_loaded:
+                blob = data_layer.forward(1)
+                batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+
 
             # from PIL import Image
             # img = Image.fromarray(blob["data"].astype(np.uint8)[0])
