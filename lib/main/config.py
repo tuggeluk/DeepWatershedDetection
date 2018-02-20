@@ -67,10 +67,13 @@ __C.TRAIN.SCALES = (600,)
 __C.TRAIN.MAX_SIZE = 640
 
 # Instead of rescaling - Crop out a MAX_SIZExMAX_SIZE Portion out of the image
-__C.TRAIN.CROP = False
+__C.TRAIN.CROP = True
 
 # Rescale before crop by this Factor
 __C.TRAIN.CROP_SCALE = 0.5
+
+# Determine how often the crop will be from top left
+__C.TRAIN.TOPLEFT_BIAS = 0.3
 
 # Overlap threshold for a ROI to be considered foreground (if >= FG_THRESH)
 __C.TRAIN.FG_THRESH = 0.5

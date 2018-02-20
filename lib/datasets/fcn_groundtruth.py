@@ -20,8 +20,9 @@ def objectness_energy(data, gt_boxes):
 
         coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
 
-        if sanatize_coords(objectness.shape, coords):
-            objectness[coords[0]:coords[1],coords[2]:coords[3]] = mark
+        part_marker, part_coords = get_partial_marker(objectness.shape, coords, mark)
+        if part_marker is not None:
+            objectness[part_coords[0]:part_coords[1],part_coords[2]:part_coords[3]] = part_marker
 
     #debug_energy_maps(data,gt_boxes,objectness)
     return np.expand_dims(np.expand_dims(objectness,-1),0)
@@ -37,8 +38,9 @@ def fcn_class_labels(data, gt_boxes):
 
         coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
 
-        if sanatize_coords(fcn_class.shape, coords):
-            fcn_class[coords[0]:coords[1],coords[2]:coords[3]] = mark
+        part_marker, part_coords = get_partial_marker(fcn_class.shape, coords, mark)
+        if part_marker is not None:
+            fcn_class[part_coords[0]:part_coords[1],part_coords[2]:part_coords[3]] = part_marker
 
     return np.expand_dims(np.expand_dims(fcn_class,-1),0)
 
@@ -56,8 +58,10 @@ def fcn_bbox_labels(data, gt_boxes):
 
         coords = [int(center_0-mark.shape[0]/2), int(center_0+mark.shape[0]/2+1), int(center_1 - mark.shape[1] / 2), int(center_1 + mark.shape[1] / 2)+1]
 
-        if sanatize_coords(fcn_bbox.shape, coords):
-            fcn_bbox[coords[0]:coords[1],coords[2]:coords[3]] = mark
+        part_marker, part_coords = get_partial_marker(fcn_bbox.shape, coords, mark)
+        if part_marker is not None:
+            fcn_bbox[part_coords[0]:part_coords[1],part_coords[2]:part_coords[3]] = part_marker
+
     return np.expand_dims(fcn_bbox,0)
 
 
@@ -71,6 +75,22 @@ def sanatize_coords(canvas_shape, coords):
         return True
 
 
+def get_partial_marker(canvas_shape, coords, mark):
+    orig_coords = np.asarray(coords)
+    crop_coords = np.asarray(coords)
+    crop_coords = np.maximum(crop_coords, 0)
+    crop_coords[0:2] = np.minimum(crop_coords[0:2],canvas_shape[0])
+    crop_coords[2:4] = np.minimum(crop_coords[2:4],canvas_shape[1])
+
+    # if a dimension collapses kill element
+    if crop_coords[0] == crop_coords[1] or crop_coords[2]==crop_coords[3]:
+        return None, None
+
+    reorder_idx = [0,2,1,3]
+    mark_subs = np.asarray((0,0)+mark.shape)[reorder_idx] - (orig_coords - crop_coords)
+    mark = mark[mark_subs[0]:mark_subs[1],mark_subs[2]:mark_subs[3]]
+
+    return mark, crop_coords
 
 
 def objectness_energy_high_dym(data, gt_boxes, num_classes):
