@@ -75,7 +75,7 @@ def get_minibatch(roidb, num_classes, batch_size):
     # remove nones
     gt_boxes = [x for x in gt_boxes if x is not None]
 
-    len(gt_boxes)
+    print("len-bboxes:" +str(len(gt_boxes)))
 
     blobs['gt_boxes'] = np.expand_dims(gt_boxes, 0)
     blobs['im_info'] = np.array(
