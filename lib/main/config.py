@@ -84,7 +84,7 @@ __C.TRAIN.BG_THRESH_HI = 0.5
 __C.TRAIN.BG_THRESH_LO = 0.1
 
 # Use horizontally-flipped images during training?
-__C.TRAIN.USE_FLIPPED = False
+__C.TRAIN.USE_FLIPPED = True
 
 # Iterations between snapshots
 __C.TRAIN.SNAPSHOT_ITERS = 5000

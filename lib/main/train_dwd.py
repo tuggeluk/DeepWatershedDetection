@@ -71,12 +71,14 @@ def main(unused_argv):
 
     if "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
         image_mode = "music"
 
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
+        img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         resnet_dir = cfg.PRETRAINED_DIR+"/ImageNet/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/VOC2012/"
         image_mode = "realistic"
@@ -90,6 +92,7 @@ def main(unused_argv):
     # original bbox label
     label_orig = tf.placeholder(tf.float32, shape=[None, None, 5])
 
+    img_energy_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
 
     print("Initializing Model:" + args.model)
     [dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(
@@ -116,18 +119,24 @@ def main(unused_argv):
 
             print("Init optimizers")
             var_list = [var for var in tf.trainable_variables()]
-            # opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
+            opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
             # opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
             opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
 
             print("Init Summary")
-            tf.summary.scalar("energy_loss", energy_loss)
-            tf.summary.scalar("class_loss", class_loss)
-            tf.summary.scalar("box_loss", box_loss)
-            tf.summary.scalar("tot_loss", tot_loss)
+            scalar_sums = []
+            scalar_sums.append(tf.summary.scalar("energy_loss", energy_loss))
+            scalar_sums.append(tf.summary.scalar("class_loss", class_loss))
+            scalar_sums.append(tf.summary.scalar("box_loss", box_loss))
+            scalar_sums.append(tf.summary.scalar("tot_loss", tot_loss))
+            scalar_summary_op = tf.summary.merge(scalar_sums)
+
+            images_sums = []
+            images_sums.append(tf.summary.image('Energy_Map', img_energy_placeholder))
+            images_sums.append(tf.summary.image('Prediction', img_pred_placeholder))
+            images_summary_op = tf.summary.merge(images_sums)
 
 
-            summary_op = tf.summary.merge_all()
 
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
@@ -158,7 +167,7 @@ def main(unused_argv):
 
     # set up tensorboard
     if args.tensorboard:
-        tbdir = cfg.EXP_DIR + "/" + image_mode + "/" + args.model
+        tbdir = cfg.EXP_DIR + "/" + image_mode + "/" + args.model+"_tensorboard"
         writer = tf.summary.FileWriter(tbdir, sess.graph)
 
     if args.is_training:
@@ -172,11 +181,6 @@ def main(unused_argv):
                 batch_not_loaded = len(blob["gt_boxes"].shape) != 3
 
 
-            # from PIL import Image
-            # img = Image.fromarray(blob["data"].astype(np.uint8)[0])
-            # img.show()
-            # img_gt = Image.fromarray((blob["gt_fcn"]+10).astype(np.uint8)*10)
-            # img_gt.show()
             if "DeepScores" in args.dataset:
                 blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
                 #one-hot class labels
@@ -188,29 +192,29 @@ def main(unused_argv):
 
 
             # train step
-            # _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run([opt_energy, energy_loss,class_loss,box_loss],
-            #                                                 feed_dict={input: blob["data"],
-            #                                                            label_dws_energy: blob["dws_energy"],
-            #                                                            label_class: blob["class_map"],
-            #                                                            label_bbox: blob["bbox_fcn"],
-            #                                                            label_orig: blob["gt_boxes"] })
+            _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run([opt_energy, energy_loss,class_loss,box_loss],
+                                                            feed_dict={input: blob["data"],
+                                                                       label_dws_energy: blob["dws_energy"],
+                                                                       label_class: blob["class_map"],
+                                                                       label_bbox: blob["bbox_fcn"],
+                                                                       label_orig: blob["gt_boxes"] })
 
             if itr % 21 == 0 or itr == 1:
-                # _, summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_class_logits, pred_bbox = sess.run(
-                #     [opt_tot, summary_op, energy_loss, class_loss, box_loss, dws_energy, class_logits, bbox_size],
-                #     feed_dict={input: blob["data"],
-                #                label_dws_energy: blob["dws_energy"],
-                #                label_class: blob["class_map"],
-                #                label_bbox: blob["bbox_fcn"],
-                #                label_orig: blob["gt_boxes"]})
-
-                summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_class_logits, pred_bbox = sess.run(
-                    [summary_op, energy_loss, class_loss, box_loss, dws_energy, class_logits, bbox_size],
+                _, summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_class_logits, pred_bbox = sess.run(
+                    [opt_tot, scalar_summary_op, energy_loss, class_loss, box_loss, dws_energy, class_logits, bbox_size],
                     feed_dict={input: blob["data"],
                                label_dws_energy: blob["dws_energy"],
                                label_class: blob["class_map"],
                                label_bbox: blob["bbox_fcn"],
                                label_orig: blob["gt_boxes"]})
+
+                # summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_class_logits, pred_bbox = sess.run(
+                #     [scalar_summary_op, energy_loss, class_loss, box_loss, dws_energy, class_logits, bbox_size],
+                #     feed_dict={input: blob["data"],
+                #                label_dws_energy: blob["dws_energy"],
+                #                label_class: blob["class_map"],
+                #                label_bbox: blob["bbox_fcn"],
+                #                label_orig: blob["gt_boxes"]})
 
                 if args.tensorboard:
                     writer.add_summary(summary, float(itr))
@@ -221,12 +225,19 @@ def main(unused_argv):
 
 
                     # build images
-                    # TODO scale individualy such that max is 255
-                    conc_array = (np.concatenate((pred_energy[0],blob["dws_energy"][0]),0)+10)*10
-                    conc_array.astype("uint8")
-                    im_energy = Image.fromarray(np.squeeze(conc_array.astype("uint8")))
+                    # scale
+                    pred_scaled = pred_energy[0] + np.abs(np.min(pred_energy[0]))
+                    pred_scaled = pred_scaled / np.max(pred_scaled)*255
+
+                    orig_scaled = blob["dws_energy"][0] + np.abs(np.min(blob["dws_energy"][0]))
+                    orig_scaled = orig_scaled / float(np.max(orig_scaled))*255
+
+                    conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
+                    energy_array = np.squeeze(conc_array.astype("uint8"))
+                    energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
+
                     # switch bgr to rgb
-                    im_rgb = blob["data"][0][:,:,[2,1,0]]
+                    im_rgb = blob["data"][0][:,:,[2,1,0]]+cfg.PIXEL_MEANS[:,:,[2,1,0]]
                     im = Image.fromarray(im_rgb.astype("uint8"))
                     draw = ImageDraw.Draw(im)
                     # overlay GT boxes
@@ -234,7 +245,20 @@ def main(unused_argv):
                         draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
                     for row in dws_list:
                         draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
-                    im.show()
+                    im_array = np.array(im).astype("uint8")
+                    im_array = np.expand_dims(im_array, 0)
+
+                    if len(im_array.shape) < 4:
+                        im_array = np.expand_dims(im_array, -1)
+
+
+                    # save images to tensorboard
+                    summary = sess.run([images_summary_op],
+                             feed_dict={
+                                 img_pred_placeholder: im_array,
+                                 img_energy_placeholder: energy_array})
+                    writer.add_summary(summary[0], float(itr))
+
             else:
                 _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
                     [opt_tot, energy_loss, class_loss, box_loss],
@@ -287,12 +311,12 @@ if __name__ == '__main__':
     parser.add_argument("--crop", type=bool, default=True, help="should images be cropped - only applies to DeepScores")
     parser.add_argument("--crop_size", type=bytearray, default=[640,640], help="size of the image to be cropped to - only applies to DeepScores")
     parser.add_argument("--scaling", type=int, default=1, help="scaling factor to be applied before cropping - only applies to DeepScores")
-    parser.add_argument("--continue_training", type=bool, default=False, help="load checkpoint")
+    parser.add_argument("--continue_training", type=bool, default=True, help="load checkpoint")
     parser.add_argument("--iterations", type=int, default=50000, help="nr of batches to train")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
-    parser.add_argument("--pretrain_lvl", type=str, default="no", help="What kind of pretraining to use: no,class,semseg")
+    parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--loss", type=str, default="cross_ent", help="Used loss - cross_ent, regression, bbox")
     parser.add_argument("--is_training", type=bool, default=True, help="Train or Test mode")
     parser.add_argument("--loss_mode", type=str, default="low-dim", help="low-dim or high dim")
