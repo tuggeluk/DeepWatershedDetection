@@ -38,23 +38,24 @@ class RoIDataLayer(object):
       st0 = np.random.get_state()
       millis = int(round(time.time() * 1000)) % 4294967295
       np.random.seed(millis)
-    
-    if cfg.TRAIN.ASPECT_GROUPING:
-      widths = np.array([r['width'] for r in self._roidb])
-      heights = np.array([r['height'] for r in self._roidb])
-      horz = (widths >= heights)
-      vert = np.logical_not(horz)
-      horz_inds = np.where(horz)[0]
-      vert_inds = np.where(vert)[0]
-      inds = np.hstack((
-          np.random.permutation(horz_inds),
-          np.random.permutation(vert_inds)))
-      inds = np.reshape(inds, (-1, 2))
-      row_perm = np.random.permutation(np.arange(inds.shape[0]))
-      inds = np.reshape(inds[row_perm, :], (-1,))
-      self._perm = inds
-    else:
-      self._perm = np.random.permutation(np.arange(len(self._roidb)))
+
+    # use batches if size 1 anyways
+    # if cfg.TRAIN.ASPECT_GROUPING:
+    #   widths = np.array([r['width'] for r in self._roidb])
+    #   heights = np.array([r['height'] for r in self._roidb])
+    #   horz = (widths >= heights)
+    #   vert = np.logical_not(horz)
+    #   horz_inds = np.where(horz)[0]
+    #   vert_inds = np.where(vert)[0]
+    #   inds = np.hstack((
+    #       np.random.permutation(horz_inds),
+    #       np.random.permutation(vert_inds)))
+    #   inds = np.reshape(inds, (-1, 2))
+    #   row_perm = np.random.permutation(np.arange(inds.shape[0]))
+    #   inds = np.reshape(inds[row_perm, :], (-1,))
+    #   self._perm = inds
+    # else:
+    self._perm = np.random.permutation(np.arange(len(self._roidb)))
     # Restore the random state
     if self._random:
       np.random.set_state(st0)

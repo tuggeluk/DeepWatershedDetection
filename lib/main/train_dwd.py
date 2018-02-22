@@ -290,7 +290,8 @@ def main(unused_argv):
 
 def get_training_roidb(imdb):
   """Returns a roidb (Region of Interest database) for use in training."""
-  if cfg.TRAIN.USE_FLIPPED:
+  #TODO add arg for flipping
+  if True:
     print('Appending horizontally-flipped training examples...')
     imdb.append_flipped_images()
     print('done')
@@ -318,6 +319,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--loss", type=str, default="cross_ent", help="Used loss - cross_ent, regression, bbox")
+    #TODO fix bool args
     parser.add_argument("--is_training", type=bool, default=True, help="Train or Test mode")
     parser.add_argument("--loss_mode", type=str, default="low-dim", help="low-dim or high dim")
     parser.add_argument("--tensorboard", type=bool, default=True, help="post summaries to tensorboard")

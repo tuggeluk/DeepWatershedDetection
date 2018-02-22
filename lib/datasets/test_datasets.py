@@ -10,12 +10,6 @@ from main.config import cfg
 
 
 def get_training_roidb(imdb):
-  """Returns a roidb (Region of Interest database) for use in training."""
-  if cfg.TRAIN.USE_FLIPPED:
-    print('Appending horizontally-flipped training examples...')
-    imdb.append_flipped_images()
-    print('done')
-
   print('Preparing training data...')
   rdl_roidb.prepare_roidb(imdb)
   print('done')
@@ -39,4 +33,3 @@ if __name__ == '__main__':
 
     blobs = data_layer.forward()
 
-    print("asdf")

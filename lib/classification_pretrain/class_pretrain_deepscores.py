@@ -120,17 +120,17 @@ if __name__ == '__main__':
     pretrained_dir = "pretrain_deepscores"
     # load network
     if args.net == 'res50':
-        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=cfg.TRAIN.WEIGHT_DECAY)):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.0005)):
             out, end_points = resnet_v1.resnet_v1_50(input, is_training=args.train, scope='resnet_v1_50', num_classes=num_classes)
             # RefineNet requires pre-trained ResNet weights
             init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_50.ckpt'), slim.get_model_variables('resnet_v1_50'))
     elif args.net == 'res101':
-        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=cfg.TRAIN.WEIGHT_DECAY)):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.0005)):
             out, end_points = resnet_v1.resnet_v1_101(input, is_training=args.train, scope='resnet_v1_101', num_classes=num_classes)
             # RefineNet requires pre-trained ResNet weights
             init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_101.ckpt'), slim.get_model_variables('resnet_v1_101'))
     elif args.net == 'res152':
-        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=cfg.TRAIN.WEIGHT_DECAY)):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.0005)):
             out, end_points = resnet_v1.resnet_v1_152(input, is_training=args.train, scope='resnet_v1_152', num_classes=num_classes)
             # RefineNet requires pre-trained ResNet weights
             init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_152.ckpt'), slim.get_model_variables('resnet_v1_152'))
