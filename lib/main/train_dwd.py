@@ -15,6 +15,7 @@ from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
 import utils.summary_helpers as sh
+from collections import OrderedDict
 
 from PIL import Image, ImageDraw
 
@@ -36,14 +37,14 @@ def main(unused_argv):
     print("Setting up image database: " + args.dataset)
     imdb = get_imdb(args.dataset)
     print('Loaded dataset `{:s}` for training'.format(imdb.name))
-    roidb = get_training_roidb(imdb)
+    roidb = get_training_roidb(imdb, args.use_flipped == "True")
     print('{:d} roidb entries'.format(len(roidb)))
 
     if args.dataset_validation != "no":
         print("Setting up validation image database: " + args.dataset_validation)
         imdb_val = get_imdb(args.dataset_validation)
         print('Loaded dataset `{:s}` for validation'.format(imdb_val.name))
-        roidb_val = get_training_roidb(imdb_val)
+        roidb_val = get_training_roidb(imdb_val, False)
         print('{:d} roidb entries'.format(len(roidb_val)))
     else:
         imdb_val = None
@@ -57,7 +58,7 @@ def main(unused_argv):
 
     batch_not_loaded = True
     while batch_not_loaded:
-        data = data_layer.forward(1)
+        data = data_layer.forward(args)
         batch_not_loaded = len(data["gt_boxes"].shape) != 3
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
 
@@ -288,10 +289,9 @@ def main(unused_argv):
 
 
 
-def get_training_roidb(imdb):
+def get_training_roidb(imdb, use_flipped):
   """Returns a roidb (Region of Interest database) for use in training."""
-  #TODO add arg for flipping
-  if True:
+  if use_flipped:
     print('Appending horizontally-flipped training examples...')
     imdb.append_flipped_images()
     print('done')
@@ -305,24 +305,29 @@ def get_training_roidb(imdb):
 
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=1, help="batch size for training")
-    parser.add_argument("--crop", type=bool, default=True, help="should images be cropped - only applies to DeepScores")
-    parser.add_argument("--crop_size", type=bytearray, default=[640,640], help="size of the image to be cropped to - only applies to DeepScores")
-    parser.add_argument("--scaling", type=int, default=1, help="scaling factor to be applied before cropping - only applies to DeepScores")
-    parser.add_argument("--continue_training", type=bool, default=True, help="load checkpoint")
-    parser.add_argument("--iterations", type=int, default=50000, help="nr of batches to train")
+
+    parser.add_argument("--scale_list", type=list, default=[0.9,1,1.1], help="global scaling factor randomly chosen from this list")
+    parser.add_argument("--crop", type=str, default="False", help="should images be cropped")
+    parser.add_argument("--crop_size", type=bytearray, default=[640,640], help="size of the image to be cropped to")
+    parser.add_argument("--crop_top_left_bias", type=float, default=0.3, help="fixed probability that the crop will be from the top left corner")
+    parser.add_argument("--max_edge", type=int, default=1280, help="if there is no cropping - scale such that the longest edge has this size")
+    parser.add_argument("--use_flipped", type=str, default="False", help="wether or not to append Horizontally flipped images")
+    parser.add_argument("--substract_mean", type=str, default="True", help="wether or not to substract the mean of the VOC images")
+    parser.add_argument("--pad_to", type=int, default=320, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
+    parser.add_argument("--pad_with", type=int, default=0,help="use this number to pad images")
+
+    parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
+    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
-    parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
-    parser.add_argument("--loss", type=str, default="cross_ent", help="Used loss - cross_ent, regression, bbox")
-    #TODO fix bool args
-    parser.add_argument("--is_training", type=bool, default=True, help="Train or Test mode")
-    parser.add_argument("--loss_mode", type=str, default="low-dim", help="low-dim or high dim")
-    parser.add_argument("--tensorboard", type=bool, default=True, help="post summaries to tensorboard")
+
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
+    parser.add_argument('--training_regime', type=OrderedDict, default={'pre_energy1': '2000', 'energy': '1000', 'tot': '4'}, help="Training regime: how many iterations are to be trained on which loss")
+
+
     args, unparsed = parser.parse_known_args()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)

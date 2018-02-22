@@ -19,18 +19,18 @@ from datasets.fcn_groundtruth import objectness_energy, show_image, objectness_e
     fcn_bbox_labels
 
 
-def get_minibatch(roidb, num_classes, batch_size):
+def get_minibatch(roidb, args):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
-    random_scale_inds = npr.randint(0, high=len(cfg.TRAIN.SCALES),
+    random_scale_inds = npr.randint(0, high=len(args.scale_list),
                                     size=num_images)
-    assert (batch_size % num_images == 0), \
+    assert (args.batch_size % num_images == 0), \
         'num_images ({}) must divide BATCH_SIZE ({})'. \
-            format(num_images, cfg.TRAIN.BATCH_SIZE)
+            format(num_images, args.batch_size)
 
-    # Get the input image blob, formatted for caffe
-    im_blob, im_scales, crop_box = _get_image_blob(roidb, random_scale_inds)
+    # Get the input image blob
+    im_blob, im_scales, crop_box = _get_image_blob(roidb, random_scale_inds, args)
 
     blobs = {'data': im_blob}
 
@@ -97,7 +97,7 @@ def crop_boxes(img_shape, coord):
     coord[0:4] = crop_coords
     return coord
 
-def _get_image_blob(roidb, scale_inds):
+def _get_image_blob(roidb, scale_inds, args):
     """Builds an input blob from the images in the roidb at the specified
     scales.
     """
@@ -110,9 +110,8 @@ def _get_image_blob(roidb, scale_inds):
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
-        target_size = cfg.TRAIN.SCALES[scale_inds[i]]
-        im, im_scale, im_crop_box = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
-                                                     cfg.TRAIN.MAX_SIZE, cfg.TRAIN.CROP, cfg.TRAIN.CROP_SCALE)
+        global_scale = args.scale_list[scale_inds[i]]
+        im, im_scale, im_crop_box = prep_im_for_blob(im, cfg.PIXEL_MEANS, global_scale, args)
 
         crop_box.append(im_crop_box)
         im_scales.append(im_scale)
