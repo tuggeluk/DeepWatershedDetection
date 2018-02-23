@@ -20,9 +20,7 @@ class PrefetchWrapper:
     def execute_func(self, fp, prefetch_len, *args):
         while not self.done:
             if self.q.qsize() < prefetch_len:
-                print("loading data")
                 self.q.put(fp(args[0]))
             else:
-                print("sleeping")
                 time.sleep(.5)
         return None
