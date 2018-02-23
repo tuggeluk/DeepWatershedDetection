@@ -234,8 +234,8 @@ def main(unused_argv):
             pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
             pred_scaled = np.expand_dims(pred_scaled, -1)*255
 
-            orig_scaled = blob["dws_energy"][0] + np.abs(np.min(blob["dws_energy"][0]))
-            orig_scaled = orig_scaled / float(np.max(orig_scaled))*255
+            orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
+            orig_scaled = np.expand_dims(orig_scaled, -1)*255
 
             conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
             energy_array = np.squeeze(conc_array.astype("uint8"))
