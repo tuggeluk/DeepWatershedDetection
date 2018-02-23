@@ -269,14 +269,6 @@ def main(unused_argv):
             print("class_loss: " + str(class_loss_fetch))
             print("box_loss: " + str(box_loss_fetch))
 
-        else:
-            _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
-                [opt_energy, energy_loss, class_loss, box_loss],
-                feed_dict={input: blob["data"],
-                           label_dws_energy: blob["dws_energy"],
-                           label_class: blob["class_map"],
-                           label_bbox: blob["bbox_fcn"],
-                           label_orig: blob["gt_boxes"]})
 
 
         if itr % args.save_interval == 0:
