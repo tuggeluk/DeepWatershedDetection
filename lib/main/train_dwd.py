@@ -93,6 +93,7 @@ def main(unused_argv):
     label_dws_energy = tf.placeholder(tf.float32, shape=[None, None, None, 1])
     label_class = tf.placeholder(tf.float32, shape=[None,  None, None, num_classes])
     label_bbox = tf.placeholder(tf.float32, shape=[None, None, None, 2])
+    label_foreground = tf.placeholder(tf.float32, shape=[None, None, None, 2])
 
     # original bbox label
     label_orig = tf.placeholder(tf.float32, shape=[None, None, 5])
@@ -100,12 +101,15 @@ def main(unused_argv):
     img_energy_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
 
     print("Initializing Model:" + args.model)
-    [dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(
+    [foreground, dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(
         input, model=args.model,num_classes=num_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
     with tf.variable_scope('deep_watershed'):
         print("Using loss:")
-        energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
+        # Hack foreground loss
+        #energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
+        energy_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=foreground, labels=label_foreground))
+
 
         dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
 
@@ -125,7 +129,7 @@ def main(unused_argv):
         var_list = [var for var in tf.trainable_variables()]
         opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
         # opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
-        opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
+        #opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
 
         print("Init Summary")
         scalar_sums = []
@@ -148,7 +152,7 @@ def main(unused_argv):
     # set up saver path
     checkpoint_dir = cfg.EXP_DIR + "/" + image_mode
     checkpoint_name =  args.model
-    if args.continue_training or not args.is_training:
+    if args.continue_training == "True":
         print("Loading checkpoint")
         saver.restore(sess, checkpoint_dir + "/" + checkpoint_name)
     else:
@@ -174,7 +178,7 @@ def main(unused_argv):
     writer = tf.summary.FileWriter(tbdir, sess.graph)
 
     print("Start training")
-    for itr in range(1, 1000):
+    for itr in range(1, 50000):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
@@ -193,6 +197,7 @@ def main(unused_argv):
         if "voc" in args.dataset:
             #one-hot class labels
             blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+            blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
 
 
         # train step
@@ -201,16 +206,18 @@ def main(unused_argv):
                                                                    label_dws_energy: blob["dws_energy"],
                                                                    label_class: blob["class_map"],
                                                                    label_bbox: blob["bbox_fcn"],
-                                                                   label_orig: blob["gt_boxes"] })
+                                                                   label_orig: blob["gt_boxes"],
+                                                                   label_foreground: blob["foreground"]})
 
         if itr % args.save_interval == 0 or itr == 1:
-            _, summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_class_logits, pred_bbox = sess.run(
-                [opt_tot, scalar_summary_op, energy_loss, class_loss, box_loss, dws_energy, class_logits, bbox_size],
+            _, summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_foreground, pred_class_logits, pred_bbox = sess.run(
+                [opt_energy, scalar_summary_op, energy_loss, class_loss, box_loss, dws_energy,foreground, class_logits, bbox_size],
                 feed_dict={input: blob["data"],
                            label_dws_energy: blob["dws_energy"],
                            label_class: blob["class_map"],
                            label_bbox: blob["bbox_fcn"],
-                           label_orig: blob["gt_boxes"]})
+                           label_orig: blob["gt_boxes"],
+                           label_foreground: blob["foreground"]})
 
 
             writer.add_summary(summary, float(itr))
@@ -221,8 +228,11 @@ def main(unused_argv):
 
             # build images
             # rescale
-            pred_scaled = pred_energy[0] + np.abs(np.min(pred_energy[0]))
-            pred_scaled = pred_scaled / np.max(pred_scaled)*255
+            # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
+            # pred_scaled = pred_scaled / np.max(pred_scaled)*255
+            # np.argmax(, axis=None, out=None)
+            pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
+            pred_scaled = np.expand_dims(pred_scaled, -1)*255
 
             orig_scaled = blob["dws_energy"][0] + np.abs(np.min(blob["dws_energy"][0]))
             orig_scaled = orig_scaled / float(np.max(orig_scaled))*255
@@ -261,7 +271,7 @@ def main(unused_argv):
 
         else:
             _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run(
-                [opt_tot, energy_loss, class_loss, box_loss],
+                [opt_energy, energy_loss, class_loss, box_loss],
                 feed_dict={input: blob["data"],
                            label_dws_energy: blob["dws_energy"],
                            label_class: blob["class_map"],
@@ -276,7 +286,7 @@ def main(unused_argv):
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
 
-def do_training(itr,end_itr,opt):
+def train_on_task(itr,end_itr,task):
     print("")
 
 

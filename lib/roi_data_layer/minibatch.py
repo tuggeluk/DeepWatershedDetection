@@ -16,7 +16,7 @@ import cv2
 from main.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 from datasets.fcn_groundtruth import objectness_energy, show_image, objectness_energy_high_dym, fcn_class_labels, \
-    fcn_bbox_labels
+    fcn_bbox_labels, fcn_foreground
 
 
 def get_minibatch(roidb, args):
@@ -67,6 +67,7 @@ def get_minibatch(roidb, args):
     # objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
     blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
     blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
+    blobs["foreground"] = fcn_foreground(im_blob, gt_boxes)
 
     # gt_boxes = gt_boxes[bad_coords == False]
     # crop boxes

@@ -11,6 +11,7 @@ def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False)
         dws_energy = slim.conv2d(g[3], 1, [1, 1], activation_fn=None, scope='dws_energy')
         class_logits = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
         bbox_size = slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='dws_size')
+        foreground = slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='foreground')
 
 
-        return [dws_energy,class_logits,bbox_size], init_fn
+        return [foreground,dws_energy,class_logits,bbox_size], init_fn

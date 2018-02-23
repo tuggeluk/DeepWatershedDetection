@@ -45,6 +45,23 @@ def fcn_class_labels(data, gt_boxes):
     return np.expand_dims(np.expand_dims(fcn_class,-1),0)
 
 
+def fcn_foreground(data, gt_boxes):
+    fcn_foreground = np.zeros(data[0].shape[0:2], dtype=np.int16)
+    for row in gt_boxes:
+        # crop to fit data
+        x_1 = int(max(0,row[0]))
+        x_2 = int(min(data[0].shape[0], row[2]))
+
+        y_1 = int(max(0,row[1]))
+        y_2 = int(min(data[0].shape[1], row[3]))
+
+        # set foreground to 1
+        fcn_foreground[y_1:y_2, x_1:x_2] = 1
+
+    #show_image(data,gt_boxes,True)
+
+    return np.expand_dims(np.expand_dims(fcn_foreground,-1),0)
+
 
 def fcn_bbox_labels(data, gt_boxes):
     fcn_bbox = np.zeros(data[0].shape[0:2]+(2,), dtype=np.int16)
