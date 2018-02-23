@@ -48,14 +48,13 @@ def prep_im_for_blob(im, pixel_means, global_scale, args):
   if im_size_max > args.max_edge:
     if not args.crop == "True":
       # scale down if bigger than max size
-      im_scale = float(args.max_edge) / float(im_size_max)
-      im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale,
+      global_scale = float(args.max_edge) / float(im_size_max)
+      im = cv2.resize(im, None, None, fx=global_scale, fy=global_scale,
                     interpolation=cv2.INTER_LINEAR)
       crop_box = [0,0,im.shape[0],im.shape[1]]
     else:
       # Crop image
-      # Todo export to config file
-      topleft = random.uniform(0,1)<0.3
+      topleft = random.uniform(0,1)<args.crop_top_left_bias
 
       # crop to max size if necessary
       if im.shape[0] <= args.max_edge or topleft:
@@ -81,5 +80,5 @@ def prep_im_for_blob(im, pixel_means, global_scale, args):
     canv[0:im.shape[0], 0:im.shape[1]] = im
     im = canv
 
-  return im, im_scale, crop_box
+  return im, global_scale, crop_box
 

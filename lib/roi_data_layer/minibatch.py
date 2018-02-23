@@ -44,10 +44,10 @@ def get_minibatch(roidb, args):
     else:
         # For the COCO ground truth boxes, exclude the  ones that are ''iscrowd''
         gt_inds = np.where(roidb[0]['gt_classes'] != 0 & np.all(roidb[0]['gt_overlaps'].toarray() > -1.0, axis=1))[0]
-    gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
-    bad_coords = np.zeros(len(gt_inds), dtype=np.bool)
 
-    if cfg.TRAIN.CROP:
+    gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
+
+    if args.crop == "True":
         # scale Coords
         gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
 
@@ -62,12 +62,11 @@ def get_minibatch(roidb, args):
     gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
 
     # build additional gt for FCN
-    if cfg.TRAIN.BUILD_FCN:
-        # show_image(im_blob, gt_boxes, gt=True)
-        blobs['dws_energy'] = objectness_energy(im_blob, gt_boxes)
-        # objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
-        blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
-        blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
+    # show_image(im_blob, gt_boxes, gt=True)
+    blobs['dws_energy'] = objectness_energy(im_blob, gt_boxes)
+    # objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
+    blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
+    blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
 
     # gt_boxes = gt_boxes[bad_coords == False]
     # crop boxes
