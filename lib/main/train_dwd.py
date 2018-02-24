@@ -60,11 +60,17 @@ def main(unused_argv):
     if args.prefetch == "True":
         data_layer_pw = PrefetchWrapper(data_layer.forward, args.prefetch_len, args)
 
+    #
+    # Debug stuffs
+    #
     batch_not_loaded = True
     while batch_not_loaded:
         data = data_layer.forward(args)
         batch_not_loaded = len(data["gt_boxes"].shape) != 3
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
+    #
+    #
+
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -149,9 +155,9 @@ def main(unused_argv):
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
 
-    # set up saver path
-    checkpoint_dir = cfg.EXP_DIR + "/" + image_mode
-    checkpoint_name =  args.model
+    # set up checkpoint path
+    checkpoint_dir = get_checkpoint_dir(args)
+    checkpoint_name =  "backbone"
     if args.continue_training == "True":
         print("Loading checkpoint")
         saver.restore(sess, checkpoint_dir + "/" + checkpoint_name)
@@ -174,11 +180,10 @@ def main(unused_argv):
             print("Not loading a pretrained network")
 
     # set up tensorboard
-    tbdir = cfg.EXP_DIR + "/" + image_mode + "/" + args.model+"_tensorboard"
-    writer = tf.summary.FileWriter(tbdir, sess.graph)
+    writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
     print("Start training")
-    for itr in range(1, 50000):
+    for itr in range(1, args.itrs):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
@@ -277,6 +282,24 @@ def main(unused_argv):
                 os.makedirs(checkpoint_dir)
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
+    data_layer_pw.kill()
+
+def get_checkpoint_dir(args):
+    # assemble path
+    if "DeepScores" in args.dataset:
+        image_mode = "music"
+    else:
+        image_mode = "realistic"
+    tbdir = cfg.EXP_DIR + "/" + image_mode +"/"+"pretrain_lvl_"+args.pretrain_lvl+"/" + args.model
+    if not os.path.exists(tbdir):
+        os.makedirs(tbdir)
+    runs_dir = os.listdir(tbdir)
+    if args.continue_training == "True":
+        tbdir = tbdir + "/" + "run_" + str(len(runs_dir)-1)
+    else:
+        tbdir = tbdir+"/"+"run_"+str(len(runs_dir))
+        os.makedirs(tbdir)
+    return tbdir
 
 def train_on_task(itr,end_itr,task):
     print("")
@@ -326,7 +349,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
     parser.add_argument('--training_regime', type=OrderedDict, default={'pre_energy1': '2000', 'energy': '1000', 'tot': '4'}, help="Training regime: how many iterations are to be trained on which loss")
-
+    parser.add_argument('--itrs', type=int,
+                        default=50000,
+                        help="nr of iterations")
 
     args, unparsed = parser.parse_known_args()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
