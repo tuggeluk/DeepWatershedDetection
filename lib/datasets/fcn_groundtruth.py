@@ -131,6 +131,7 @@ def func_nothing(grid):
 def func_square(grid):
     return np.square(grid)
 
+
 def debug_energy_maps(data, gt_boxes, orig_object):
     orig_object = orig_object+10
     im = Image.fromarray(orig_object.astype("uint8"))
@@ -170,6 +171,78 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     grid_y = np.concatenate((range(sy),range(sy,-1,-1)))
     exec_grid = np.min(np.stack(np.meshgrid(grid_x, grid_y)),0)
     return fnc(exec_grid)
+
+# TODO marker and objectness energy grad
+def get_markers():
+    #
+    #   build objectness gt
+    #   size:               size of the largest feature map the gt is built for
+    #   ds_factors:         factors of downsampling for which de gt is built
+    #   gt:                 list of the ground-truth bounding boxes
+    #   downsample_marker:  if True the marker will be downsampled accordingly otherwise the marker has the same size
+    #                       for each feature map
+    #   overlap_solution:   what to do with overlaps
+    #                       "no": the values just get overwritten
+    #                       "max": the maximum of both values persists (per pixel)
+    #                       "closest": each pixel gets assigned according to its closet center
+    #                       --> prints to console if conflicts exist
+    #   stamp_func:         function that defines individual markers
+    #   stamp_args:         dict with additional arguments passed on to stamp_func
+
+    return None
+
+
+def stamp_directions(bbox,args):
+
+    #   for bbox == -1 return dim
+    #   Builds gt for objectness energy gradients has the shape of an oval
+    #
+    #   must be contained by args:
+    #   marker_dim:         if it is not None every object will have the same size marker
+    #   size_percentage:    percentage of the oval axes w.r.t. to the corresponding bounding boxes, only applied if
+    #                       marker_dim is None
+    #   hole:               percentage of the oval on which we ignore gt (rounded down), from the center point
+    #                       --> make it a doughnut
+    #
+    #   return patch, and coords
+
+    return None
+
+
+def stamp_energy(bbox,args):
+
+    #   for bbox == -1 return dim
+    #
+    #   Builds gt for objectness energy
+    #
+    #   must be contained by args:
+    #   marker_dim:         if it is not None every object will have the same size marker
+    #   size_percentage:    percentage of the oval axes w.r.t. to the corresponding bounding boxes, only applied if
+    #                       marker_dim is None
+    #   shape:              "oval" or "square" detemines the shape of the energy marker
+    #   loss:               softmax, regression
+    #   energy_shape:       function that maps from position in patch to objectnes energy i.e.
+    #                       (x-x_0,y-y_0)--> R, rounded for loss softmax
+    #
+    #   return patch, and coords
+
+    return None
+
+
+def stamp_class(bbox, args):
+    # for bbox == -1 return dim
+    #   Builds gt for objectness energy gradients has the shape of an oval
+    #
+    #   must be contained by args:
+    #   marker_dim:         if it is not None every object will have the same size marker
+    #   size_percentage:    percentage of the oval axes w.r.t. to the corresponding bounding boxes, only applied if
+    #                       marker_dim is None
+    #   hole:               percentage of the oval on which we ignore gt from the center point --> make it a doughnut
+    #
+    #   return patch, and coords
+
+    return None
+
 
 # pil_im = Image.fromarray(im)
 def show_image(data, gt_boxes=None, gt=False):

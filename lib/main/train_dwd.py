@@ -101,52 +101,88 @@ def main(unused_argv):
     label_bbox = tf.placeholder(tf.float32, shape=[None, None, None, 2])
     label_foreground = tf.placeholder(tf.float32, shape=[None, None, None, 2])
 
+    if args.segment_resolution == "regression":
+        marker_0 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        marker_1 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        marker_2 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        marker_3 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+    elif args.segment_resolution == "binary":
+        marker_0 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
+        marker_1 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
+        marker_2 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
+        marker_3 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
+    elif args.segment_resolution == "class":
+        marker_0 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
+        marker_1 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
+        marker_2 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
+        marker_3 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
+
+
     # original bbox label
     label_orig = tf.placeholder(tf.float32, shape=[None, None, 5])
-
     img_energy_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
+    img_marker_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
 
     print("Initializing Model:" + args.model)
-    [foreground, dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(
+    [markers,foreground, dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(args,
         input, model=args.model,num_classes=num_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
     with tf.variable_scope('deep_watershed'):
         print("Using loss:")
-        # Hack foreground loss
-        #energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
-        energy_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=foreground, labels=label_foreground))
+        # marker Loss
+        if args.segment_resolution == "regression":
+            l_mark_0 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[0], labels=marker_0))
+            l_mark_1 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[1], labels=marker_1))
+            l_mark_2 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[2], labels=marker_2))
+            l_mark_3 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[3], labels=marker_3))
+        elif args.segment_resolution == "binary" or args.segment_resolution == "class":
+            l_mark_0 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[0], labels=marker_0))
+            l_mark_1 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[1], labels=marker_1))
+            l_mark_2 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[2], labels=marker_2))
+            l_mark_3 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[3], labels=marker_3))
 
 
-        dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
+        stacked_markers = tf.stack([l_mark_0,l_mark_1,l_mark_2,l_mark_3])
+        mean_stacked_loss = tf.reduce_mean(stacked_markers)
+        min_stacked_loss = tf.reduce_min(stacked_markers)
 
-        class_masked_logits = tf.boolean_mask(class_logits, dws_mask)
-        class_masked_labels = tf.boolean_mask(label_class, dws_mask)
-        class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
+        energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
 
-        bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
-        class_masked_labels = tf.boolean_mask(label_bbox, dws_mask)
-        box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
-
-        ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
-        tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
+        # energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
+        #
+        # dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
+        #
+        # class_masked_logits = tf.boolean_mask(class_logits, dws_mask)
+        # class_masked_labels = tf.boolean_mask(label_class, dws_mask)
+        # class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
+        #
+        # bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
+        # class_masked_labels = tf.boolean_mask(label_bbox, dws_mask)
+        # box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
+        #
+        # ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
+        # tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
 
 
         print("Init optimizers")
         var_list = [var for var in tf.trainable_variables()]
         opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
-        # opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
+        opt_min = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(min_stacked_loss, var_list=var_list)
+        opt_mean = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(mean_stacked_loss,var_list=var_list)
+
+        #opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
         #opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
 
         print("Init Summary")
         scalar_sums = []
         scalar_sums.append(tf.summary.scalar("energy_loss", energy_loss))
-        scalar_sums.append(tf.summary.scalar("class_loss", class_loss))
-        scalar_sums.append(tf.summary.scalar("box_loss", box_loss))
-        scalar_sums.append(tf.summary.scalar("tot_loss", tot_loss))
+        scalar_sums.append(tf.summary.scalar("mean_stacked", mean_stacked_loss))
+        scalar_sums.append(tf.summary.scalar("min_stacked", min_stacked_loss))
         scalar_summary_op = tf.summary.merge(scalar_sums)
 
         images_sums = []
         images_sums.append(tf.summary.image('Energy_Map', img_energy_placeholder))
+        images_sums.append(tf.summary.image('Marker_Maps', img_marker_placeholder))
         images_sums.append(tf.summary.image('Prediction', img_pred_placeholder))
         images_summary_op = tf.summary.merge(images_sums)
 
@@ -182,6 +218,8 @@ def main(unused_argv):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
+    optim_op = opt_min
+
     print("Start training")
     for itr in range(1, args.itrs):
         # load batch - only use batches with content
@@ -206,7 +244,7 @@ def main(unused_argv):
 
 
         # train step
-        _, energy_loss_fetch, class_loss_fetch, box_loss_fetch = sess.run([opt_energy, energy_loss,class_loss,box_loss],
+        _, energy_loss_fetch, mean_mark_loss, min_mark_loss = sess.run([optim_op, energy_loss,mean_stacked_loss,min_stacked_loss],
                                                         feed_dict={input: blob["data"],
                                                                    label_dws_energy: blob["dws_energy"],
                                                                    label_class: blob["class_map"],
@@ -215,8 +253,8 @@ def main(unused_argv):
                                                                    label_foreground: blob["foreground"]})
 
         if itr % args.save_interval == 0 or itr == 1:
-            _, summary, energy_loss_fetch, class_loss_fetch, box_loss_fetch, pred_energy, pred_foreground, pred_class_logits, pred_bbox = sess.run(
-                [opt_energy, scalar_summary_op, energy_loss, class_loss, box_loss, dws_energy,foreground, class_logits, bbox_size],
+            _, summary, energy_loss_fetch, mean_mark_loss, min_mark_loss, pred_energy, pred_foreground, pred_class_logits, pred_bbox = sess.run(
+                [optim_op, scalar_summary_op, energy_loss, mean_stacked_loss,min_stacked_loss, dws_energy,foreground, class_logits, bbox_size],
                 feed_dict={input: blob["data"],
                            label_dws_energy: blob["dws_energy"],
                            label_class: blob["class_map"],
@@ -271,8 +309,8 @@ def main(unused_argv):
 
             print("loss at itr: " + str(itr))
             print("energy_loss: " + str(energy_loss_fetch))
-            print("class_loss: " + str(class_loss_fetch))
-            print("box_loss: " + str(box_loss_fetch))
+            print("mean_stack_loss: " + str(mean_stacked_loss))
+            print("min_stack_loss: " + str(min_stacked_loss))
 
 
 
@@ -348,10 +386,12 @@ if __name__ == '__main__':
 
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
-    parser.add_argument('--training_regime', type=OrderedDict, default={'pre_energy1': '2000', 'energy': '1000', 'tot': '4'}, help="Training regime: how many iterations are to be trained on which loss")
-    parser.add_argument('--itrs', type=int,
-                        default=50000,
-                        help="nr of iterations")
+
+    #parser.add_argument('--training_regime', type=OrderedDict, default={'pre_energy1': '2000', 'energy': '1000', 'tot': '4'}, help="Training regime: how many iterations are to be trained on which loss")
+    parser.add_argument('--itrs', type=int, default=50000, help="nr of iterations")
+    parser.add_argument('--segment_style', type=str, default="marker", help="network has to detect a marker or the whole bbox")
+    parser.add_argument('--segment_resolution', type=str, default="class", help="binary,class or regression (for Centerness-energy)")
+
 
     args, unparsed = parser.parse_known_args()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
