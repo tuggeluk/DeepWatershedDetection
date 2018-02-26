@@ -16,7 +16,7 @@ import cv2
 from main.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 from datasets.fcn_groundtruth import objectness_energy, show_image, objectness_energy_high_dym, fcn_class_labels, \
-    fcn_bbox_labels, fcn_foreground
+    fcn_bbox_labels, fcn_foreground, get_markers
 
 
 def get_minibatch(roidb, args):
@@ -60,6 +60,8 @@ def get_minibatch(roidb, args):
         gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
 
     gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
+
+
 
     # build additional gt for FCN
     # show_image(im_blob, gt_boxes, gt=True)

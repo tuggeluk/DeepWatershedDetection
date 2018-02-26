@@ -173,7 +173,9 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     return fnc(exec_grid)
 
 # TODO marker and objectness energy grad
-def get_markers():
+def get_markers(size, gt, objectness_settings):
+
+    #   ds_factors, downsample_marker, overlap_solution, samp_func, samp_args
     #
     #   build objectness gt
     #   size:               size of the largest feature map the gt is built for
@@ -188,6 +190,9 @@ def get_markers():
     #                       --> prints to console if conflicts exist
     #   stamp_func:         function that defines individual markers
     #   stamp_args:         dict with additional arguments passed on to stamp_func
+
+    print("asdrsadfasd")
+
 
     return None
 
@@ -221,6 +226,7 @@ def stamp_energy(bbox,args):
     #                       marker_dim is None
     #   shape:              "oval" or "square" detemines the shape of the energy marker
     #   loss:               softmax, regression
+    #   min_max:            tuple of maximal and minimal energy (will be rounded up to at least zero for softmax)
     #   energy_shape:       function that maps from position in patch to objectnes energy i.e.
     #                       (x-x_0,y-y_0)--> R, rounded for loss softmax
     #
@@ -230,14 +236,17 @@ def stamp_energy(bbox,args):
 
 
 def stamp_class(bbox, args):
-    # for bbox == -1 return dim
-    #   Builds gt for objectness energy gradients has the shape of an oval
+
+    #   for bbox == -1 return dim
+    #
+    #   Builds gt for class prediction
     #
     #   must be contained by args:
     #   marker_dim:         if it is not None every object will have the same size marker
     #   size_percentage:    percentage of the oval axes w.r.t. to the corresponding bounding boxes, only applied if
     #                       marker_dim is None
-    #   hole:               percentage of the oval on which we ignore gt from the center point --> make it a doughnut
+    #   shape:              square or oval
+    #   class_resolution:   "binary" for background/foreground or "class"
     #
     #   return patch, and coords
 

@@ -20,6 +20,8 @@ from utils.prefetch_wrapper import PrefetchWrapper
 
 from PIL import Image, ImageDraw
 
+from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy
+
 # Training regime
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
 # - pretrain on classification i.e. make classification loss available
@@ -31,6 +33,8 @@ from PIL import Image, ImageDraw
 
 def main(unused_argv):
     print(args)
+
+    save_objectness_function_handles(args)
 
     np.random.seed(cfg.RNG_SEED)
 
@@ -357,6 +361,18 @@ def get_training_roidb(imdb, use_flipped):
   return imdb.roidb
 
 
+def save_objectness_function_handles(args):
+    FUNCTION_MAP = {'stamp_directions':stamp_directions,
+                    'stamp_energy': stamp_energy,
+                    'stamp_class': stamp_class}
+
+    for obj_setting in args.objectness_settings:
+        obj_setting["stamp_func"] = FUNCTION_MAP[obj_setting["stamp_func"]]
+
+    return args
+
+
+
 
 
 if __name__ == '__main__':
@@ -393,5 +409,24 @@ if __name__ == '__main__':
     parser.add_argument('--segment_resolution', type=str, default="class", help="binary,class or regression (for Centerness-energy)")
 
 
+    parser.add_argument('--objectness_settings', type=list,
+                        default=[
+    # energy markers
+                            {'ds_factors': [2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
+                                 'stamp_func': 'stamp_energy',
+                                 'stamp_args':{'marker_dim': (9,9), "shape": "square", "loss": "softmax", "energy_shape": "linear"}},
+    # class markers 0.8% - size-downsample
+                            {'ds_factors': [2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                             'stamp_func': 'stamp_class',
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class"}},
+    # direction markers 0.3 to 0.7 percent, downsample
+                            {'ds_factors': [2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                             'stamp_func': 'stamp_directions',
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7, 'hole': 0.3}}
+                        ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+
     args, unparsed = parser.parse_known_args()
+
+
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+
