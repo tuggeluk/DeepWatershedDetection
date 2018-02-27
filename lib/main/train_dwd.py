@@ -22,18 +22,10 @@ from PIL import Image, ImageDraw
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy
 
-# Training regime
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
-# - pretrain on classification i.e. make classification loss available
-#
-# - try high dimensional loss
-# - try regression loss
-# - with and without pretraining on semantic segmentation
-
 
 def main(unused_argv):
     print(args)
-
 
 
     np.random.seed(cfg.RNG_SEED)
@@ -111,9 +103,10 @@ def main(unused_argv):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
-
+    used_losses_and_optimizers = []
     for assign in args.training_assignements:
-        losses = train_on_assignment(args,imdb,data_layer,saver,sess,writer,network_heads,assign)
+        losses = train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign)
+        used_losses_and_optimizers.append(losses)
 
     for comb_assign in args.combined_assignements:
         train_on_comb_assignment()
@@ -122,11 +115,11 @@ def main(unused_argv):
         data_layer.kill()
 
 
-def train_on_assignment(args,imdb,data_layer,saver,sess,writer,network_heads,assign):
+def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign):
     # get groundtruth input placeholders
     gt_placeholders = get_gt_placeholders(assign,imdb)
+
     # define loss
-    print("define loss")
     if assign["stamp_args"]["loss"] == "softmax":
         loss_components = [tf.losses.mean_squared_error(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
                                                         labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
@@ -139,6 +132,8 @@ def train_on_assignment(args,imdb,data_layer,saver,sess,writer,network_heads,ass
     if assign["mask_zeros"]:
         raise NotImplementedError("masking out not implemented")
 
+    # call tf.reduce mean on each loss component
+    loss_components = [tf.reduce_mean(x) for x in loss_components]
     stacked_components = tf.stack(loss_components)
     if assign["layer_loss_aggregate"] == "min":
         loss = tf.reduce_min(stacked_components)
@@ -148,13 +143,129 @@ def train_on_assignment(args,imdb,data_layer,saver,sess,writer,network_heads,ass
         raise NotImplementedError("unknown layer aggregate")
 
 
-    print("define optimizer")
+    # init optimizer
+    var_list = [var for var in tf.trainable_variables()]
+    optim = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=var_list)
 
-    print("define summary op")
-
+    # define summary ops
     print("train loop")
+    scalar_sums = []
 
-    return loss
+    for i in range(len(assign["ds_factors"])):
+        scalar_sums.append(tf.summary.scalar("sub_loss_"+str(i)+": " + get_config_id(assign), loss_components[i]))
+
+    scalar_sums.append(tf.summary.scalar("loss: "+get_config_id(assign), loss))
+    scalar_summary_op = tf.summary.merge(scalar_sums)
+
+    images_sums = []
+    images_placeholders = []
+
+    # feature maps
+    for i in range(len(assign["ds_factors"])):
+        sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+        images_placeholders.append(sub_prediction_placeholder)
+        images_sums.append(tf.summary.image('sub_prediction_'+str(i), sub_prediction_placeholder))
+
+        sub_gt_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+        images_placeholders.append(sub_gt_placeholder)
+        images_sums.append(tf.summary.image('sub_prediction_' + str(i), sub_gt_placeholder))
+
+    final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    images_summary_op = tf.summary.merge(images_sums)
+
+
+    print("Start training")
+    #TODO make itr count up continousely
+    for itr in range(1, args.itrs):
+        # load batch - only use batches with content
+        batch_not_loaded = True
+        while batch_not_loaded:
+            if args.prefetch == "True":
+                blob = data_layer.get_item()
+            else:
+                blob = data_layer.forward(args)
+            batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+
+        # if "DeepScores" in args.dataset:
+        #     blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
+        #     # one-hot class labels
+        #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+        #
+        # if "voc" in args.dataset:
+        #     # one-hot class labels
+        #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+        #     blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
+
+        feed_dict ={input: blob["data"]}
+        for i in range(len(gt_placeholders)):
+            feed_dict[gt_placeholders[i]] = blob["gt_map"+str(i)]
+
+        # train step
+        _, loss_fetch = sess.run(
+            [optim,loss],
+            feed_dict=feed_dict)
+
+        if itr % args.print_interval == 0 or itr == 1:
+            print("loss at itr: " + str(itr))
+            print(loss_fetch)
+
+        if itr % args.save_interval == 0 or itr == 1:
+            sess.run([scalar_summary_op],
+                feed_dict=feed_dict)
+
+            writer.add_summary(summary, float(itr))
+
+            # leave this for later
+            # print("add-prediciton to tensorboard")
+            # # compute prediction
+            # pred_class = np.argmax(pred_class_logits, axis=3)
+            # dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
+            #
+            # # build images
+            # # rescale
+            # # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
+            # # pred_scaled = pred_scaled / np.max(pred_scaled)*255
+            # # np.argmax(, axis=None, out=None)
+            # pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
+            # pred_scaled = np.expand_dims(pred_scaled, -1) * 255
+            #
+            # orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
+            # orig_scaled = np.expand_dims(orig_scaled, -1) * 255
+            #
+            # conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
+            # energy_array = np.squeeze(conc_array.astype("uint8"))
+            # energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
+            #
+            # # switch bgr to rgb
+            # im_rgb = blob["data"][0][:, :, [2, 1, 0]] + cfg.PIXEL_MEANS[:, :, [2, 1, 0]]
+            # im = Image.fromarray(im_rgb.astype("uint8"))
+            # draw = ImageDraw.Draw(im)
+            # # overlay GT boxes
+            # for row in blob["gt_boxes"][0]:
+            #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
+            # for row in dws_list:
+            #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
+            # im_array = np.array(im).astype("uint8")
+            # im_array = np.expand_dims(im_array, 0)
+            #
+            # if len(im_array.shape) < 4:
+            #     im_array = np.expand_dims(im_array, -1)
+
+            # save images to tensorboard
+            summary = sess.run([images_summary_op],
+                               feed_dict={
+                                   img_pred_placeholder: im_array,
+                                   img_energy_placeholder: energy_array})
+            writer.add_summary(summary[0], float(itr))
+
+
+        if itr % args.save_interval == 0:
+            print("saving weights")
+            if not os.path.exists(checkpoint_dir):
+                os.makedirs(checkpoint_dir)
+            saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
+
+    return loss,optim
 
 
 def get_gt_placeholders(assign, imdb):
@@ -164,6 +275,11 @@ def get_gt_placeholders(assign, imdb):
 
 def train_on_comb_assignment():
     return
+
+
+def get_config_id(assign):
+    return assign["stamp_func"][0]+"_"+ assign["stamp_args"]["loss"]
+
 
 
 def get_checkpoint_dir(args):
@@ -359,103 +475,3 @@ if __name__ == '__main__':
  #        images_summary_op = tf.summary.merge(images_sums)
  #
  #
- #
- #            # print("Start training")
- #    # for itr in range(1, args.itrs):
- #    #     # load batch - only use batches with content
- #    #     batch_not_loaded = True
- #    #     while batch_not_loaded:
- #    #         if args.prefetch == "True":
- #    #             blob = data_layer_pw.get_item()
- #    #         else:
- #    #             blob = data_layer.forward(args)
- #    #         batch_not_loaded = len(blob["gt_boxes"].shape) != 3
- #    #
- #    #
- #    #     if "DeepScores" in args.dataset:
- #    #         blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
- #    #         #one-hot class labels
- #    #         blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
- #    #
- #    #     if "voc" in args.dataset:
- #    #         #one-hot class labels
- #    #         blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
- #    #         blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
- #    #
- #    #
- #    #     # train step
- #    #     _, energy_loss_fetch, mean_mark_loss, min_mark_loss = sess.run([optim_op, energy_loss,mean_stacked_loss,min_stacked_loss],
- #    #                                                     feed_dict={input: blob["data"],
- #    #                                                                label_dws_energy: blob["dws_energy"],
- #    #                                                                label_class: blob["class_map"],
- #    #                                                                label_bbox: blob["bbox_fcn"],
- #    #                                                                label_orig: blob["gt_boxes"],
- #    #                                                                label_foreground: blob["foreground"]})
- #    #
- #    #     if itr % args.save_interval == 0 or itr == 1:
- #    #         _, summary, energy_loss_fetch, mean_mark_loss, min_mark_loss, pred_energy, pred_foreground, pred_class_logits, pred_bbox = sess.run(
- #    #             [optim_op, scalar_summary_op, energy_loss, mean_stacked_loss,min_stacked_loss, dws_energy,foreground, class_logits, bbox_size],
- #    #             feed_dict={input: blob["data"],
- #    #                        label_dws_energy: blob["dws_energy"],
- #    #                        label_class: blob["class_map"],
- #    #                        label_bbox: blob["bbox_fcn"],
- #    #                        label_orig: blob["gt_boxes"],
- #    #                        label_foreground: blob["foreground"]})
- #    #
- #    #
- #    #         writer.add_summary(summary, float(itr))
- #    #         print("add-prediciton to tensorboard")
- #    #         # compute prediction
- #    #         pred_class = np.argmax(pred_class_logits, axis=3)
- #    #         dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
- #    #
- #    #         # build images
- #    #         # rescale
- #    #         # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
- #    #         # pred_scaled = pred_scaled / np.max(pred_scaled)*255
- #    #         # np.argmax(, axis=None, out=None)
- #    #         pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
- #    #         pred_scaled = np.expand_dims(pred_scaled, -1)*255
- #    #
- #    #         orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
- #    #         orig_scaled = np.expand_dims(orig_scaled, -1)*255
- #    #
- #    #         conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
- #    #         energy_array = np.squeeze(conc_array.astype("uint8"))
- #    #         energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
- #    #
- #    #         # switch bgr to rgb
- #    #         im_rgb = blob["data"][0][:,:,[2,1,0]]+cfg.PIXEL_MEANS[:,:,[2,1,0]]
- #    #         im = Image.fromarray(im_rgb.astype("uint8"))
- #    #         draw = ImageDraw.Draw(im)
- #    #         # overlay GT boxes
- #    #         for row in blob["gt_boxes"][0]:
- #    #             draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
- #    #         for row in dws_list:
- #    #             draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
- #    #         im_array = np.array(im).astype("uint8")
- #    #         im_array = np.expand_dims(im_array, 0)
- #    #
- #    #         if len(im_array.shape) < 4:
- #    #             im_array = np.expand_dims(im_array, -1)
- #    #
- #    #
- #    #         # save images to tensorboard
- #    #         summary = sess.run([images_summary_op],
- #    #                  feed_dict={
- #    #                      img_pred_placeholder: im_array,
- #    #                      img_energy_placeholder: energy_array})
- #    #         writer.add_summary(summary[0], float(itr))
- #    #
- #    #         print("loss at itr: " + str(itr))
- #    #         print("energy_loss: " + str(energy_loss_fetch))
- #    #         print("mean_stack_loss: " + str(mean_stacked_loss))
- #    #         print("min_stack_loss: " + str(min_stacked_loss))
- #    #
- #    #
- #    #
- #    #     if itr % args.save_interval == 0:
- #    #         print("saving weights")
- #    #         if not os.path.exists(checkpoint_dir):
- #    #             os.makedirs(checkpoint_dir)
- #    #         saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
