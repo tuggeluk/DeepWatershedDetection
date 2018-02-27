@@ -1,33 +1,35 @@
 from models.RefineNet import build_refinenet
 import tensorflow as tf
 from tensorflow.contrib import slim
+from main.config import cfg
 
 
-def build_dwd_net(args,input,model,num_classes,pretrained_dir,substract_mean = False):
+def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False):
     g, init_fn = build_refinenet(input, preset_model=model, num_classes=None, pretrained_dir=pretrained_dir,
                                  substract_mean=substract_mean)
 
+    network_heads = dict()
     with tf.variable_scope('deep_watershed'):
-        if args.segment_resolution == "regression":
-            markers = [slim.conv2d(g[0], 1, [1, 1], activation_fn=None, scope='dws_mark_0'),
-                       slim.conv2d(g[1], 1, [1, 1], activation_fn=None, scope='dws_mark_1'),
-                       slim.conv2d(g[2], 1, [1, 1], activation_fn=None, scope='dws_mark_2'),
-                       slim.conv2d(g[3], 1, [1, 1], activation_fn=None, scope='dws_mark_3')]
-        elif args.segment_resolution == "binary":
-            markers = [slim.conv2d(g[0], 2, [1, 1], activation_fn=None, scope='dws_mark_0'),
-                       slim.conv2d(g[1], 2, [1, 1], activation_fn=None, scope='dws_mark_1'),
-                       slim.conv2d(g[2], 2, [1, 1], activation_fn=None, scope='dws_mark_2'),
-                       slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='dws_mark_3')]
-        elif args.segment_resolution == "class":
-            markers = [slim.conv2d(g[0], num_classes, [1, 1], activation_fn=None, scope='dws_mark_0'),
-                       slim.conv2d(g[1], num_classes, [1, 1], activation_fn=None, scope='dws_mark_1'),
-                       slim.conv2d(g[2], num_classes, [1, 1], activation_fn=None, scope='dws_mark_2'),
-                       slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='dws_mark_3')]
 
-        dws_energy = slim.conv2d(g[3], 1, [1, 1], activation_fn=None, scope='dws_energy')
-        class_logits = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
-        bbox_size = slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='dws_size')
-        foreground = slim.conv2d(g[3], 2, [1, 1], activation_fn=None, scope='foreground')
+        network_heads["stamp_class"] = dict()
+        # class binary
+        network_heads["stamp_class"]["binary"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='class_binary_'+str(x)) for x in range(0, len(g))]
+        # class pred
+        network_heads["stamp_class"]["class"] = [slim.conv2d(g[x], num_classes, [1, 1], activation_fn=None, scope='class_pred_' + str(x)) for x in range(0, len(g))]
 
+        # direction
+        network_heads["stamp_directions"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='direction_' + str(x)) for x in range(0, len(g))]
 
-        return [markers,foreground,dws_energy,class_logits,bbox_size], init_fn
+        network_heads["stamp_energy"] = dict()
+        # energy marker - regression
+        network_heads["stamp_energy"]["reg"] = [slim.conv2d(g[x], 1, [1, 1], activation_fn=None, scope='energy_reg_' + str(x)) for x in range(0, len(g))]
+        # energy marker - logits
+        network_heads["stamp_energy"]["softmax"] = [slim.conv2d(g[x], cfg.TRAIN.MAX_ENERGY, [1, 1], activation_fn=None, scope='energy_logits_' + str(x)) for x in range(0, len(g))]
+
+        network_heads["stamp_bbox"] = dict()
+        # bbox_size - reg
+        network_heads["stamp_bbox"]["reg"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='bbox_reg_' + str(x)) for x in range(0, len(g))]
+        # bbox_size - logits
+        network_heads["stamp_bbox"]["softmax"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='bbox_logits_' + str(x)) for x in range(0, len(g))]
+
+        return network_heads, init_fn

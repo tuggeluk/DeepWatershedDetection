@@ -31,6 +31,8 @@ __C.TRAIN.BG_THRESH_LO = 0.1
 # For COCO, setting USE_ALL_GT to False will exclude boxes that are flagged as ''iscrowd''
 __C.TRAIN.USE_ALL_GT = True
 
+# how many softmax levels are to be used for energy
+__C.TRAIN.MAX_ENERGY = 20
 
 
 #

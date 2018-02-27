@@ -7,6 +7,7 @@
 from PIL import Image, ImageDraw
 import numpy as np
 import random
+from main.config import cfg
 
 marker_size = [4,4]
 
@@ -173,7 +174,7 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     return fnc(exec_grid)
 
 # TODO marker and objectness energy grad
-def get_markers(size, gt, objectness_settings):
+def get_markers(size, gt, nr_classes, objectness_settings):
 
     #   ds_factors, downsample_marker, overlap_solution, samp_func, samp_args
     #
@@ -197,7 +198,7 @@ def get_markers(size, gt, objectness_settings):
     return None
 
 
-def stamp_directions(bbox,args):
+def stamp_directions(bbox,args,nr_classes):
 
     #   for bbox == -1 return dim
     #   Builds gt for objectness energy gradients has the shape of an oval
@@ -210,11 +211,13 @@ def stamp_directions(bbox,args):
     #                       --> make it a doughnut
     #
     #   return patch, and coords
+    if bbox == -1:
+        return 2
 
     return None
 
 
-def stamp_energy(bbox,args):
+def stamp_energy(bbox,args,nr_classes):
 
     #   for bbox == -1 return dim
     #
@@ -231,11 +234,15 @@ def stamp_energy(bbox,args):
     #                       (x-x_0,y-y_0)--> R, rounded for loss softmax
     #
     #   return patch, and coords
-
+    if bbox == -1:
+        if args["loss"]== "softmax":
+            return cfg.TRAIN.MAX_ENERGY
+        else:
+            return 1
     return None
 
 
-def stamp_class(bbox, args):
+def stamp_class(bbox, args, nr_classes):
 
     #   for bbox == -1 return dim
     #
@@ -249,6 +256,11 @@ def stamp_class(bbox, args):
     #   class_resolution:   "binary" for background/foreground or "class"
     #
     #   return patch, and coords
+    if bbox == -1:
+        if args["class_resolution"]== "binary":
+            return 2
+        else:
+            return nr_classes
 
     return None
 

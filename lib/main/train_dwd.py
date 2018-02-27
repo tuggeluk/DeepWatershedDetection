@@ -34,47 +34,26 @@ from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy
 def main(unused_argv):
     print(args)
 
-    save_objectness_function_handles(args)
+
 
     np.random.seed(cfg.RNG_SEED)
 
-    # load databases
-    print("Setting up image database: " + args.dataset)
-    imdb = get_imdb(args.dataset)
-    print('Loaded dataset `{:s}` for training'.format(imdb.name))
-    roidb = get_training_roidb(imdb, args.use_flipped == "True")
-    print('{:d} roidb entries'.format(len(roidb)))
+    # load database
+    imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val = load_database(args)
 
-    if args.dataset_validation != "no":
-        print("Setting up validation image database: " + args.dataset_validation)
-        imdb_val = get_imdb(args.dataset_validation)
-        print('Loaded dataset `{:s}` for validation'.format(imdb_val.name))
-        roidb_val = get_training_roidb(imdb_val, False)
-        print('{:d} roidb entries'.format(len(roidb_val)))
-    else:
-        imdb_val = None
-        roidb_val = None
-
-
-    data_layer = RoIDataLayer(roidb, imdb.num_classes)
-
-    if roidb_val is not None:
-        data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
-
-    if args.prefetch == "True":
-        data_layer_pw = PrefetchWrapper(data_layer.forward, args.prefetch_len, args)
+    # replaces keywords with function handles in training assignements
+    save_objectness_function_handles(args,imdb)
 
     #
     # Debug stuffs
     #
-    batch_not_loaded = True
-    while batch_not_loaded:
-        data = data_layer.forward(args)
-        batch_not_loaded = len(data["gt_boxes"].shape) != 3
+    # batch_not_loaded = True
+    # while batch_not_loaded:
+    #     data = data_layer.forward(args)
+    #     batch_not_loaded = len(data["gt_boxes"].shape) != 3
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
     #
-
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -83,119 +62,29 @@ def main(unused_argv):
 
     # input and output tensors
     num_classes = len(imdb._classes)
-
     if "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
-        image_mode = "music"
 
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         resnet_dir = cfg.PRETRAINED_DIR+"/ImageNet/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/VOC2012/"
-        image_mode = "realistic"
 
-    # label placeholders
-    # dws_labels
-    label_dws_energy = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-    label_class = tf.placeholder(tf.float32, shape=[None,  None, None, num_classes])
-    label_bbox = tf.placeholder(tf.float32, shape=[None, None, None, 2])
-    label_foreground = tf.placeholder(tf.float32, shape=[None, None, None, 2])
-
-    if args.segment_resolution == "regression":
-        marker_0 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        marker_1 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        marker_2 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        marker_3 = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-    elif args.segment_resolution == "binary":
-        marker_0 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
-        marker_1 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
-        marker_2 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
-        marker_3 = tf.placeholder(tf.float32, shape=[None, None, None, 2])
-    elif args.segment_resolution == "class":
-        marker_0 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
-        marker_1 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
-        marker_2 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
-        marker_3 = tf.placeholder(tf.float32, shape=[None, None, None, num_classes])
-
-
-    # original bbox label
-    label_orig = tf.placeholder(tf.float32, shape=[None, None, 5])
-    img_energy_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
-    img_marker_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
 
     print("Initializing Model:" + args.model)
-    [markers,foreground, dws_energy, class_logits, bbox_size],init_fn = build_dwd_net(args,
+    # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
+    network_heads, init_fn = build_dwd_net(
         input, model=args.model,num_classes=num_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
-    with tf.variable_scope('deep_watershed'):
-        print("Using loss:")
-        # marker Loss
-        if args.segment_resolution == "regression":
-            l_mark_0 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[0], labels=marker_0))
-            l_mark_1 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[1], labels=marker_1))
-            l_mark_2 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[2], labels=marker_2))
-            l_mark_3 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[3], labels=marker_3))
-        elif args.segment_resolution == "binary" or args.segment_resolution == "class":
-            l_mark_0 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[0], labels=marker_0))
-            l_mark_1 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[1], labels=marker_1))
-            l_mark_2 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[2], labels=marker_2))
-            l_mark_3 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[3], labels=marker_3))
-
-
-        stacked_markers = tf.stack([l_mark_0,l_mark_1,l_mark_2,l_mark_3])
-        mean_stacked_loss = tf.reduce_mean(stacked_markers)
-        min_stacked_loss = tf.reduce_min(stacked_markers)
-
-        energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
-
-        # energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
-        #
-        # dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
-        #
-        # class_masked_logits = tf.boolean_mask(class_logits, dws_mask)
-        # class_masked_labels = tf.boolean_mask(label_class, dws_mask)
-        # class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
-        #
-        # bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
-        # class_masked_labels = tf.boolean_mask(label_bbox, dws_mask)
-        # box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
-        #
-        # ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
-        # tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
-
-
-        print("Init optimizers")
-        var_list = [var for var in tf.trainable_variables()]
-        opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
-        opt_min = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(min_stacked_loss, var_list=var_list)
-        opt_mean = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(mean_stacked_loss,var_list=var_list)
-
-        #opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
-        #opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
-
-        print("Init Summary")
-        scalar_sums = []
-        scalar_sums.append(tf.summary.scalar("energy_loss", energy_loss))
-        scalar_sums.append(tf.summary.scalar("mean_stacked", mean_stacked_loss))
-        scalar_sums.append(tf.summary.scalar("min_stacked", min_stacked_loss))
-        scalar_summary_op = tf.summary.merge(scalar_sums)
-
-        images_sums = []
-        images_sums.append(tf.summary.image('Energy_Map', img_energy_placeholder))
-        images_sums.append(tf.summary.image('Marker_Maps', img_marker_placeholder))
-        images_sums.append(tf.summary.image('Prediction', img_pred_placeholder))
-        images_summary_op = tf.summary.merge(images_sums)
-
-
-
+    # init tensorflow session
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
 
-    # set up checkpoint path
+    # load model weights
     checkpoint_dir = get_checkpoint_dir(args)
     checkpoint_name =  "backbone"
     if args.continue_training == "True":
@@ -222,109 +111,60 @@ def main(unused_argv):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
-    optim_op = opt_min
 
-    print("Start training")
-    for itr in range(1, args.itrs):
-        # load batch - only use batches with content
-        batch_not_loaded = True
-        while batch_not_loaded:
-            if args.prefetch == "True":
-                blob = data_layer_pw.get_item()
-            else:
-                blob = data_layer.forward(args)
-            batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+    for assign in args.training_assignements:
+        losses = train_on_assignment(args,imdb,data_layer,saver,sess,writer,network_heads,assign)
+
+    for comb_assign in args.combined_assignements:
+        train_on_comb_assignment()
+
+    if args.prefetch == "True":
+        data_layer.kill()
 
 
-        if "DeepScores" in args.dataset:
-            blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
-            #one-hot class labels
-            blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
-
-        if "voc" in args.dataset:
-            #one-hot class labels
-            blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
-            blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
-
-
-        # train step
-        _, energy_loss_fetch, mean_mark_loss, min_mark_loss = sess.run([optim_op, energy_loss,mean_stacked_loss,min_stacked_loss],
-                                                        feed_dict={input: blob["data"],
-                                                                   label_dws_energy: blob["dws_energy"],
-                                                                   label_class: blob["class_map"],
-                                                                   label_bbox: blob["bbox_fcn"],
-                                                                   label_orig: blob["gt_boxes"],
-                                                                   label_foreground: blob["foreground"]})
-
-        if itr % args.save_interval == 0 or itr == 1:
-            _, summary, energy_loss_fetch, mean_mark_loss, min_mark_loss, pred_energy, pred_foreground, pred_class_logits, pred_bbox = sess.run(
-                [optim_op, scalar_summary_op, energy_loss, mean_stacked_loss,min_stacked_loss, dws_energy,foreground, class_logits, bbox_size],
-                feed_dict={input: blob["data"],
-                           label_dws_energy: blob["dws_energy"],
-                           label_class: blob["class_map"],
-                           label_bbox: blob["bbox_fcn"],
-                           label_orig: blob["gt_boxes"],
-                           label_foreground: blob["foreground"]})
+def train_on_assignment(args,imdb,data_layer,saver,sess,writer,network_heads,assign):
+    # get groundtruth input placeholders
+    gt_placeholders = get_gt_placeholders(assign,imdb)
+    # define loss
+    print("define loss")
+    if assign["stamp_args"]["loss"] == "softmax":
+        loss_components = [tf.losses.mean_squared_error(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
+                                                        labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+    else:
+        loss_components = [safe_softmax_cross_entropy_with_logits(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
+                                                        labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
 
 
-            writer.add_summary(summary, float(itr))
-            print("add-prediciton to tensorboard")
-            # compute prediction
-            pred_class = np.argmax(pred_class_logits, axis=3)
-            dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
+    # potentially mask out zeros
+    if assign["mask_zeros"]:
+        raise NotImplementedError("masking out not implemented")
 
-            # build images
-            # rescale
-            # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
-            # pred_scaled = pred_scaled / np.max(pred_scaled)*255
-            # np.argmax(, axis=None, out=None)
-            pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
-            pred_scaled = np.expand_dims(pred_scaled, -1)*255
-
-            orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
-            orig_scaled = np.expand_dims(orig_scaled, -1)*255
-
-            conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
-            energy_array = np.squeeze(conc_array.astype("uint8"))
-            energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
-
-            # switch bgr to rgb
-            im_rgb = blob["data"][0][:,:,[2,1,0]]+cfg.PIXEL_MEANS[:,:,[2,1,0]]
-            im = Image.fromarray(im_rgb.astype("uint8"))
-            draw = ImageDraw.Draw(im)
-            # overlay GT boxes
-            for row in blob["gt_boxes"][0]:
-                draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
-            for row in dws_list:
-                draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
-            im_array = np.array(im).astype("uint8")
-            im_array = np.expand_dims(im_array, 0)
-
-            if len(im_array.shape) < 4:
-                im_array = np.expand_dims(im_array, -1)
+    stacked_components = tf.stack(loss_components)
+    if assign["layer_loss_aggregate"] == "min":
+        loss = tf.reduce_min(stacked_components)
+    elif assign["layer_loss_aggregate"] == "avg":
+        loss = tf.reduce_mean(stacked_components)
+    else:
+        raise NotImplementedError("unknown layer aggregate")
 
 
-            # save images to tensorboard
-            summary = sess.run([images_summary_op],
-                     feed_dict={
-                         img_pred_placeholder: im_array,
-                         img_energy_placeholder: energy_array})
-            writer.add_summary(summary[0], float(itr))
+    print("define optimizer")
 
-            print("loss at itr: " + str(itr))
-            print("energy_loss: " + str(energy_loss_fetch))
-            print("mean_stack_loss: " + str(mean_stacked_loss))
-            print("min_stack_loss: " + str(min_stacked_loss))
+    print("define summary op")
+
+    print("train loop")
+
+    return loss
 
 
+def get_gt_placeholders(assign, imdb):
+    gt_dim = assign["stamp_func"][1](-1, assign["stamp_args"], len(imdb._classes))
+    return [tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]]
 
-        if itr % args.save_interval == 0:
-            print("saving weights")
-            if not os.path.exists(checkpoint_dir):
-                os.makedirs(checkpoint_dir)
-            saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
-    data_layer_pw.kill()
+def train_on_comb_assignment():
+    return
+
 
 def get_checkpoint_dir(args):
     # assemble path
@@ -343,9 +183,6 @@ def get_checkpoint_dir(args):
         os.makedirs(tbdir)
     return tbdir
 
-def train_on_task(itr,end_itr,task):
-    print("")
-
 
 def get_training_roidb(imdb, use_flipped):
   """Returns a roidb (Region of Interest database) for use in training."""
@@ -361,17 +198,42 @@ def get_training_roidb(imdb, use_flipped):
   return imdb.roidb
 
 
-def save_objectness_function_handles(args):
+def save_objectness_function_handles(args, imdb):
     FUNCTION_MAP = {'stamp_directions':stamp_directions,
                     'stamp_energy': stamp_energy,
                     'stamp_class': stamp_class}
 
-    for obj_setting in args.objectness_settings:
-        obj_setting["stamp_func"] = FUNCTION_MAP[obj_setting["stamp_func"]]
+    for obj_setting in args.training_assignements:
+        obj_setting["stamp_func"] = [obj_setting["stamp_func"], FUNCTION_MAP[obj_setting["stamp_func"]]]
 
     return args
 
+def load_database(args):
+    print("Setting up image database: " + args.dataset)
+    imdb = get_imdb(args.dataset)
+    print('Loaded dataset `{:s}` for training'.format(imdb.name))
+    roidb = get_training_roidb(imdb, args.use_flipped == "True")
+    print('{:d} roidb entries'.format(len(roidb)))
 
+    if args.dataset_validation != "no":
+        print("Setting up validation image database: " + args.dataset_validation)
+        imdb_val = get_imdb(args.dataset_validation)
+        print('Loaded dataset `{:s}` for validation'.format(imdb_val.name))
+        roidb_val = get_training_roidb(imdb_val, False)
+        print('{:d} roidb entries'.format(len(roidb_val)))
+    else:
+        imdb_val = None
+        roidb_val = None
+
+
+    data_layer = RoIDataLayer(roidb, imdb.num_classes)
+
+    if roidb_val is not None:
+        data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
+
+    if args.prefetch == "True":
+        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args)
+    return imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val
 
 
 
@@ -393,7 +255,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
-    parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
+    parser.add_argument("--pretrain_lvl", type=str, default="no", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
@@ -409,24 +271,191 @@ if __name__ == '__main__':
     parser.add_argument('--segment_resolution', type=str, default="class", help="binary,class or regression (for Centerness-energy)")
 
 
-    parser.add_argument('--objectness_settings', type=list,
+    parser.add_argument('--training_assignements', type=list,
                         default=[
     # energy markers
-                            {'ds_factors': [2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
-                                 'stamp_func': 'stamp_energy',
+                            {'itrs': 50000,'ds_factors': [0,2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
+                                 'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
                                  'stamp_args':{'marker_dim': (9,9), "shape": "square", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'ds_factors': [2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
-                             'stamp_func': 'stamp_class',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class"}},
+                            {'itrs': 50000, 'ds_factors': [0, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "loss": "class"}},
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'ds_factors': [2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
-                             'stamp_func': 'stamp_directions',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7, 'hole': 0.3}}
+                            {'itrs': 50000, 'ds_factors': [0, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7, 'hole': 0.3, 'loss': "reg"}}
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+
+    parser.add_argument('--combined_assignements', type=list,
+                        default=[],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     args, unparsed = parser.parse_known_args()
 
 
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
 
+
+
+ #
+ #
+ # with tf.variable_scope('deep_watershed'):
+ #        print("Using loss:")
+ #        # marker Loss
+ #        if args.segment_resolution == "regression":
+ #            l_mark_0 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[0], labels=marker_0))
+ #            l_mark_1 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[1], labels=marker_1))
+ #            l_mark_2 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[2], labels=marker_2))
+ #            l_mark_3 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[3], labels=marker_3))
+ #        elif args.segment_resolution == "binary" or args.segment_resolution == "class":
+ #            l_mark_0 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[0], labels=marker_0))
+ #            l_mark_1 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[1], labels=marker_1))
+ #            l_mark_2 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[2], labels=marker_2))
+ #            l_mark_3 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[3], labels=marker_3))
+ #
+ #
+ #        stacked_markers = tf.stack([l_mark_0,l_mark_1,l_mark_2,l_mark_3])
+ #        mean_stacked_loss = tf.reduce_mean(stacked_markers)
+ #        min_stacked_loss = tf.reduce_min(stacked_markers)
+ #
+ #        energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
+ #
+ #        # energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
+ #        #
+ #        # dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
+ #        #
+ #        # class_masked_logits = tf.boolean_mask(class_logits, dws_mask)
+ #        # class_masked_labels = tf.boolean_mask(label_class, dws_mask)
+ #        # class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
+ #        #
+ #        # bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
+ #        # class_masked_labels = tf.boolean_mask(label_bbox, dws_mask)
+ #        # box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
+ #        #
+ #        # ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
+ #        # tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
+ #
+ #
+ #        print("Init optimizers")
+ #        var_list = [var for var in tf.trainable_variables()]
+ #        opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
+ #        opt_min = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(min_stacked_loss, var_list=var_list)
+ #        opt_mean = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(mean_stacked_loss,var_list=var_list)
+ #
+ #        #opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
+ #        #opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
+ #
+ #        print("Init Summary")
+ #        scalar_sums = []
+ #        scalar_sums.append(tf.summary.scalar("energy_loss", energy_loss))
+ #        scalar_sums.append(tf.summary.scalar("mean_stacked", mean_stacked_loss))
+ #        scalar_sums.append(tf.summary.scalar("min_stacked", min_stacked_loss))
+ #        scalar_summary_op = tf.summary.merge(scalar_sums)
+ #
+ #        images_sums = []
+ #        images_sums.append(tf.summary.image('Energy_Map', img_energy_placeholder))
+ #        images_sums.append(tf.summary.image('Marker_Maps', img_marker_placeholder))
+ #        images_sums.append(tf.summary.image('Prediction', img_pred_placeholder))
+ #        images_summary_op = tf.summary.merge(images_sums)
+ #
+ #
+ #
+ #            # print("Start training")
+ #    # for itr in range(1, args.itrs):
+ #    #     # load batch - only use batches with content
+ #    #     batch_not_loaded = True
+ #    #     while batch_not_loaded:
+ #    #         if args.prefetch == "True":
+ #    #             blob = data_layer_pw.get_item()
+ #    #         else:
+ #    #             blob = data_layer.forward(args)
+ #    #         batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+ #    #
+ #    #
+ #    #     if "DeepScores" in args.dataset:
+ #    #         blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
+ #    #         #one-hot class labels
+ #    #         blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+ #    #
+ #    #     if "voc" in args.dataset:
+ #    #         #one-hot class labels
+ #    #         blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+ #    #         blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
+ #    #
+ #    #
+ #    #     # train step
+ #    #     _, energy_loss_fetch, mean_mark_loss, min_mark_loss = sess.run([optim_op, energy_loss,mean_stacked_loss,min_stacked_loss],
+ #    #                                                     feed_dict={input: blob["data"],
+ #    #                                                                label_dws_energy: blob["dws_energy"],
+ #    #                                                                label_class: blob["class_map"],
+ #    #                                                                label_bbox: blob["bbox_fcn"],
+ #    #                                                                label_orig: blob["gt_boxes"],
+ #    #                                                                label_foreground: blob["foreground"]})
+ #    #
+ #    #     if itr % args.save_interval == 0 or itr == 1:
+ #    #         _, summary, energy_loss_fetch, mean_mark_loss, min_mark_loss, pred_energy, pred_foreground, pred_class_logits, pred_bbox = sess.run(
+ #    #             [optim_op, scalar_summary_op, energy_loss, mean_stacked_loss,min_stacked_loss, dws_energy,foreground, class_logits, bbox_size],
+ #    #             feed_dict={input: blob["data"],
+ #    #                        label_dws_energy: blob["dws_energy"],
+ #    #                        label_class: blob["class_map"],
+ #    #                        label_bbox: blob["bbox_fcn"],
+ #    #                        label_orig: blob["gt_boxes"],
+ #    #                        label_foreground: blob["foreground"]})
+ #    #
+ #    #
+ #    #         writer.add_summary(summary, float(itr))
+ #    #         print("add-prediciton to tensorboard")
+ #    #         # compute prediction
+ #    #         pred_class = np.argmax(pred_class_logits, axis=3)
+ #    #         dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
+ #    #
+ #    #         # build images
+ #    #         # rescale
+ #    #         # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
+ #    #         # pred_scaled = pred_scaled / np.max(pred_scaled)*255
+ #    #         # np.argmax(, axis=None, out=None)
+ #    #         pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
+ #    #         pred_scaled = np.expand_dims(pred_scaled, -1)*255
+ #    #
+ #    #         orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
+ #    #         orig_scaled = np.expand_dims(orig_scaled, -1)*255
+ #    #
+ #    #         conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
+ #    #         energy_array = np.squeeze(conc_array.astype("uint8"))
+ #    #         energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
+ #    #
+ #    #         # switch bgr to rgb
+ #    #         im_rgb = blob["data"][0][:,:,[2,1,0]]+cfg.PIXEL_MEANS[:,:,[2,1,0]]
+ #    #         im = Image.fromarray(im_rgb.astype("uint8"))
+ #    #         draw = ImageDraw.Draw(im)
+ #    #         # overlay GT boxes
+ #    #         for row in blob["gt_boxes"][0]:
+ #    #             draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
+ #    #         for row in dws_list:
+ #    #             draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
+ #    #         im_array = np.array(im).astype("uint8")
+ #    #         im_array = np.expand_dims(im_array, 0)
+ #    #
+ #    #         if len(im_array.shape) < 4:
+ #    #             im_array = np.expand_dims(im_array, -1)
+ #    #
+ #    #
+ #    #         # save images to tensorboard
+ #    #         summary = sess.run([images_summary_op],
+ #    #                  feed_dict={
+ #    #                      img_pred_placeholder: im_array,
+ #    #                      img_energy_placeholder: energy_array})
+ #    #         writer.add_summary(summary[0], float(itr))
+ #    #
+ #    #         print("loss at itr: " + str(itr))
+ #    #         print("energy_loss: " + str(energy_loss_fetch))
+ #    #         print("mean_stack_loss: " + str(mean_stacked_loss))
+ #    #         print("min_stack_loss: " + str(min_stacked_loss))
+ #    #
+ #    #
+ #    #
+ #    #     if itr % args.save_interval == 0:
+ #    #         print("saving weights")
+ #    #         if not os.path.exists(checkpoint_dir):
+ #    #             os.makedirs(checkpoint_dir)
+ #    #         saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
