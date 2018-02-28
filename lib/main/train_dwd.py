@@ -22,16 +22,23 @@ from PIL import Image, ImageDraw
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy
 
+nr_classes = None
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
 
 def main(unused_argv):
     print(args)
-
+    iteration = 1
 
     np.random.seed(cfg.RNG_SEED)
 
     # load database
     imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val = load_database(args)
+
+    global nr_classes
+    nr_classes = len(imdb._classes)
+    args.nr_classes.append(nr_classes)
+    if args.prefetch == "True":
+        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args)
 
     # replaces keywords with function handles in training assignements
     save_objectness_function_handles(args,imdb)
@@ -39,10 +46,10 @@ def main(unused_argv):
     #
     # Debug stuffs
     #
-    # batch_not_loaded = True
-    # while batch_not_loaded:
-    #     data = data_layer.forward(args)
-    #     batch_not_loaded = len(data["gt_boxes"].shape) != 3
+    batch_not_loaded = True
+    while batch_not_loaded:
+        data = data_layer.forward(args, args.training_assignements[0])
+        batch_not_loaded = len(data["gt_boxes"].shape) != 3
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
     #
@@ -53,7 +60,6 @@ def main(unused_argv):
     sess = tf.Session(config=config)
 
     # input and output tensors
-    num_classes = len(imdb._classes)
     if "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
@@ -70,7 +76,7 @@ def main(unused_argv):
     print("Initializing Model:" + args.model)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model,num_classes=num_classes, pretrained_dir=resnet_dir, substract_mean=False)
+        input, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
     # init tensorflow session
     saver = tf.train.Saver(max_to_keep=1000)
@@ -105,7 +111,7 @@ def main(unused_argv):
 
     used_losses_and_optimizers = []
     for assign in args.training_assignements:
-        losses = train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign)
+        losses = train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration)
         used_losses_and_optimizers.append(losses)
 
     for comb_assign in args.combined_assignements:
@@ -115,11 +121,11 @@ def main(unused_argv):
         data_layer.kill()
 
 
-def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign):
+def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration):
     # get groundtruth input placeholders
     gt_placeholders = get_gt_placeholders(assign,imdb)
 
-    # define loss
+    # define loss #TODO directional loss
     if assign["stamp_args"]["loss"] == "softmax":
         loss_components = [tf.losses.mean_squared_error(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
                                                         labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
@@ -130,7 +136,14 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
 
     # potentially mask out zeros
     if assign["mask_zeros"]:
-        raise NotImplementedError("masking out not implemented")
+        # only compute loss where GT is not zero intended for "directional donuts"
+        masked_components = []
+        for x in range(len(assign["ds_factors"])):
+            mask = tf.squeeze(gt_placeholders[x] > 0, -1) # TODO does this squeeze make sense for directions
+            masked_components.append(tf.boolean_mask(loss_components[x], mask))
+
+        loss_components = masked_components
+
 
     # call tf.reduce mean on each loss component
     loss_components = [tf.reduce_mean(x) for x in loss_components]
@@ -148,7 +161,6 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
     optim = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=var_list)
 
     # define summary ops
-    print("train loop")
     scalar_sums = []
 
     for i in range(len(assign["ds_factors"])):
@@ -168,94 +180,47 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
 
         sub_gt_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         images_placeholders.append(sub_gt_placeholder)
-        images_sums.append(tf.summary.image('sub_prediction_' + str(i), sub_gt_placeholder))
+        images_sums.append(tf.summary.image('sub_gt_' + str(i), sub_gt_placeholder))
 
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    images_sums.append(tf.summary.image('final_predictions_' + str(i), final_pred_placeholder))
     images_summary_op = tf.summary.merge(images_sums)
 
 
     print("Start training")
-    #TODO make itr count up continousely
-    for itr in range(1, args.itrs):
+    for itr in range(iteration, (iteration+args.itrs)):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
             if args.prefetch == "True":
                 blob = data_layer.get_item()
             else:
-                blob = data_layer.forward(args)
+                blob = data_layer.forward(args,assign)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
 
-        # if "DeepScores" in args.dataset:
-        #     blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
-        #     # one-hot class labels
-        #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
-        #
-        # if "voc" in args.dataset:
-        #     # one-hot class labels
-        #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
-        #     blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
 
-        feed_dict ={input: blob["data"]}
+        feed_dict = {input: blob["data"]}
         for i in range(len(gt_placeholders)):
             feed_dict[gt_placeholders[i]] = blob["gt_map"+str(i)]
 
         # train step
-        _, loss_fetch = sess.run(
-            [optim,loss],
-            feed_dict=feed_dict)
+        _, loss_fetch = sess.run([optim,loss], feed_dict=feed_dict)
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
             print(loss_fetch)
 
-        if itr % args.save_interval == 0 or itr == 1:
-            sess.run([scalar_summary_op],
-                feed_dict=feed_dict)
+        if itr % args.tensorboard_interval == 0 or itr == 1:
+            fetch_list = [scalar_summary_op]
+            # fetch sub_predicitons
+            [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x]) for x in range(len(assign["ds_factors"]))]
 
+            summary, fetched_maps = sess.run(fetch_list,feed_dict=feed_dict)
             writer.add_summary(summary, float(itr))
 
-            # leave this for later
-            # print("add-prediciton to tensorboard")
-            # # compute prediction
-            # pred_class = np.argmax(pred_class_logits, axis=3)
-            # dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
-            #
-            # # build images
-            # # rescale
-            # # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
-            # # pred_scaled = pred_scaled / np.max(pred_scaled)*255
-            # # np.argmax(, axis=None, out=None)
-            # pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
-            # pred_scaled = np.expand_dims(pred_scaled, -1) * 255
-            #
-            # orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
-            # orig_scaled = np.expand_dims(orig_scaled, -1) * 255
-            #
-            # conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
-            # energy_array = np.squeeze(conc_array.astype("uint8"))
-            # energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
-            #
-            # # switch bgr to rgb
-            # im_rgb = blob["data"][0][:, :, [2, 1, 0]] + cfg.PIXEL_MEANS[:, :, [2, 1, 0]]
-            # im = Image.fromarray(im_rgb.astype("uint8"))
-            # draw = ImageDraw.Draw(im)
-            # # overlay GT boxes
-            # for row in blob["gt_boxes"][0]:
-            #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
-            # for row in dws_list:
-            #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
-            # im_array = np.array(im).astype("uint8")
-            # im_array = np.expand_dims(im_array, 0)
-            #
-            # if len(im_array.shape) < 4:
-            #     im_array = np.expand_dims(im_array, -1)
-
+            images_feed_dict = get_images_feed_dict()
             # save images to tensorboard
-            summary = sess.run([images_summary_op],
-                               feed_dict={
-                                   img_pred_placeholder: im_array,
-                                   img_energy_placeholder: energy_array})
+            summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
             writer.add_summary(summary[0], float(itr))
 
 
@@ -265,11 +230,18 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
                 os.makedirs(checkpoint_dir)
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
+    iteration =  (iteration + args.itrs)
     return loss,optim
 
 
+def get_images_feed_dict():
+    #TODO build images for tensorflow
+    raise NotImplementedError("cant build images yet")
+    return None
+
+
 def get_gt_placeholders(assign, imdb):
-    gt_dim = assign["stamp_func"][1](-1, assign["stamp_args"], len(imdb._classes))
+    gt_dim = assign["stamp_func"][1](-1, assign["stamp_args"], nr_classes)
     return [tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]]
 
 
@@ -347,10 +319,10 @@ def load_database(args):
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)
 
-    if args.prefetch == "True":
-        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args)
     return imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val
 
+def get_nr_classes():
+    return nr_classes
 
 
 if __name__ == '__main__':
@@ -375,9 +347,10 @@ if __name__ == '__main__':
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+    parser.add_argument("--print_interval", type=int, default=100, help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=100, help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000, help="after how many iterations are the weights saved")
-
+    parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
 
@@ -475,3 +448,53 @@ if __name__ == '__main__':
  #        images_summary_op = tf.summary.merge(images_sums)
  #
  #
+
+
+
+
+    # leave this for later
+    # print("add-prediciton to tensorboard")
+    # # compute prediction
+    # pred_class = np.argmax(pred_class_logits, axis=3)
+    # dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
+    #
+    # # build images
+    # # rescale
+    # # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
+    # # pred_scaled = pred_scaled / np.max(pred_scaled)*255
+    # # np.argmax(, axis=None, out=None)
+    # pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
+    # pred_scaled = np.expand_dims(pred_scaled, -1) * 255
+    #
+    # orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
+    # orig_scaled = np.expand_dims(orig_scaled, -1) * 255
+    #
+    # conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
+    # energy_array = np.squeeze(conc_array.astype("uint8"))
+    # energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
+    #
+    # # switch bgr to rgb
+    # im_rgb = blob["data"][0][:, :, [2, 1, 0]] + cfg.PIXEL_MEANS[:, :, [2, 1, 0]]
+    # im = Image.fromarray(im_rgb.astype("uint8"))
+    # draw = ImageDraw.Draw(im)
+    # # overlay GT boxes
+    # for row in blob["gt_boxes"][0]:
+    #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
+    # for row in dws_list:
+    #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
+    # im_array = np.array(im).astype("uint8")
+    # im_array = np.expand_dims(im_array, 0)
+    #
+    # if len(im_array.shape) < 4:
+    #     im_array = np.expand_dims(im_array, -1)
+
+
+    # if "DeepScores" in args.dataset:
+    #     blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
+    #     # one-hot class labels
+    #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+    #
+    # if "voc" in args.dataset:
+    #     # one-hot class labels
+    #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
+    #     blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]

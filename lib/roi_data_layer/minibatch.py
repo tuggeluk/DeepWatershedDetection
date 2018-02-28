@@ -15,11 +15,10 @@ import numpy.random as npr
 import cv2
 from main.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
-from datasets.fcn_groundtruth import objectness_energy, show_image, objectness_energy_high_dym, fcn_class_labels, \
-    fcn_bbox_labels, fcn_foreground, get_markers
+from datasets.fcn_groundtruth import get_markers
 
 
-def get_minibatch(roidb, args):
+def get_minibatch(roidb, args, assign):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -63,13 +62,17 @@ def get_minibatch(roidb, args):
 
 
 
-    # build additional gt for FCN
-    # show_image(im_blob, gt_boxes, gt=True)
-    blobs['dws_energy'] = objectness_energy(im_blob, gt_boxes)
-    # objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
-    blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
-    blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
-    blobs["foreground"] = fcn_foreground(im_blob, gt_boxes)
+    # # build additional gt for FCN
+    # # show_image(im_blob, gt_boxes, gt=True)
+    # blobs['dws_energy'] = objectness_energy(im_blob, gt_boxes)
+    # # objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
+    # blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
+    # blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
+    # blobs["foreground"] = fcn_foreground(im_blob, gt_boxes)
+    test = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0], assign)
+    for i in range(len(assign["ds_factors"])):
+        blobs["gt_map" + str(i)] = 1
+
 
     # gt_boxes = gt_boxes[bad_coords == False]
     # crop boxes

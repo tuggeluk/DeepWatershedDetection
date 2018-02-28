@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 import numpy as np
 import random
 from main.config import cfg
+import cv2
 
 marker_size = [4,4]
 
@@ -174,7 +175,7 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     return fnc(exec_grid)
 
 # TODO marker and objectness energy grad
-def get_markers(size, gt, nr_classes, objectness_settings):
+def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, maps_list = []):
 
     #   ds_factors, downsample_marker, overlap_solution, samp_func, samp_args
     #
@@ -192,10 +193,71 @@ def get_markers(size, gt, nr_classes, objectness_settings):
     #   stamp_func:         function that defines individual markers
     #   stamp_args:         dict with additional arguments passed on to stamp_func
 
-    print("asdrsadfasd")
+    # downsample size and bounding boxes
+    samp_factor = objectness_settings["ds_factors"][downsample_ind]
+    sampled_size = (int(size[1]*samp_factor),int(size[2]*samp_factor))
+
+    sampled_gt = [x*[0.5,0.5,0.5,0.5,1] for x in gt]
 
 
-    return None
+    print("init canvas")
+    last_dim = objectness_settings["stamp_func"][1](-1,objectness_settings["stamp_args"],nr_classes)
+    canvas = np.zeros(sampled_size+(last_dim,), dtype=np.int16)
+
+    used_coords = []
+    for bbox in sampled_gt:
+        stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+        if objectness_settings["overlap_solution"] == "max":
+            canvas[coords] = np.max(canvas[coords], stamp)
+        elif objectness_settings["overlap_solution"] == "no":
+            canvas[coords] = stamp
+        elif objectness_settings["overlap_solution"] == "nearest":
+            closest_mask = get_closest_mask(coords, used_coords)
+            canvas[coords] =  (1-closest_mask)*canvas[coords]+closest_mask*stamp
+            used_coords.append(coords)
+            # get overlapping bboxes
+            # shave off pixels that are closer to another center
+        else:
+            raise NotImplementedError("overlap solution unkown")
+
+    maps_list.append(canvas)
+    # if downsample marker --> use cv2 to downsample gt
+    if objectness_settings["downsample_marker"]:
+        for x in range(1,len(objectness_settings["ds_factors"])):
+            maps_list.append(cv2.resize(canvas,fx=1/x,fy=1/x,interpolation=cv2.INTER_NEAREST))
+
+    # if do not downsample marker, recursively rebuild for each ds level
+    else:
+        if (downsample_ind+1) == len(objectness_settings["ds_factors"]):
+            return maps_list
+        else:
+            return get_markers(size, gt, nr_classes, objectness_settings, downsample_ind+1, maps_list)
+
+    return maps_list
+
+
+
+
+def get_closest_mask(coords, used_coords):
+    # coords format x1,y1,x2,y2
+    mask = np.ones((int(coords[3]-coords[1]), int(coords[2]-coords[0])))
+    center = [int((coords[3]+coords[1])*0.5),int((coords[2]+coords[0])*0.5)]
+
+    x_coords = np.array(range(coords[0], coords[2]))
+    y_coords = np.array(range(coords[1], coords[3]))
+    coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
+
+    for used_coord in used_coords:
+        used_center = [int((used_coord[3]+used_coord[1])*0.5), int((used_coord[2]+used_coord[0])*0.5)]
+        closer_map = obj_closer(coords_grid,center,used_center)
+        mask = np.min(mask,closer_map)
+    return mask
+
+def obj_closer(grid, pos1, pos2):
+    dist1 = np.sqrt(np.square(grid[0] - pos1[0]) + np.square(grid[1] - pos1[1]))
+    dist2 = np.sqrt(np.square(grid[0] - pos2[0]) + np.square(grid[1] - pos2[1]))
+
+    return (dist1 < dist2)*1
 
 
 def stamp_directions(bbox,args,nr_classes):
