@@ -363,15 +363,15 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # energy markers
-                            {'itrs': 50000,'ds_factors': [0,2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
+                            {'itrs': 50000,'ds_factors': [1,2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
                                  'stamp_args':{'marker_dim': (9,9), "shape": "square", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'itrs': 50000, 'ds_factors': [0, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "loss": "class"}},
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'itrs': 50000, 'ds_factors': [0, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
                              'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.7, 'hole': 0.3, 'loss': "reg"}}
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")

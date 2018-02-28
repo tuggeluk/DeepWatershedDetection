@@ -174,7 +174,7 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     exec_grid = np.min(np.stack(np.meshgrid(grid_x, grid_y)),0)
     return fnc(exec_grid)
 
-# TODO marker and objectness energy grad
+
 def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, maps_list = []):
 
     #   ds_factors, downsample_marker, overlap_solution, samp_func, samp_args
@@ -194,10 +194,10 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     #   stamp_args:         dict with additional arguments passed on to stamp_func
 
     # downsample size and bounding boxes
-    samp_factor = objectness_settings["ds_factors"][downsample_ind]
+    samp_factor = 1/objectness_settings["ds_factors"][downsample_ind]
     sampled_size = (int(size[1]*samp_factor),int(size[2]*samp_factor))
 
-    sampled_gt = [x*[0.5,0.5,0.5,0.5,1] for x in gt]
+    sampled_gt = [x*[samp_factor,samp_factor,samp_factor,samp_factor,1] for x in gt]
 
 
     print("init canvas")
@@ -291,11 +291,39 @@ def stamp_energy(bbox,args,nr_classes):
     #                       marker_dim is None
     #   shape:              "oval" or "square" detemines the shape of the energy marker
     #   loss:               softmax, regression
-    #   min_max:            tuple of maximal and minimal energy (will be rounded up to at least zero for softmax)
     #   energy_shape:       function that maps from position in patch to objectnes energy i.e.
     #                       (x-x_0,y-y_0)--> R, rounded for loss softmax
     #
     #   return patch, and coords
+
+    if args["marker_dim"] is None:
+        # use bbox size
+        print("use percentage bbox size")
+        # determine marker size
+        marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
+    else:
+        marker_size = args["marker_dim"]
+
+    marker = get_energy_marker(marker_size, args["shape"])
+
+    # apply shape function
+    shape_fnc = None
+    if args["energy_shape"] == "linear":
+        1==1 # do nothing
+    elif args["energy_shape"] == "root":
+        marker = np.sqrt(marker)
+        marker = marker/np.max(marker)* (cfg.TRAIN.MAX_ENERGY-1)
+    elif args["energy_shape"] == "quadratic":
+        marker = np.square(marker)
+        marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY-1)
+
+    if args["loss"]== "softmax":
+        marker = np.round(marker).astype(np.int32)
+        marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
+        # turn into one-hot softmax targets
+
+    return marker
+
     if bbox == -1:
         if args["loss"]== "softmax":
             return cfg.TRAIN.MAX_ENERGY
@@ -303,6 +331,38 @@ def stamp_energy(bbox,args,nr_classes):
             return 1
     return None
 
+
+def get_energy_marker(size, shape):
+    if shape == "square":
+        sy = size[0] / 2
+        sx = size[1] / 2
+        if size[0]%2 == 1:
+            grid_y = np.concatenate((range(sy),range(sy,-1,-1)))
+        else:
+            grid_y = np.concatenate((range(sy), range(sy-1, -1, -1)))
+
+        if size[1]%2 == 1:
+            grid_x = np.concatenate((range(sx), range(sx, -1, -1)))
+        else:
+            grid_x = np.concatenate((range(sx), range(sx-1, -1, -1)))
+
+        marker = np.min(np.stack(np.meshgrid(grid_x, grid_y)),0)
+        marker = marker/float(np.max(marker))*(cfg.TRAIN.MAX_ENERGY-1)
+        return marker
+    if shape == "oval":
+        center = np.asanyarray(size) *0.5
+
+        y_coords = np.array(range(size[0]))+0.5
+        x_coords = np.array(range(size[1]))+0.5
+        coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
+
+        marker = np.sqrt(np.square((coords_grid[0] - center[0])/(size[0])) + np.square((coords_grid[1] - center[1])/(size[1])))
+        largest = max(marker[int(center[1]),0],marker[0,int(center[0])])
+        marker = 1-(marker / float(np.max(largest)))
+        marker[marker < 0] = 0
+        marker = marker * (cfg.TRAIN.MAX_ENERGY-1)
+        return marker
+    return None
 
 def stamp_class(bbox, args, nr_classes):
 
