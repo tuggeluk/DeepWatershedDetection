@@ -191,7 +191,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     #                       "closest": each pixel gets assigned according to its closet center
     #                       --> prints to console if conflicts exist
     #   stamp_func:         function that defines individual markers
-    #   stamp_args:         dict with additional arguments passed on to stamp_func
+    #   stamp_args:         dict with  additional arguments passed on to stamp_func
 
     # downsample size and bounding boxes
     samp_factor = 1/objectness_settings["ds_factors"][downsample_ind]
