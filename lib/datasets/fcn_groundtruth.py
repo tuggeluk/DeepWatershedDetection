@@ -201,12 +201,13 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
 
     print("init canvas")
-    last_dim = objectness_settings["stamp_func"][1](-1,objectness_settings["stamp_args"],nr_classes)
+    last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"],nr_classes)
     canvas = np.zeros(sampled_size+(last_dim,), dtype=np.int16)
 
     used_coords = []
     for bbox in sampled_gt:
         stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+        # Todo sanatize out of bounds coords
         if objectness_settings["overlap_solution"] == "max":
             canvas[coords] = np.max(canvas[coords], stamp)
         elif objectness_settings["overlap_solution"] == "no":
@@ -296,13 +297,25 @@ def stamp_energy(bbox,args,nr_classes):
     #
     #   return patch, and coords
 
+    if bbox is None:
+        if args["loss"]== "softmax":
+            return cfg.TRAIN.MAX_ENERGY
+        else:
+            return 1
+
+
     if args["marker_dim"] is None:
         # use bbox size
         print("use percentage bbox size")
         # determine marker size
         marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
+
     else:
         marker_size = args["marker_dim"]
+
+    coords_offset = ([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5
+    coords = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0],
+              bbox[0]+coords_offset[1]+marker_size[1],bbox[1]+coords_offset[0]+marker_size[1]]).astype(np.int)
 
     marker = get_energy_marker(marker_size, args["shape"])
 
@@ -322,13 +335,11 @@ def stamp_energy(bbox,args,nr_classes):
         marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
         # turn into one-hot softmax targets
 
-    return marker
 
-    if bbox == -1:
-        if args["loss"]== "softmax":
-            return cfg.TRAIN.MAX_ENERGY
-        else:
-            return 1
+
+    return marker, coords
+
+
     return None
 
 
@@ -378,6 +389,36 @@ def stamp_class(bbox, args, nr_classes):
     #   class_resolution:   "binary" for background/foreground or "class"
     #
     #   return patch, and coords
+
+    if args["marker_dim"] is None:
+        # use bbox size
+        # determine marker size
+        marker_size = (int(args["size_percentage"] * (bbox[3] - bbox[1])), int(args["size_percentage"] * (bbox[2] - bbox[0])))
+    else:
+        marker_size = args["marker_dim"]
+
+    marker = get_energy_marker(marker_size, args["shape"])
+
+    # apply shape function
+    shape_fnc = None
+    if args["energy_shape"] == "linear":
+        1 == 1  # do nothing
+    elif args["energy_shape"] == "root":
+        marker = np.sqrt(marker)
+        marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY - 1)
+    elif args["energy_shape"] == "quadratic":
+        marker = np.square(marker)
+        marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY - 1)
+
+    if args["loss"] == "softmax":
+        marker = np.round(marker).astype(np.int32)
+        marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
+        # turn into one-hot softmax targets
+
+    return marker
+
+
+
     if bbox == -1:
         if args["class_resolution"]== "binary":
             return 2
