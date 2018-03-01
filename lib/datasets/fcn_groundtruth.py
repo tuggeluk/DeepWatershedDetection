@@ -9,6 +9,8 @@ import numpy as np
 import random
 from main.config import cfg
 import cv2
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 marker_size = [4,4]
 
@@ -194,38 +196,60 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     #   stamp_args:         dict with  additional arguments passed on to stamp_func
 
     # downsample size and bounding boxes
-    samp_factor = 1/objectness_settings["ds_factors"][downsample_ind]
+    samp_factor = 1.0/objectness_settings["ds_factors"][downsample_ind]
     sampled_size = (int(size[1]*samp_factor),int(size[2]*samp_factor))
 
     sampled_gt = [x*[samp_factor,samp_factor,samp_factor,samp_factor,1] for x in gt]
 
 
-    print("init canvas")
+    #init canvas
     last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"],nr_classes)
     canvas = np.zeros(sampled_size+(last_dim,), dtype=np.int16)
 
     used_coords = []
     for bbox in sampled_gt:
         stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
-        # Todo sanatize out of bounds coords
+        stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
+        if stamp is None:
+            continue #skip this element
+
         if objectness_settings["overlap_solution"] == "max":
-            canvas[coords] = np.max(canvas[coords], stamp)
+            if objectness_settings["stamp_args"]["loss"]=="softmax":
+                maskout_map = np.argmax(canvas[coords[1]:coords[3],coords[0]:(coords[2])], -1) < np.argmax(stamp,-1)
+                canvas[coords[1]:coords[3], coords[0]:coords[2]][maskout_map] = stamp[maskout_map]
+            else:
+                canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.max(canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp)
         elif objectness_settings["overlap_solution"] == "no":
-            canvas[coords] = stamp
+            canvas[coords[1]:coords[3],coords[0]:coords[2]] = stamp
         elif objectness_settings["overlap_solution"] == "nearest":
             closest_mask = get_closest_mask(coords, used_coords)
-            canvas[coords] =  (1-closest_mask)*canvas[coords]+closest_mask*stamp
+            if objectness_settings["stamp_args"]["loss"] == "softmax":
+                closest_mask = np.expand_dims(closest_mask,-1)
+                canvas[coords[1]:coords[3],coords[0]:coords[2]] = \
+                    (1 - closest_mask) * canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask * stamp
+            else:
+                canvas[coords] = (1-closest_mask)*canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask*stamp
+
             used_coords.append(coords)
             # get overlapping bboxes
             # shave off pixels that are closer to another center
         else:
             raise NotImplementedError("overlap solution unkown")
 
-    maps_list.append(canvas)
+    maps_list.append(np.expand_dims(canvas,0))
     # if downsample marker --> use cv2 to downsample gt
     if objectness_settings["downsample_marker"]:
-        for x in range(1,len(objectness_settings["ds_factors"])):
-            maps_list.append(cv2.resize(canvas,fx=1/x,fy=1/x,interpolation=cv2.INTER_NEAREST))
+        if objectness_settings["stamp_args"]["loss"] == "softmax":
+            sm_dim = canvas.shape[-1]
+            canvas_un_oh = np.argmax(canvas, -1)
+            for x in objectness_settings["ds_factors"][1:]:
+                resized = np.round(cv2.resize(canvas_un_oh, None, None, 1.0/x, 1.0/x, cv2.INTER_NEAREST))
+                resized_oh = np.eye(sm_dim)[resized[:,:]]
+                maps_list.append(np.expand_dims(resized_oh,0))
+        else:
+            for x in objectness_settings["ds_factors"][1:]:
+                resized = np.round(cv2.resize(canvas, None, None, 1.0 / x, 1.0 / x, cv2.INTER_NEAREST))
+                maps_list.append(np.expand_dims(resized,0))
 
     # if do not downsample marker, recursively rebuild for each ds level
     else:
@@ -237,26 +261,24 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     return maps_list
 
 
-
-
 def get_closest_mask(coords, used_coords):
     # coords format x1,y1,x2,y2
-    mask = np.ones((int(coords[3]-coords[1]), int(coords[2]-coords[0])))
+    mask = np.ones((int(coords[3]-coords[1]), int(coords[2]-coords[0]))).astype(np.int)
     center = [int((coords[3]+coords[1])*0.5),int((coords[2]+coords[0])*0.5)]
 
     x_coords = np.array(range(coords[0], coords[2]))
     y_coords = np.array(range(coords[1], coords[3]))
-    coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
+    coords_grid = np.stack(np.meshgrid(x_coords, y_coords))
 
     for used_coord in used_coords:
         used_center = [int((used_coord[3]+used_coord[1])*0.5), int((used_coord[2]+used_coord[0])*0.5)]
         closer_map = obj_closer(coords_grid,center,used_center)
-        mask = np.min(mask,closer_map)
+        mask = np.min(np.stack([mask, closer_map],-1),-1)
     return mask
 
 def obj_closer(grid, pos1, pos2):
-    dist1 = np.sqrt(np.square(grid[0] - pos1[0]) + np.square(grid[1] - pos1[1]))
-    dist2 = np.sqrt(np.square(grid[0] - pos2[0]) + np.square(grid[1] - pos2[1]))
+    dist1 = np.sqrt(np.square(grid[0] - pos1[1]) + np.square(grid[1] - pos1[0]))
+    dist2 = np.sqrt(np.square(grid[0] - pos2[1]) + np.square(grid[1] - pos2[0]))
 
     return (dist1 < dist2)*1
 
@@ -274,10 +296,73 @@ def stamp_directions(bbox,args,nr_classes):
     #                       --> make it a doughnut
     #
     #   return patch, and coords
-    if bbox == -1:
+    if bbox == None:
         return 2
 
-    return None
+    if args["marker_dim"] is None:
+        # use bbox size
+        print("use percentage bbox size")
+        # determine marker size
+        marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
+
+    else:
+        marker_size = args["marker_dim"]
+
+    coords_offset = ([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5
+    coords = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0],
+              bbox[0]+coords_offset[1]+marker_size[1],bbox[1]+coords_offset[0]+marker_size[1]]).astype(np.int)
+
+    marker = get_direction_marker(marker_size, args["shape"],args["hole"])
+
+    return marker, coords
+
+
+def get_direction_marker(size, shape, hole):
+
+    # get directions map
+    grid_y = range(size[0])
+    grid_x = range(size[1])
+
+    # push center slightly off otherwise the norms would not be defined exactly at the center
+    center = np.asanyarray(size) * 0.5 + (np.array([0.00001, 0.00001])*random.choice([-1.0, 1.0]))
+
+    marker = np.stack(np.meshgrid(grid_y, grid_x),-1)-center
+    # norm last dimension
+    marker = marker / np.expand_dims(np.linalg.norm(marker,ord=2,axis=-1),-1)
+
+    center = np.asanyarray(size) * 0.5
+
+    if shape == "oval":
+        # mask out non-oval parts
+        y_coords = np.array(range(size[0]))+0.5
+        x_coords = np.array(range(size[1]))+0.5
+        coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
+
+        oval = np.sqrt(np.square((coords_grid[0] - center[0])/(size[0])) + np.square((coords_grid[1] - center[1])/(size[1])))
+        largest = max(oval[int(center[1]),0],oval[0,int(center[0])])
+        oval = 1-(oval / float(np.max(largest)))
+        marker[oval < 0] = 0
+
+
+    if hole is not None:
+        # punch hole in the middle
+        hole_size = np.round(np.asanyarray(size)*hole).astype(np.int)
+        hole_center = hole_size * 0.5
+        y_coords = np.array(range(hole_size[0]))+0.5
+        x_coords = np.array(range(hole_size[1]))+0.5
+        coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
+
+        oval = np.sqrt(np.square((coords_grid[0] - hole_center[0])/(hole_size[0])) + np.square((coords_grid[1] - hole_center[1])/(hole_size[1])))
+        largest = max(oval[int(hole_center[1]),0],oval[0,int(hole_center[0])])
+        oval = 1-(oval / float(np.max(largest)))
+
+        hole_map = np.ones(marker.shape[0:2])*-1
+        # place oval at the center
+        hole_map[int(center[1]-hole_center[1]):(int(center[1]-hole_center[1])+oval.shape[0]),
+        int(center[0]-center[0]):(int(center[0]-center[0])+oval.shape[1])] = oval
+        marker[hole_map > 0] = 0
+
+    return marker
 
 
 def stamp_energy(bbox,args,nr_classes):
@@ -306,21 +391,24 @@ def stamp_energy(bbox,args,nr_classes):
 
     if args["marker_dim"] is None:
         # use bbox size
-        print("use percentage bbox size")
+
         # determine marker size
         marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
 
     else:
         marker_size = args["marker_dim"]
 
-    coords_offset = ([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5
-    coords = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0],
-              bbox[0]+coords_offset[1]+marker_size[1],bbox[1]+coords_offset[0]+marker_size[1]]).astype(np.int)
+    # transpose marker size bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1,0]]
+
+    coords_offset = np.round(([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5)
+    topleft = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0]]).astype(np.int)
+    coords = [topleft[0],topleft[1],
+              topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
     marker = get_energy_marker(marker_size, args["shape"])
 
     # apply shape function
-    shape_fnc = None
     if args["energy_shape"] == "linear":
         1==1 # do nothing
     elif args["energy_shape"] == "root":
@@ -336,11 +424,7 @@ def stamp_energy(bbox,args,nr_classes):
         # turn into one-hot softmax targets
 
 
-
     return marker, coords
-
-
-    return None
 
 
 def get_energy_marker(size, shape):
@@ -375,6 +459,7 @@ def get_energy_marker(size, shape):
         return marker
     return None
 
+
 def stamp_class(bbox, args, nr_classes):
 
     #   for bbox == -1 return dim
@@ -389,6 +474,11 @@ def stamp_class(bbox, args, nr_classes):
     #   class_resolution:   "binary" for background/foreground or "class"
     #
     #   return patch, and coords
+    if bbox is None:
+        if args["class_resolution"]== "binary":
+            return 2
+        else:
+            return nr_classes
 
     if args["marker_dim"] is None:
         # use bbox size
@@ -397,46 +487,79 @@ def stamp_class(bbox, args, nr_classes):
     else:
         marker_size = args["marker_dim"]
 
+
+    coords_offset = np.round(([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5)
+    topleft = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0]]).astype(np.int)
+    coords = [topleft[0],topleft[1],
+              topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
+
+
+    # piggy back on energy marker
     marker = get_energy_marker(marker_size, args["shape"])
 
-    # apply shape function
-    shape_fnc = None
-    if args["energy_shape"] == "linear":
-        1 == 1  # do nothing
-    elif args["energy_shape"] == "root":
-        marker = np.sqrt(marker)
-        marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY - 1)
-    elif args["energy_shape"] == "quadratic":
-        marker = np.square(marker)
-        marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY - 1)
-
-    if args["loss"] == "softmax":
-        marker = np.round(marker).astype(np.int32)
-        marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
+    if args["class_resolution"] == "class":
+        marker[marker != 0] = int(bbox[4])
+        marker = marker.astype(np.int)
         # turn into one-hot softmax targets
+        marker = np.eye(nr_classes)[marker[:, :]]
+    elif args["class_resolution"] == "binary":
+        marker[marker != 0] = 1
+        # turn into one-hot softmax targets
+        marker = np.eye(2)[marker[:, :]]
 
-    return marker
+    else:
+        raise NotImplementedError("unknown class resolution:"+args["class_resolution"])
+
+    return marker, coords
 
 
-
-    if bbox == -1:
-        if args["class_resolution"]== "binary":
-            return 2
-        else:
-            return nr_classes
-
+def try_all_assign(data_layer,args):
+    for assign in args.training_assignements:
+        batch_not_loaded = True
+        while batch_not_loaded:
+            data = data_layer.forward(args, assign)
+            batch_not_loaded = len(data["gt_boxes"].shape) != 3
+        get_map_visuals(data,assign,show=True)
     return None
 
 
-# pil_im = Image.fromarray(im)
-def show_image(data, gt_boxes=None, gt=False):
-    im = Image.fromarray(data[0].astype("uint8"))
-    im.show()
+def get_map_visuals(data,assign,show=False):
+    vis = []
+    for i in range(len(assign["ds_factors"])):
+        img_map = data["gt_map" + str(i)]
+        if assign["stamp_func"][0] == "stamp_energy":
+            if assign["stamp_args"]["loss"]=="softmax":
+                img_map = np.argmax(img_map,-1)
 
-    if gt:
+            colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:,0:3]
+            colored_map = (colors[img_map[0], :]*255).astype(np.uint8)
+            vis.append(colored_map)
+
+        if assign["stamp_func"][0] == "stamp_class":
+            if assign["stamp_args"]["loss"]=="softmax":
+                img_map = np.argmax(img_map,-1)
+
+            colors = np.asarray(cm.nipy_spectral(np.linspace(0, 1, 25)))[:, 0:3]
+            colored_map = (colors[img_map[0], :] * 255).astype(np.uint8)
+            vis.append(colored_map)
+
+    if show:
+        for color_map in vis:
+            Image.fromarray(color_map).show()
+        show_image(data["data"],data["gt_boxes"])
+
+    return vis
+
+# pil_im = Image.fromarray(im)
+def show_image(data, gt_boxes=None):
+    if gt_boxes is None:
+        im = Image.fromarray(data[0].astype("uint8"))
+        im.show()
+    else:
+        im = Image.fromarray(data[0].astype("uint8"))
         draw = ImageDraw.Draw(im)
         # overlay GT boxes
-        for row in gt_boxes:
+        for row in gt_boxes[0]:
             draw.rectangle(((row[0],row[1]),(row[2],row[3])), fill="red")
         im.show()
     return

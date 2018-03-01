@@ -20,7 +20,7 @@ from utils.prefetch_wrapper import PrefetchWrapper
 
 from PIL import Image, ImageDraw
 
-from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy
+from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, try_all_assign
 
 nr_classes = None
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
@@ -46,10 +46,8 @@ def main(unused_argv):
     #
     # Debug stuffs
     #
-    batch_not_loaded = True
-    while batch_not_loaded:
-        data = data_layer.forward(args, args.training_assignements[0])
-        batch_not_loaded = len(data["gt_boxes"].shape) != 3
+    try_all_assign(data_layer,args)
+
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
     #
@@ -365,13 +363,13 @@ if __name__ == '__main__':
     # energy markers
                             {'itrs': 50000,'ds_factors': [1,2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
-                                 'stamp_args':{'marker_dim': (9,9), "shape": "square", "loss": "softmax", "energy_shape": "linear"}},
+                                 'stamp_args':{'marker_dim': None,'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "loss": "class"}},
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'closest',
+                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.7, 'hole': 0.3, 'loss': "reg"}}
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")

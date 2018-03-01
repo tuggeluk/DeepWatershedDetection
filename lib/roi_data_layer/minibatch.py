@@ -69,9 +69,9 @@ def get_minibatch(roidb, args, assign):
     # blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
     # blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
     # blobs["foreground"] = fcn_foreground(im_blob, gt_boxes)
-    test = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0], assign)
+    markers_list = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0], assign)
     for i in range(len(assign["ds_factors"])):
-        blobs["gt_map" + str(i)] = 1
+        blobs["gt_map" + str(i)] = markers_list[i]
 
 
     # gt_boxes = gt_boxes[bad_coords == False]
