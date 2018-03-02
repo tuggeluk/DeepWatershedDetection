@@ -369,9 +369,9 @@ if __name__ == '__main__':
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7, 'hole': 0.3, 'loss': "reg"}}
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': 0.1, 'loss': "reg"}}
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parser.add_argument('--combined_assignements', type=list,

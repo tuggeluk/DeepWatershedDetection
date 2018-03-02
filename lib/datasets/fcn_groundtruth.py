@@ -11,6 +11,7 @@ from main.config import cfg
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import math
 
 marker_size = [4,4]
 
@@ -204,7 +205,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
     #init canvas
     last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"],nr_classes)
-    canvas = np.zeros(sampled_size+(last_dim,), dtype=np.int16)
+    canvas = np.zeros(sampled_size+(last_dim,), dtype=np.float)
 
     used_coords = []
     for bbox in sampled_gt:
@@ -228,14 +229,17 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 canvas[coords[1]:coords[3],coords[0]:coords[2]] = \
                     (1 - closest_mask) * canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask * stamp
             else:
-                canvas[coords] = (1-closest_mask)*canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask*stamp
+                if len(closest_mask.shape) < len(stamp.shape):
+                    closest_mask = np.expand_dims(closest_mask,-1)
+
+                canvas[coords[1]:coords[3], coords[0]:coords[2]] = (1-closest_mask)*canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask*stamp
 
             used_coords.append(coords)
             # get overlapping bboxes
             # shave off pixels that are closer to another center
         else:
             raise NotImplementedError("overlap solution unkown")
-
+    #color_map(canvas, objectness_settings, True)
     maps_list.append(np.expand_dims(canvas,0))
     # if downsample marker --> use cv2 to downsample gt
     if objectness_settings["downsample_marker"]:
@@ -248,7 +252,13 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 maps_list.append(np.expand_dims(resized_oh,0))
         else:
             for x in objectness_settings["ds_factors"][1:]:
-                resized = np.round(cv2.resize(canvas, None, None, 1.0 / x, 1.0 / x, cv2.INTER_NEAREST))
+                # if has 3rd dimension downsample dim3 one by one
+                # if len(canvas.shape) == 3:
+                #     for dim in range(3):
+                #         rez_l = []
+                #         rez_l.append()
+                # else:
+                resized = cv2.resize(canvas, None, None, 1.0 / x, 1.0 / x, cv2.INTER_NEAREST)
                 maps_list.append(np.expand_dims(resized,0))
 
     # if do not downsample marker, recursively rebuild for each ds level
@@ -296,7 +306,7 @@ def stamp_directions(bbox,args,nr_classes):
     #                       --> make it a doughnut
     #
     #   return patch, and coords
-    if bbox == None:
+    if bbox is None:
         return 2
 
     if args["marker_dim"] is None:
@@ -308,9 +318,13 @@ def stamp_directions(bbox,args,nr_classes):
     else:
         marker_size = args["marker_dim"]
 
-    coords_offset = ([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5
-    coords = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0],
-              bbox[0]+coords_offset[1]+marker_size[1],bbox[1]+coords_offset[0]+marker_size[1]]).astype(np.int)
+    # transpose marker size bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1,0]]
+
+    coords_offset = np.round(([bbox[2]-bbox[0], bbox[3]-bbox[1]] - np.asarray(marker_size))*0.5)
+    topleft = np.round([bbox[0]+coords_offset[0],bbox[1]+coords_offset[1]]).astype(np.int)
+    coords = [topleft[0],topleft[1],
+              topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
     marker = get_direction_marker(marker_size, args["shape"],args["hole"])
 
@@ -348,6 +362,7 @@ def get_direction_marker(size, shape, hole):
         # punch hole in the middle
         hole_size = np.round(np.asanyarray(size)*hole).astype(np.int)
         hole_center = hole_size * 0.5
+
         y_coords = np.array(range(hole_size[0]))+0.5
         x_coords = np.array(range(hole_size[1]))+0.5
         coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
@@ -359,7 +374,7 @@ def get_direction_marker(size, shape, hole):
         hole_map = np.ones(marker.shape[0:2])*-1
         # place oval at the center
         hole_map[int(center[1]-hole_center[1]):(int(center[1]-hole_center[1])+oval.shape[0]),
-        int(center[0]-center[0]):(int(center[0]-center[0])+oval.shape[1])] = oval
+        int(center[0]-hole_center[0]):(int(center[0]-hole_center[0])+oval.shape[1])] = oval
         marker[hole_map > 0] = 0
 
     return marker
@@ -401,8 +416,8 @@ def stamp_energy(bbox,args,nr_classes):
     # transpose marker size bc of wierd bbox definition
     marker_size = np.asarray(marker_size)[[1,0]]
 
-    coords_offset = np.round(([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5)
-    topleft = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0]]).astype(np.int)
+    coords_offset = np.round(([bbox[2]-bbox[0], bbox[3]-bbox[1]] - np.asarray(marker_size))*0.5)
+    topleft = np.round([bbox[0]+coords_offset[0],bbox[1]+coords_offset[1]]).astype(np.int)
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
@@ -523,29 +538,43 @@ def try_all_assign(data_layer,args):
     return None
 
 
+
+def color_map(img_map, assign,show=False):
+    if assign["stamp_func"][0] == "stamp_energy":
+        if assign["stamp_args"]["loss"] == "softmax":
+            img_map = np.argmax(img_map, -1)
+
+        colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:, 0:3]
+        colored_map = (colors[img_map, :] * 255).astype(np.uint8)
+
+    if assign["stamp_func"][0] == "stamp_class":
+        if assign["stamp_args"]["loss"] == "softmax":
+            img_map = np.argmax(img_map, -1)
+
+        colors = np.asarray(cm.nipy_spectral(np.linspace(0, 1, 25)))[:, 0:3]
+        colored_map = (colors[img_map, :] * 255).astype(np.uint8)
+
+    if assign["stamp_func"][0] == "stamp_directions":
+        nonzeros = img_map != 0
+        #apply arccos along last dimension
+        img_map[nonzeros] = np.arccos(img_map[nonzeros])
+        img_map = np.round(img_map/math.pi*255)
+        # add zero B channel
+        img_map = np.concatenate([img_map, np.zeros(img_map.shape[:-1]+(1,))],-1)
+        colored_map = img_map.astype(np.uint8)
+    if show:
+        Image.fromarray(colored_map).show()
+    return colored_map
+
+
 def get_map_visuals(data,assign,show=False):
     vis = []
     for i in range(len(assign["ds_factors"])):
         img_map = data["gt_map" + str(i)]
-        if assign["stamp_func"][0] == "stamp_energy":
-            if assign["stamp_args"]["loss"]=="softmax":
-                img_map = np.argmax(img_map,-1)
-
-            colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:,0:3]
-            colored_map = (colors[img_map[0], :]*255).astype(np.uint8)
-            vis.append(colored_map)
-
-        if assign["stamp_func"][0] == "stamp_class":
-            if assign["stamp_args"]["loss"]=="softmax":
-                img_map = np.argmax(img_map,-1)
-
-            colors = np.asarray(cm.nipy_spectral(np.linspace(0, 1, 25)))[:, 0:3]
-            colored_map = (colors[img_map[0], :] * 255).astype(np.uint8)
-            vis.append(colored_map)
+        colored_map = color_map(img_map[0],assign,show)
+        vis.append(colored_map)
 
     if show:
-        for color_map in vis:
-            Image.fromarray(color_map).show()
         show_image(data["data"],data["gt_boxes"])
 
     return vis
