@@ -15,10 +15,11 @@ def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False)
         # class binary
         network_heads["stamp_class"]["binary"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='class_binary_'+str(x)) for x in range(0, len(g))]
         # class pred
-        network_heads["stamp_class"]["class"] = [slim.conv2d(g[x], num_classes, [1, 1], activation_fn=None, scope='class_pred_' + str(x)) for x in range(0, len(g))]
+        network_heads["stamp_class"]["softmax"] = [slim.conv2d(g[x], num_classes, [1, 1], activation_fn=None, scope='class_pred_' + str(x)) for x in range(0, len(g))]
 
         # direction
-        network_heads["stamp_directions"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='direction_' + str(x)) for x in range(0, len(g))]
+        network_heads["stamp_directions"] = dict()
+        network_heads["stamp_directions"]["reg"] = [slim.conv2d(g[x], 2, [1, 1], activation_fn=None, scope='direction_' + str(x)) for x in range(0, len(g))]
 
         network_heads["stamp_energy"] = dict()
         # energy marker - regression

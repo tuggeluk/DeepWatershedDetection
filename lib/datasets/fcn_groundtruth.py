@@ -548,14 +548,18 @@ def color_map(img_map, assign,show=False):
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 
     if assign["stamp_func"][0] == "stamp_class":
-        if assign["stamp_args"]["loss"] == "softmax":
-            img_map = np.argmax(img_map, -1)
+
+        img_map = np.argmax(img_map, -1)
 
         colors = np.asarray(cm.nipy_spectral(np.linspace(0, 1, 25)))[:, 0:3]
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 
     if assign["stamp_func"][0] == "stamp_directions":
         nonzeros = img_map != 0
+
+        # Normalize
+        img_map = img_map / np.expand_dims(np.linalg.norm(img_map, axis=2), -1)
+
         #apply arccos along last dimension
         img_map[nonzeros] = np.arccos(img_map[nonzeros])
         img_map = np.round(img_map/math.pi*255)
@@ -567,17 +571,52 @@ def color_map(img_map, assign,show=False):
     return colored_map
 
 
-def get_map_visuals(data,assign,show=False):
+def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
+    # add mean
+    image += cfg.PIXEL_MEANS[0][0][[0,1,2]]
+    image = image[:,:,[2,1,0]] # Switch to rgb
+    im = Image.fromarray(image.astype("uint8"))
+
+    if fill:
+        outline = [None,None]
+        fill = ["red","green"]
+    else:
+        outline = ["red","green"]
+        fill = [None,None]
+
+    draw = ImageDraw.Draw(im)
+    if gt_boxes is not None:
+        for row in gt_boxes:
+            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[0], outline=outline[0])
+
+    if pred_boxes is not None:
+        for row in pred_boxes:
+            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[1], outline=outline[1])
+    if show:
+        im.show()
+    return np.asarray(im).astype("uint8")
+
+
+def get_gt_visuals(data,assign,pred_boxes=None,show=False):
     vis = []
     for i in range(len(assign["ds_factors"])):
         img_map = data["gt_map" + str(i)]
         colored_map = color_map(img_map[0],assign,show)
         vis.append(colored_map)
 
-    if show:
-        show_image(data["data"],data["gt_boxes"])
+    colored_gt = overlayed_image(image=data["data"][0],gt_boxes=data["gt_boxes"][0],pred_boxes=pred_boxes,fill=False,show=show)
+    vis.append(colored_gt)
+    return vis
+
+
+def get_map_visuals(fetched_maps,assign,show=False):
+    vis = []
+    for fetched_map in fetched_maps:
+        colored_map = color_map(fetched_map[0],assign,show)
+        vis.append(colored_map)
 
     return vis
+
 
 # pil_im = Image.fromarray(im)
 def show_image(data, gt_boxes=None):

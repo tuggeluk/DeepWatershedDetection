@@ -20,7 +20,7 @@ from utils.prefetch_wrapper import PrefetchWrapper
 
 from PIL import Image, ImageDraw
 
-from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, try_all_assign
+from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, try_all_assign,get_gt_visuals,get_map_visuals
 
 nr_classes = None
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
@@ -46,7 +46,7 @@ def main(unused_argv):
     #
     # Debug stuffs
     #
-    try_all_assign(data_layer,args)
+    # try_all_assign(data_layer,args)
 
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
@@ -107,9 +107,11 @@ def main(unused_argv):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
+    train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,args.training_assignements[0],checkpoint_dir,checkpoint_name,iteration)
+
     used_losses_and_optimizers = []
     for assign in args.training_assignements:
-        losses = train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration)
+        [losses,optim,iteration] = train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration)
         used_losses_and_optimizers.append(losses)
 
     for comb_assign in args.combined_assignements:
@@ -122,25 +124,84 @@ def main(unused_argv):
 def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration):
     # get groundtruth input placeholders
     gt_placeholders = get_gt_placeholders(assign,imdb)
-
+    debug_fetch = dict()
     # define loss #TODO directional loss
-    if assign["stamp_args"]["loss"] == "softmax":
-        loss_components = [tf.losses.mean_squared_error(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
-                                                        labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
-    else:
-        loss_components = [safe_softmax_cross_entropy_with_logits(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
-                                                        labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
-
-
-    # potentially mask out zeros
-    if assign["mask_zeros"]:
-        # only compute loss where GT is not zero intended for "directional donuts"
-        masked_components = []
+    if assign["stamp_func"][0] == "stamp_directions":
+        loss_components = []
         for x in range(len(assign["ds_factors"])):
-            mask = tf.squeeze(gt_placeholders[x] > 0, -1) # TODO does this squeeze make sense for directions
-            masked_components.append(tf.boolean_mask(loss_components[x], mask))
+            debug_fetch[str(x)] = dict()
+            # # mask, where gt is zero
+            split1, split2 = tf.split(gt_placeholders[x],2,-1)
+            debug_fetch[str(x)]["split1"] = split1
 
-        loss_components = masked_components
+            mask = tf.squeeze(split1 > 0, -1)
+            debug_fetch[str(x)]["mask"] = mask
+
+            masked_pred = tf.boolean_mask(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x], mask)
+            debug_fetch[str(x)]["masked_pred"]= masked_pred
+
+            masked_gt = tf.boolean_mask(gt_placeholders[x], mask)
+            debug_fetch[str(x)]["masked_gt"] = masked_gt
+
+            # norm prediction
+            norms = tf.norm(masked_pred,ord="euclidean",axis=-1,keep_dims=True)
+            masked_pred = masked_pred/norms
+            debug_fetch[str(x)]["masked_gt_normed"] = masked_pred
+
+            # inner product
+            inner = tf.diag_part(tf.tensordot(masked_gt,tf.transpose(masked_pred),1))
+            acos_inner = tf.acos(inner)
+            debug_fetch[str(x)]["acos_inner"] = acos_inner
+
+            loss_components.append(acos_inner)
+    else:
+        if assign["stamp_args"]["loss"] == "softmax":
+            loss_components = [tf.losses.mean_squared_error(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
+                                                            labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+        else:
+            loss_components = [safe_softmax_cross_entropy_with_logits(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
+                                                            labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+
+
+    #################################################################################################################
+    #     # debug directional loss
+    #         # load batch - only use batches with content
+    # batch_not_loaded = True
+    # while batch_not_loaded:
+    #     if args.prefetch == "True":
+    #         blob = data_layer.get_item()
+    #     else:
+    #         blob = data_layer.forward(args, assign)
+    #     batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+    #
+    #     feed_dict = {input: blob["data"]}
+    #     for i in range(len(gt_placeholders)):
+    #         feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders)-i-1)]
+    #
+    # 1==1
+    # # train step
+    #
+    # [split] = sess.run([debug_fetch[str(x)]["split1"]], feed_dict=feed_dict)
+    # [pred] = sess.run([network_heads[assign["stamp_func"][0]][x]], feed_dict=feed_dict)
+    # [mask] = sess.run([debug_fetch[str(x)]["mask"]], feed_dict=feed_dict)
+    # [masked_gt_normed] = sess.run([debug_fetch[str(x)]["masked_gt_normed"]], feed_dict=feed_dict)
+    # [acos_inner] = sess.run([debug_fetch[str(x)]["acos_inner"]], feed_dict=feed_dict)
+    #
+    #
+    # debug_fetch[str(x)].keys()
+    #     # for i in range(mask_gt_fetch.shape[0]):
+    #     #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
+    #################################################################################################################
+
+        # potentially mask out zeros
+        if assign["mask_zeros"]:
+            # only compute loss where GT is not zero intended for "directional donuts"
+            masked_components = []
+            for x in range(len(assign["ds_factors"])):
+                mask = tf.squeeze(gt_placeholders[x] > 0, -1)
+                masked_components.append(tf.boolean_mask(loss_components[x], mask))
+
+            loss_components = masked_components
 
 
     # call tf.reduce mean on each loss component
@@ -152,6 +213,7 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
         loss = tf.reduce_mean(stacked_components)
     else:
         raise NotImplementedError("unknown layer aggregate")
+
 
 
     # init optimizer
@@ -181,6 +243,7 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
         images_sums.append(tf.summary.image('sub_gt_' + str(i), sub_gt_placeholder))
 
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    images_placeholders.append(final_pred_placeholder)
     images_sums.append(tf.summary.image('final_predictions_' + str(i), final_pred_placeholder))
     images_summary_op = tf.summary.merge(images_sums)
 
@@ -199,8 +262,10 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
 
         feed_dict = {input: blob["data"]}
         for i in range(len(gt_placeholders)):
-            feed_dict[gt_placeholders[i]] = blob["gt_map"+str(i)]
+            feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders) - i - 1)]
 
+        # initialize variable uninitalized at this point
+        sess.run(tf.global_variables_initializer())
         # train step
         _, loss_fetch = sess.run([optim,loss], feed_dict=feed_dict)
 
@@ -213,10 +278,15 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
             # fetch sub_predicitons
             [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x]) for x in range(len(assign["ds_factors"]))]
 
-            summary, fetched_maps = sess.run(fetch_list,feed_dict=feed_dict)
-            writer.add_summary(summary, float(itr))
+            summary = sess.run(fetch_list,feed_dict=feed_dict)
+            writer.add_summary(summary[0], float(itr))
 
-            images_feed_dict = get_images_feed_dict()
+            # use predicted feature maps
+            # TODO predict boxes
+
+            gt_visuals = get_gt_visuals(blob, assign, pred_boxes=None, show=False)
+            map_visuals = get_map_visuals(summary[1:],assign,show=False)
+            images_feed_dict = get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
             # save images to tensorboard
             summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
             writer.add_summary(summary[0], float(itr))
@@ -228,18 +298,33 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
                 os.makedirs(checkpoint_dir)
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
-    iteration =  (iteration + args.itrs)
-    return loss,optim
+    iteration = (iteration + args.itrs)
+    return loss,optim, iteration
 
 
-def get_images_feed_dict():
-    #TODO build images for tensorflow
-    raise NotImplementedError("cant build images yet")
-    return None
+def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders):
+    feed_dict = dict()
+    for i in range(len(assign["ds_factors"])*2):
+        if i%2 ==0:
+            # prediction
+            feed_dict[images_placeholders[i]] = map_visuals[i/2]
+
+        else:
+            feed_dict[images_placeholders[i]] = gt_visuals[i/2]
+
+
+    for key in feed_dict.keys():
+        feed_dict[key] = np.expand_dims(feed_dict[key], 0)
+
+    feed_dict[images_placeholders[len(images_placeholders)-1]] = blob["data"].astype(np.uint8)
+
+
+
+    return feed_dict
 
 
 def get_gt_placeholders(assign, imdb):
-    gt_dim = assign["stamp_func"][1](-1, assign["stamp_args"], nr_classes)
+    gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes)
     return [tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]]
 
 
@@ -361,17 +446,17 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # energy markers
-                            {'itrs': 50000,'ds_factors': [1,2,4,8], 'downsample_marker': False, 'overlap_solution': 'max',
-                                 'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
-                                 'stamp_args':{'marker_dim': None,'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
+                            {'itrs': 50000,'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
+                                 'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                                 'stamp_args':{'marker_dim': (9,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
+                            {'itrs': 50000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'itrs': 50000, 'ds_factors': [1, 2, 4, 8], 'downsample_marker': True, 'overlap_solution': 'no',
-                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'min', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': 0.1, 'loss': "reg"}}
+                            {'itrs': 50000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': 0, 'loss': "reg"}}
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parser.add_argument('--combined_assignements', type=list,

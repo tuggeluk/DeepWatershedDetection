@@ -102,6 +102,7 @@ def crop_boxes(img_shape, coord):
     coord[0:4] = crop_coords
     return coord
 
+
 def _get_image_blob(roidb, scale_inds, args):
     """Builds an input blob from the images in the roidb at the specified
     scales.
