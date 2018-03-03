@@ -550,15 +550,15 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'itrs': 2000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
+    #                         {'itrs': 2000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+    #                          'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+    #                          'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
-                            {'itrs': 2000,'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
+                            {'itrs': 10000,'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                                  'stamp_args':{'marker_dim': (12,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'itrs': 2000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'itrs': 10000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}}
 
@@ -569,11 +569,11 @@ if __name__ == '__main__':
                         default=[
                             {"Nr": 0, "Itrs": 10000},
                             {"Nr": 1, "Itrs": 10000},
-                            {"Nr": 2, "Itrs": 10000},
+
 
                             {"Nr": 0, "Itrs": 10000},
-                            {"Nr": 1, "Itrs": 10000},
-                            {"Nr": 2, "Itrs": 10000}
+                            {"Nr": 1, "Itrs": 10000}
+
 
                         ], help="configure how assignements get repeated")
 
