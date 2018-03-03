@@ -366,7 +366,7 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
             feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders) - i - 1)]
 
         # initialize variable uninitalized at this point
-        sess.run(tf.global_variables_initializer())
+        #sess.run(tf.global_variables_initializer())
         # train step
         _, loss_fetch = sess.run([optim,loss], feed_dict=feed_dict)
 
