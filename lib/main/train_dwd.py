@@ -520,7 +520,7 @@ if __name__ == '__main__':
     parser.add_argument("--crop_size", type=bytearray, default=[160,160], help="size of the image to be cropped to")
     parser.add_argument("--crop_top_left_bias", type=float, default=0.3, help="fixed probability that the crop will be from the top left corner")
     parser.add_argument("--max_edge", type=int, default=1280, help="if there is no cropping - scale such that the longest edge has this size")
-    parser.add_argument("--use_flipped", type=str, default="False", help="wether or not to append Horizontally flipped images")
+    parser.add_argument("--use_flipped", type=str, default="True", help="wether or not to append Horizontally flipped images")
     parser.add_argument("--substract_mean", type=str, default="True", help="wether or not to substract the mean of the VOC images")
     parser.add_argument("--pad_to", type=int, default=160, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0,help="use this number to pad images")
@@ -535,8 +535,8 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=100, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--tensorboard_interval", type=int, default=100, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--save_interval", type=int, default=2000, help="after how many iterations are the weights saved")
+    parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
+    parser.add_argument("--save_interval", type=int, default=1000, help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
@@ -550,15 +550,15 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'itrs': 10000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'itrs': 2000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
-                            {'itrs': 10000,'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
+                            {'itrs': 2000,'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                                  'stamp_args':{'marker_dim': (12,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'itrs': 10000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'itrs': 2000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}}
 
