@@ -98,19 +98,33 @@ def sanatize_coords(canvas_shape, coords):
 
 
 def get_partial_marker(canvas_shape, coords, mark):
+
+
+    # if coords are outside of bbox
     orig_coords = np.asarray(coords)
     crop_coords = np.asarray(coords)
     crop_coords = np.maximum(crop_coords, 0)
-    crop_coords[0:2] = np.minimum(crop_coords[0:2],canvas_shape[0])
-    crop_coords[2:4] = np.minimum(crop_coords[2:4],canvas_shape[1])
+    crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], canvas_shape[0]-1)
+    crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], canvas_shape[1]-1)
 
     # if a dimension collapses kill element
     if crop_coords[0] == crop_coords[1] or crop_coords[2]==crop_coords[3]:
         return None, None
 
-    reorder_idx = [0,2,1,3]
-    mark_subs = np.asarray((0,0)+mark.shape)[reorder_idx] - (orig_coords - crop_coords)
-    mark = mark[mark_subs[0]:mark_subs[1],mark_subs[2]:mark_subs[3]]
+    # if marker has bigger size than coords
+    size_offsets = np.asarray(mark.shape[0:2])-[crop_coords[3]-crop_coords[1],crop_coords[2]-crop_coords[0]]
+    # if sum(size_offsets == [0,0])<2:
+    #     1==1
+
+    # shrink mark by size_offsets
+    mark = mark[int(0+np.ceil(size_offsets[0]/2.0)):int(mark.shape[0]-np.floor(size_offsets[0]/2.0)),
+           int(0+np.ceil(size_offsets[1]/2.0)):int(mark.shape[1]-np.floor(size_offsets[1]/2.0))]
+
+    # check size-offsets again
+    size_offsets = np.asarray(mark.shape[0:2]) - [crop_coords[3] - crop_coords[1], crop_coords[2] - crop_coords[0]]
+    if sum(size_offsets == [0,0])<2:
+        1==1
+
 
     return mark, crop_coords
 
@@ -311,7 +325,6 @@ def stamp_directions(bbox,args,nr_classes):
 
     if args["marker_dim"] is None:
         # use bbox size
-        print("use percentage bbox size")
         # determine marker size
         marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
 
@@ -368,7 +381,7 @@ def get_direction_marker(size, shape, hole):
         coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
 
         oval = np.sqrt(np.square((coords_grid[0] - hole_center[0])/(hole_size[0])) + np.square((coords_grid[1] - hole_center[1])/(hole_size[1])))
-        largest = max(oval[int(hole_center[1]),0],oval[0,int(hole_center[0])])
+        largest = max(oval[int(hole_center[1]),0],oval[0, int(hole_center[0])])
         oval = 1-(oval / float(np.max(largest)))
 
         hole_map = np.ones(marker.shape[0:2])*-1
@@ -528,13 +541,21 @@ def stamp_class(bbox, args, nr_classes):
     return marker, coords
 
 
-def try_all_assign(data_layer,args):
+def try_all_assign(data_layer, args, nr_tries = 1):
     for assign in args.training_assignements:
-        batch_not_loaded = True
-        while batch_not_loaded:
-            data = data_layer.forward(args, assign)
-            batch_not_loaded = len(data["gt_boxes"].shape) != 3
-        get_map_visuals(data,assign,show=True)
+        for i in range(nr_tries):
+            batch_not_loaded = True
+            while batch_not_loaded:
+                data = data_layer.forward(args, assign)
+                batch_not_loaded = len(data["gt_boxes"].shape) != 3
+
+            fetched_maps =[]
+            for key in data.keys():
+                if "map" in key:
+                    fetched_maps.append(data[key])
+
+            get_gt_visuals(data, assign, data["gt_boxes"][0], show=False)
+
     return None
 
 

@@ -3,14 +3,19 @@ import time
 
 
 class PrefetchWrapper:
-    q = Queue()
+    q = None
     done = False
 
     def __init__(self,fp, prefetch_len, *args):
-        self.p = Process(target=self.execute_func, args=(fp,prefetch_len, args[0]))
+        self.q = Queue()
+        self.p = Process(target=self.execute_func, args=(fp,prefetch_len, args[0],args[1]))
         self.p.start()
 
     def get_item(self):
+        return self.q.get()
+
+    def forward(self, *args):
+        # dont care about incoming args
         return self.q.get()
 
     def kill(self):
@@ -20,7 +25,7 @@ class PrefetchWrapper:
     def execute_func(self, fp, prefetch_len, *args):
         while not self.done:
             if self.q.qsize() < prefetch_len:
-                self.q.put(fp(args[0]))
+                self.q.put(fp(args[0],args[1]))
             else:
                 time.sleep(.5)
         return None
