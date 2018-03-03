@@ -350,7 +350,7 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
     if args.prefetch == "True":
         data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign)
 
-
+    sess.run(tf.global_variables_initializer())
     print("Start training")
     for itr in range(iteration, (iteration+assign["itrs"])):
         print(itr)
