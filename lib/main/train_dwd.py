@@ -78,7 +78,7 @@ def main(unused_argv):
     # initialize tasks
     preped_assign = []
     for assign in args.training_assignements:
-        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads)
+        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input)
         preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders])
 
     # init tensorflow session
@@ -129,7 +129,7 @@ def main(unused_argv):
     # for comb_assign in args.combined_assignements:
     #     train_on_comb_assignment()
 
-def initialize_assignement(assign,imdb,network_heads):
+def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
     gt_placeholders = get_gt_placeholders(assign,imdb)
     debug_fetch = dict()
     # define loss #TODO directional loss
@@ -153,11 +153,22 @@ def initialize_assignement(assign,imdb,network_heads):
             # norm prediction
             norms = tf.norm(masked_pred,ord="euclidean",axis=-1,keep_dims=True)
             masked_pred = masked_pred/norms
-            debug_fetch[str(x)]["masked_gt_normed"] = masked_pred
+            debug_fetch[str(x)]["masked_pred_normed"] = masked_pred
 
             # inner product
-            inner = tf.diag_part(tf.tensordot(masked_gt,tf.transpose(masked_pred),1))
-            acos_inner = tf.acos(inner)
+            # inner = tf.diag_part(tf.tensordot(masked_gt,tf.transpose(masked_pred),1))
+            # debug_fetch[str(x)]["inner"] = inner
+
+            gt_1, gt_2 = tf.split(masked_gt, 2, -1)
+            pred_1, pred_2 = tf.split(masked_pred, 2, -1)
+            inner_2 = gt_1*pred_1+gt_2*pred_2
+            debug_fetch[str(x)]["inner_2"] = inner_2
+            # round to 4 digits after dot
+            multiplier = tf.constant(10 ** 4, dtype=tf.float32)
+            inner_rounded = tf.round(inner_2 * multiplier) / multiplier
+            debug_fetch[str(x)]["inner_rounded"] = inner_rounded
+
+            acos_inner = tf.acos(inner_rounded)
             debug_fetch[str(x)]["acos_inner"] = acos_inner
 
             loss_components.append(acos_inner)
@@ -171,44 +182,43 @@ def initialize_assignement(assign,imdb,network_heads):
 
 
     #################################################################################################################
-    #     # debug directional loss
-    #         # load batch - only use batches with content
+        # debug directional loss
+            # load batch - only use batches with content
     # batch_not_loaded = True
     # while batch_not_loaded:
-    #     if args.prefetch == "True":
-    #         blob = data_layer.get_item()
-    #     else:
-    #         blob = data_layer.forward(args, assign)
+    #
+    #     blob = data_layer.forward(args, assign)
     #     batch_not_loaded = len(blob["gt_boxes"].shape) != 3
     #
     #     feed_dict = {input: blob["data"]}
     #     for i in range(len(gt_placeholders)):
     #         feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders)-i-1)]
-    #
+    # sess.run(tf.global_variables_initializer())
     # 1==1
     # # train step
     #
     # [split] = sess.run([debug_fetch[str(x)]["split1"]], feed_dict=feed_dict)
     # [pred] = sess.run([network_heads[assign["stamp_func"][0]][x]], feed_dict=feed_dict)
     # [mask] = sess.run([debug_fetch[str(x)]["mask"]], feed_dict=feed_dict)
-    # [masked_gt_normed] = sess.run([debug_fetch[str(x)]["masked_gt_normed"]], feed_dict=feed_dict)
-    # [acos_inner] = sess.run([debug_fetch[str(x)]["acos_inner"]], feed_dict=feed_dict)
-    #
-    #
+    # [masked_gt] = sess.run([debug_fetch[str(x)]["masked_gt"]], feed_dict=feed_dict)
+    # [masked_pred_normed] = sess.run([debug_fetch[str(x)]["masked_pred_normed"]], feed_dict=feed_dict)
+    # [inner] = sess.run([debug_fetch[str(x)]["inner"]], feed_dict=feed_dict)
+    # [inner_2] = sess.run([debug_fetch[str(x)]["inner_2"]], feed_dict=feed_dict)
+    # [inner_rounded] = sess.run([debug_fetch[str(x)]["inner_rounded"]], feed_dict=feed_dict)
     # debug_fetch[str(x)].keys()
-    #     # for i in range(mask_gt_fetch.shape[0]):
-    #     #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
+        # for i in range(mask_gt_fetch.shape[0]):
+        #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
     #################################################################################################################
 
-        # potentially mask out zeros
-        if assign["mask_zeros"]:
-            # only compute loss where GT is not zero intended for "directional donuts"
-            masked_components = []
-            for x in range(len(assign["ds_factors"])):
-                mask = tf.squeeze(gt_placeholders[x] > 0, -1)
-                masked_components.append(tf.boolean_mask(loss_components[x], mask))
+    # potentially mask out zeros
+    if assign["mask_zeros"]:
+        # only compute loss where GT is not zero intended for "directional donuts"
+        masked_components = []
+        for x in range(len(assign["ds_factors"])):
+            mask = tf.squeeze(gt_placeholders[x] > 0, -1)
+            masked_components.append(tf.boolean_mask(loss_components[x], mask))
 
-            loss_components = masked_components
+        loss_components = masked_components
 
 
     # call tf.reduce mean on each loss component
@@ -487,9 +497,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"Nr": 1, "Itrs": 10000},
-                            {"Nr": 1, "Itrs": 10000},
-                            {"Nr": 2, "Itrs": 10000},
+                            {"Nr": 0, "Itrs": 50000},
+                            {"Nr": 1, "Itrs": 50000},
+                            {"Nr": 2, "Itrs": 50000},
 
                             {"Nr": 0, "Itrs": 10000},
                             {"Nr": 1, "Itrs": 10000}
