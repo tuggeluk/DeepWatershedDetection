@@ -74,6 +74,13 @@ def main(unused_argv):
     network_heads, init_fn = build_dwd_net(
         input, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
+
+    # initialize tasks
+    preped_assign = []
+    for assign in args.training_assignements:
+        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads)
+        preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders])
+
     # init tensorflow session
     saver = tf.train.Saver(max_to_keep=1000)
     sess.run(tf.global_variables_initializer())
@@ -105,117 +112,24 @@ def main(unused_argv):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
-    #train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,args.training_assignements[2],checkpoint_dir,checkpoint_name,iteration)
 
-    used_losses_and_optimizers = []
-    for assign in args.training_assignements:
-        [losses ,optim, placeholders ,iteration] = train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration)
-        used_losses_and_optimizers.append([losses, optim, placeholders])
+    for do_a in args.do_assign:
+        assign_nr = do_a["Nr"]
+        do_itr = do_a["Itrs"]
+        preped_assign[assign_nr]
 
-    for redo_a in args.redo_assign:
-        assign_nr = redo_a["Nr"]
-        redo_itr = redo_a["Itrs"]
-        redo_loss = used_losses_and_optimizers[assign_nr][0]
-        redo_optim = used_losses_and_optimizers[assign_nr][1]
-        placeholders = used_losses_and_optimizers[assign_nr][2]
-        iteration = redo_assign(input,args,imdb,data_layer,saver,sess,writer,network_heads,
-                                args.training_assignements[assign_nr],checkpoint_dir,checkpoint_name,iteration,
-                                redo_itr,redo_loss,redo_optim,placeholders)
+        iteration = execute_assign(input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+                                   do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration)
+
+    # execute tasks
 
     print("done :)")
 
+    # traind on combined assigns
     # for comb_assign in args.combined_assignements:
     #     train_on_comb_assignment()
 
-def redo_assign(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration,redo_itr,redo_loss,redo_optim,placeholders):
-    # get groundtruth input placeholders
-    gt_placeholders = placeholders
-
-    loss = redo_loss
-    optim = redo_optim
-
-    # define summary ops
-    scalar_sums = []
-
-    scalar_sums.append(tf.summary.scalar("loss: " + get_config_id(assign), loss))
-    scalar_summary_op = tf.summary.merge(scalar_sums)
-
-    images_sums = []
-    images_placeholders = []
-
-    # feature maps
-    for i in range(len(assign["ds_factors"])):
-        sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-        images_placeholders.append(sub_prediction_placeholder)
-        images_sums.append(tf.summary.image('sub_prediction_' + str(i), sub_prediction_placeholder))
-
-        sub_gt_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-        images_placeholders.append(sub_gt_placeholder)
-        images_sums.append(tf.summary.image('sub_gt_' + str(i), sub_gt_placeholder))
-
-    final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    images_placeholders.append(final_pred_placeholder)
-    images_sums.append(tf.summary.image('final_predictions_' + str(i), final_pred_placeholder))
-    images_summary_op = tf.summary.merge(images_sums)
-
-    if args.prefetch == "True":
-        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign)
-
-    print("Start training")
-    for itr in range(iteration, (iteration + redo_itr)):
-        print(itr)
-        # load batch - only use batches with content
-        batch_not_loaded = True
-        while batch_not_loaded:
-            blob = data_layer.forward(args, assign)
-            batch_not_loaded = len(blob["gt_boxes"].shape) != 3
-
-        feed_dict = {input: blob["data"]}
-        for i in range(len(gt_placeholders)):
-            feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders) - i - 1)]
-
-        # initialize variable uninitalized at this point
-        sess.run(tf.global_variables_initializer())
-        # train step
-        _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
-
-        if itr % args.print_interval == 0 or itr == 1:
-            print("loss at itr: " + str(itr))
-            print(loss_fetch)
-
-        if itr % args.tensorboard_interval == 0 or itr == 1:
-            fetch_list = [scalar_summary_op]
-            # fetch sub_predicitons
-            [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x]) for x in
-             range(len(assign["ds_factors"]))]
-
-            summary = sess.run(fetch_list, feed_dict=feed_dict)
-            writer.add_summary(summary[0], float(itr))
-
-            # use predicted feature maps
-            # TODO predict boxes
-
-            gt_visuals = get_gt_visuals(blob, assign, pred_boxes=None, show=False)
-            map_visuals = get_map_visuals(summary[1:], assign, show=False)
-            images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
-            # save images to tensorboard
-            summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
-            writer.add_summary(summary[0], float(itr))
-
-        if itr % args.save_interval == 0:
-            print("saving weights")
-            if not os.path.exists(checkpoint_dir):
-                os.makedirs(checkpoint_dir)
-            saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
-
-    iteration = (iteration + assign["itrs"])
-    if args.prefetch == "True":
-        data_layer.kill()
-
-    return iteration
-
-def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_heads,assign,checkpoint_dir,checkpoint_name,iteration):
-    # get groundtruth input placeholders
+def initialize_assignement(assign,imdb,network_heads):
     gt_placeholders = get_gt_placeholders(assign,imdb)
     debug_fetch = dict()
     # define loss #TODO directional loss
@@ -320,13 +234,12 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
     var_list = [var for var in tf.trainable_variables()]
     optim = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=var_list)
 
+
+    # init summary operations
     # define summary ops
     scalar_sums = []
 
-    for i in range(len(assign["ds_factors"])):
-        scalar_sums.append(tf.summary.scalar("sub_loss_"+str(i)+": " + get_config_id(assign), loss_components[i]))
-
-    scalar_sums.append(tf.summary.scalar("loss: "+get_config_id(assign), loss))
+    scalar_sums.append(tf.summary.scalar("loss " + get_config_id(assign)+":", loss))
     scalar_summary_op = tf.summary.merge(scalar_sums)
 
     images_sums = []
@@ -336,39 +249,43 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
     for i in range(len(assign["ds_factors"])):
         sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         images_placeholders.append(sub_prediction_placeholder)
-        images_sums.append(tf.summary.image('sub_prediction_'+str(i), sub_prediction_placeholder))
+        images_sums.append(tf.summary.image('sub_prediction_' + str(i)+get_config_id(assign), sub_prediction_placeholder))
 
         sub_gt_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         images_placeholders.append(sub_gt_placeholder)
-        images_sums.append(tf.summary.image('sub_gt_' + str(i), sub_gt_placeholder))
+        images_sums.append(tf.summary.image('sub_gt_' + str(i)+get_config_id(assign), sub_gt_placeholder))
 
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_placeholders.append(final_pred_placeholder)
-    images_sums.append(tf.summary.image('final_predictions_' + str(i), final_pred_placeholder))
+    images_sums.append(tf.summary.image('final_predictions_' + str(i)+get_config_id(assign), final_pred_placeholder))
     images_summary_op = tf.summary.merge(images_sums)
+
+    return loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders
+
+
+def execute_assign(input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+                   do_itr, assign, prepped_assign, iteration):
+    loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
 
     if args.prefetch == "True":
         data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign)
 
-    sess.run(tf.global_variables_initializer())
-    print("Start training")
-    for itr in range(iteration, (iteration+assign["itrs"])):
-        print(itr)
+    print("training on:" + str(assign))
+    print("for " + str(do_itr)+ " iterations")
+    for itr in range(iteration, (iteration + do_itr)):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
-            blob = data_layer.forward(args,assign)
+            blob = data_layer.forward(args, assign)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
-
 
         feed_dict = {input: blob["data"]}
         for i in range(len(gt_placeholders)):
             feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders) - i - 1)]
 
-        # initialize variable uninitalized at this point
-        #sess.run(tf.global_variables_initializer())
+
         # train step
-        _, loss_fetch = sess.run([optim,loss], feed_dict=feed_dict)
+        _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
@@ -377,21 +294,21 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
         if itr % args.tensorboard_interval == 0 or itr == 1:
             fetch_list = [scalar_summary_op]
             # fetch sub_predicitons
-            [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x]) for x in range(len(assign["ds_factors"]))]
+            [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x]) for x in
+             range(len(assign["ds_factors"]))]
 
-            summary = sess.run(fetch_list,feed_dict=feed_dict)
+            summary = sess.run(fetch_list, feed_dict=feed_dict)
             writer.add_summary(summary[0], float(itr))
 
             # use predicted feature maps
             # TODO predict boxes
 
             gt_visuals = get_gt_visuals(blob, assign, pred_boxes=None, show=False)
-            map_visuals = get_map_visuals(summary[1:],assign,show=False)
-            images_feed_dict = get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
+            map_visuals = get_map_visuals(summary[1:], assign, show=False)
+            images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
             # save images to tensorboard
             summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
             writer.add_summary(summary[0], float(itr))
-
 
         if itr % args.save_interval == 0:
             print("saving weights")
@@ -399,11 +316,14 @@ def train_on_assignment(input,args,imdb,data_layer,saver,sess,writer,network_hea
                 os.makedirs(checkpoint_dir)
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
-    iteration = (iteration + assign["itrs"])
+    iteration = (iteration + do_itr)
     if args.prefetch == "True":
         data_layer.kill()
 
-    return loss,optim,gt_placeholders, iteration
+    return iteration
+
+
+
 
 
 def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders):
@@ -550,26 +470,26 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # direction markers 0.3 to 0.7 percent, downsample
-    #                         {'itrs': 2000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
+                            {'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
-                            {'itrs': 10000,'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
+                            {'ds_factors': [1,8,16,32], 'downsample_marker': False, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                                  'stamp_args':{'marker_dim': (12,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
     # class markers 0.8% - size-downsample
-                            {'itrs': 10000, 'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1,8,16,32], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}}
 
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    parser.add_argument('--redo_assign', type=list,
+    parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"Nr": 0, "Itrs": 10000},
                             {"Nr": 1, "Itrs": 10000},
-
+                            {"Nr": 1, "Itrs": 10000},
+                            {"Nr": 2, "Itrs": 10000},
 
                             {"Nr": 0, "Itrs": 10000},
                             {"Nr": 1, "Itrs": 10000}
