@@ -164,11 +164,15 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
             inner_2 = gt_1*pred_1+gt_2*pred_2
             debug_fetch[str(x)]["inner_2"] = inner_2
             # round to 4 digits after dot
-            multiplier = tf.constant(10 ** 4, dtype=tf.float32)
-            inner_rounded = tf.round(inner_2 * multiplier) / multiplier
-            debug_fetch[str(x)]["inner_rounded"] = inner_rounded
+            # multiplier = tf.constant(10 ** 4, dtype=tf.float32)
+            # inner_rounded = tf.round(inner_2 * multiplier) / multiplier
+            # debug_fetch[str(x)]["inner_rounded"] = inner_rounded
 
-            acos_inner = tf.acos(inner_rounded)
+            # cap to [-1,1] due to numerical instability
+
+            inner_2 = tf.maximum(tf.constant(-1, dtype=tf.float32),tf.minimum(tf.constant(1, dtype=tf.float32),inner_2))
+
+            acos_inner = tf.acos(inner_2)
             debug_fetch[str(x)]["acos_inner"] = acos_inner
 
             loss_components.append(acos_inner)
