@@ -8,7 +8,7 @@ class PrefetchWrapper:
 
     def __init__(self,fp, prefetch_len, *args):
         self.q = Queue()
-        self.p = Process(target=self.execute_func, args=(fp,prefetch_len, args[0],args[1]))
+        self.p = Process(target=self.execute_func, args=(fp,prefetch_len, args[0],args[1],args[2]))
         self.p.start()
 
     def get_item(self):
@@ -25,7 +25,7 @@ class PrefetchWrapper:
     def execute_func(self, fp, prefetch_len, *args):
         while not self.done:
             if self.q.qsize() < prefetch_len:
-                self.q.put(fp(args[0],args[1]))
+                self.q.put(fp(args[0],args[1],args[2]))
             else:
                 time.sleep(.5)
         return None

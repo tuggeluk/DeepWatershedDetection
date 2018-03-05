@@ -73,7 +73,7 @@ class RoIDataLayer(object):
 
     return db_inds
 
-  def _get_next_minibatch(self, args, assign):
+  def _get_next_minibatch(self, args, assign, helper):
     """Return the blobs to be used for the next minibatch.
 
     If cfg.TRAIN.USE_PREFETCH is True, then blobs will be computed in a
@@ -82,9 +82,9 @@ class RoIDataLayer(object):
     batch_size = args.batch_size
     db_inds = self._get_next_minibatch_inds(batch_size)
     minibatch_db = [self._roidb[i] for i in db_inds]
-    return get_minibatch(minibatch_db, args, assign)
+    return get_minibatch(minibatch_db, args, assign, helper)
       
-  def forward(self, args, assign):
+  def forward(self, args, assign, helper):
     """Get blobs and copy them into this layer's top blob vector."""
-    blobs = self._get_next_minibatch(args, assign)
+    blobs = self._get_next_minibatch(args, assign, helper)
     return blobs

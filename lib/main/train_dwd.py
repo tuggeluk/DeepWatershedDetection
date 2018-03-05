@@ -58,21 +58,25 @@ def main(unused_argv):
     # input and output tensors
     if "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
 
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
-        img_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         resnet_dir = cfg.PRETRAINED_DIR+"/ImageNet/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/VOC2012/"
 
 
+
+    # initialize helper_input
+    helper_input  = tf.placeholder(tf.float32, shape=[None, None, None, input.shape[-1]+1])
+    feed_head = slim.conv2d(helper_input, input.shape[-1], [3, 3], scope='gt_feed_head')
+
     print("Initializing Model:" + args.model)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
+        feed_head, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
+
 
 
     # initialize tasks
@@ -80,6 +84,8 @@ def main(unused_argv):
     for assign in args.training_assignements:
         [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input)
         preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders])
+
+
 
     # init tensorflow session
     saver = tf.train.Saver(max_to_keep=1000)
@@ -114,12 +120,12 @@ def main(unused_argv):
 
 
     for do_a in args.do_assign:
-        assign_nr = do_a["Nr"]
+        assign_nr = do_a["assign"]
         do_itr = do_a["Itrs"]
         preped_assign[assign_nr]
-
-        iteration = execute_assign(input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
-                                   do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration)
+        training_help = args.training_help[do_a["help"]]
+        iteration = execute_assign(helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+                                   do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
 
     # execute tasks
 
@@ -132,7 +138,7 @@ def main(unused_argv):
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
     gt_placeholders = get_gt_placeholders(assign,imdb)
     debug_fetch = dict()
-    # define loss #TODO directional loss
+
     if assign["stamp_func"][0] == "stamp_directions":
         loss_components = []
         for x in range(len(assign["ds_factors"])):
@@ -279,11 +285,11 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
 
 
 def execute_assign(input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
-                   do_itr, assign, prepped_assign, iteration):
+                   do_itr, assign, prepped_assign, iteration,training_help):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
 
     if args.prefetch == "True":
-        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign)
+        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign, training_help)
 
     print("training on:" + str(assign))
     print("for " + str(do_itr)+ " iterations")
@@ -291,12 +297,14 @@ def execute_assign(input,saver, sess, checkpoint_dir, checkpoint_name, data_laye
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
-            blob = data_layer.forward(args, assign)
+            blob = data_layer.forward(args, assign, training_help)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
 
-        feed_dict = {input: blob["data"]}
+        input_data = np.concatenate([blob["data"],blob["helper"]],-1)
+        feed_dict = {input: input_data}
         for i in range(len(gt_placeholders)):
             feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders) - i - 1)]
+
 
 
         # train step
@@ -489,6 +497,12 @@ if __name__ == '__main__':
     parser.add_argument('--segment_resolution', type=str, default="class", help="binary,class or regression (for Centerness-energy)")
 
 
+    parser.add_argument('--training_help', type=list, default=[None,
+                                                               {"level": "bbox", "samp_prob": 1.0},
+                                                               {"level": "bbox", "samp_prob": 0.75},
+                                                               {"level": "bbox", "samp_prob": 0.5},
+                                                               {"level": "bbox", "samp_prob": 0.25}], help="sample gt into imput")
+
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # direction markers 0.3 to 0.7 percent, downsample
@@ -509,18 +523,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"Nr": 0, "Itrs": 500000},
-                            {"Nr": 1, "Itrs": 1000},
-                            {"Nr": 2, "Itrs": 1000},
-                            {"Nr": 0, "Itrs": 1000},
-                            {"Nr": 1, "Itrs": 1000},
-                            {"Nr": 2, "Itrs": 1000},
-                            {"Nr": 0, "Itrs": 1000},
-                            {"Nr": 1, "Itrs": 1000},
-                            {"Nr": 2, "Itrs": 1000},
-
-                            {"Nr": 0, "Itrs": 10000},
-                            {"Nr": 1, "Itrs": 10000}
+                            {"assign": 0, "help": 1, "Itrs": 100000},
+                            {"assign": 0, "help": 2, "Itrs": 100000},
+                            {"assign": 0, "help": 3, "Itrs": 100000},
+                            {"assign": 0, "help": 4, "Itrs": 100000},
+                            {"assign": 1, "help": 0, "Itrs": 100000},
 
 
                         ], help="configure how assignements get repeated")

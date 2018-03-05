@@ -210,6 +210,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     #   stamp_func:         function that defines individual markers
     #   stamp_args:         dict with  additional arguments passed on to stamp_func
 
+
     # downsample size and bounding boxes
     samp_factor = 1.0/objectness_settings["ds_factors"][downsample_ind]
     sampled_size = (int(size[1]*samp_factor),int(size[2]*samp_factor))
@@ -280,7 +281,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         if (downsample_ind+1) == len(objectness_settings["ds_factors"]):
             return maps_list
         else:
-            return get_markers(size, gt, nr_classes, objectness_settings, downsample_ind+1, maps_list)
+            return get_markers(size, gt, nr_classes, objectness_settings,helper, downsample_ind+1, maps_list)
 
     return maps_list
 
@@ -532,6 +533,7 @@ def stamp_class(bbox, args, nr_classes):
         marker = np.eye(nr_classes)[marker[:, :]]
     elif args["class_resolution"] == "binary":
         marker[marker != 0] = 1
+        marker = marker.astype(np.int)
         # turn into one-hot softmax targets
         marker = np.eye(2)[marker[:, :]]
 
