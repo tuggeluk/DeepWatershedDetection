@@ -44,8 +44,7 @@ def main(unused_argv):
     #
     # Debug stuffs
     #
-    #try_all_assign(data_layer,args,100)
-
+    # try_all_assign(data_layer,args,100)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
     #
@@ -501,9 +500,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"Nr": 0, "Itrs": 50000},
-                            {"Nr": 1, "Itrs": 50000},
-                            {"Nr": 2, "Itrs": 50000},
+                            {"Nr": 0, "Itrs": 1000},
+                            {"Nr": 1, "Itrs": 1000},
+                            {"Nr": 2, "Itrs": 1000},
+                            {"Nr": 0, "Itrs": 1000},
+                            {"Nr": 1, "Itrs": 1000},
+                            {"Nr": 2, "Itrs": 1000},
+                            {"Nr": 0, "Itrs": 1000},
+                            {"Nr": 1, "Itrs": 1000},
+                            {"Nr": 2, "Itrs": 1000},
 
                             {"Nr": 0, "Itrs": 10000},
                             {"Nr": 1, "Itrs": 10000}
