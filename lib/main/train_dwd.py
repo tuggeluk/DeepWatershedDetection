@@ -276,6 +276,11 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
         images_sums.append(tf.summary.image('sub_prediction_' + str(i)+"_"+get_config_id(assign), sub_prediction_placeholder))
 
 
+    helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
+    images_placeholders.append(helper_img)
+    images_sums.append(tf.summary.image('helper' + str(i)+get_config_id(assign), helper_img))
+
+
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_placeholders.append(final_pred_placeholder)
     images_sums.append(tf.summary.image('final_predictions_' + str(i)+get_config_id(assign), final_pred_placeholder))
@@ -370,6 +375,7 @@ def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
     for key in feed_dict.keys():
         feed_dict[key] = np.expand_dims(feed_dict[key], 0)
 
+    feed_dict[images_placeholders[len(images_placeholders)-2]] = blob["helper"].astype(np.uint8)
     feed_dict[images_placeholders[len(images_placeholders)-1]] = blob["data"].astype(np.uint8)
 
 
