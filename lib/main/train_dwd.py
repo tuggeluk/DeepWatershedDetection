@@ -253,6 +253,10 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
     scalar_sums = []
 
     scalar_sums.append(tf.summary.scalar("loss " + get_config_id(assign)+":", loss))
+
+    for comp_nr in range(len(loss_components)):
+        scalar_sums.append(tf.summary.scalar("loss_component " + get_config_id(assign) + "Nr"+str(comp_nr)+":", loss_components[comp_nr]))
+
     scalar_summary_op = tf.summary.merge(scalar_sums)
 
     images_sums = []
@@ -262,11 +266,8 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
     for i in range(len(assign["ds_factors"])):
         sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
         images_placeholders.append(sub_prediction_placeholder)
-        images_sums.append(tf.summary.image('sub_prediction_' + str(i)+get_config_id(assign), sub_prediction_placeholder))
+        images_sums.append(tf.summary.image('sub_prediction_' + str(i)+"_"+get_config_id(assign), sub_prediction_placeholder))
 
-        sub_gt_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-        images_placeholders.append(sub_gt_placeholder)
-        images_sums.append(tf.summary.image('sub_gt_' + str(i)+get_config_id(assign), sub_gt_placeholder))
 
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_placeholders.append(final_pred_placeholder)
@@ -341,13 +342,17 @@ def execute_assign(input,saver, sess, checkpoint_dir, checkpoint_name, data_laye
 
 def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders):
     feed_dict = dict()
-    for i in range(len(assign["ds_factors"])*2):
-        if i%2 ==0:
-            # prediction
-            feed_dict[images_placeholders[i]] = map_visuals[i/2]
+    # for i in range(len(assign["ds_factors"])*2):
+    #     if i%2 ==0:
+    #         # prediction
+    #         feed_dict[images_placeholders[i]] = map_visuals[i/2]
+    #
+    #     else:
+    #         feed_dict[images_placeholders[i]] = gt_visuals[i]
 
-        else:
-            feed_dict[images_placeholders[i]] = gt_visuals[i/2]
+    for i in range(len(assign["ds_factors"])):
+        feed_dict[images_placeholders[i]] = np.concatenate(gt_visuals[i], map_visuals[i])
+
 
 
     for key in feed_dict.keys():
@@ -500,7 +505,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"Nr": 0, "Itrs": 1000},
+                            {"Nr": 0, "Itrs": 500000},
                             {"Nr": 1, "Itrs": 1000},
                             {"Nr": 2, "Itrs": 1000},
                             {"Nr": 0, "Itrs": 1000},
@@ -523,118 +528,3 @@ if __name__ == '__main__':
 
 
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
-
-
-
- #
- #
- # with tf.variable_scope('deep_watershed'):
- #        print("Using loss:")
- #        # marker Loss
- #        if args.segment_resolution == "regression":
- #            l_mark_0 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[0], labels=marker_0))
- #            l_mark_1 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[1], labels=marker_1))
- #            l_mark_2 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[2], labels=marker_2))
- #            l_mark_3 = tf.reduce_mean(tf.losses.mean_squared_error(predictions=markers[3], labels=marker_3))
- #        elif args.segment_resolution == "binary" or args.segment_resolution == "class":
- #            l_mark_0 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[0], labels=marker_0))
- #            l_mark_1 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[1], labels=marker_1))
- #            l_mark_2 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[2], labels=marker_2))
- #            l_mark_3 = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=markers[3], labels=marker_3))
- #
- #
- #        stacked_markers = tf.stack([l_mark_0,l_mark_1,l_mark_2,l_mark_3])
- #        mean_stacked_loss = tf.reduce_mean(stacked_markers)
- #        min_stacked_loss = tf.reduce_min(stacked_markers)
- #
- #        energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
- #
- #        # energy_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=dws_energy, labels=label_dws_energy))
- #        #
- #        # dws_mask = tf.squeeze(label_dws_energy >= 0, -1)
- #        #
- #        # class_masked_logits = tf.boolean_mask(class_logits, dws_mask)
- #        # class_masked_labels = tf.boolean_mask(label_class, dws_mask)
- #        # class_loss = tf.reduce_mean(safe_softmax_cross_entropy_with_logits(logits=class_masked_logits, labels=class_masked_labels))
- #        #
- #        # bbox_masked_predictions = tf.boolean_mask(bbox_size, dws_mask)
- #        # class_masked_labels = tf.boolean_mask(label_bbox, dws_mask)
- #        # box_loss = tf.reduce_mean(tf.losses.mean_squared_error(predictions=bbox_masked_predictions, labels=class_masked_labels))
- #        #
- #        # ec_loss = tf.add(energy_loss * 1.0, class_loss * 0.5)
- #        # tot_loss = tf.add(ec_loss * 1.0, box_loss * 0.5)
- #
- #
- #        print("Init optimizers")
- #        var_list = [var for var in tf.trainable_variables()]
- #        opt_energy = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(energy_loss, var_list=var_list)
- #        opt_min = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(min_stacked_loss, var_list=var_list)
- #        opt_mean = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(mean_stacked_loss,var_list=var_list)
- #
- #        #opt_ec = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(ec_loss, var_list=var_list)
- #        #opt_tot = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(tot_loss, var_list=var_list)
- #
- #        print("Init Summary")
- #        scalar_sums = []
- #        scalar_sums.append(tf.summary.scalar("energy_loss", energy_loss))
- #        scalar_sums.append(tf.summary.scalar("mean_stacked", mean_stacked_loss))
- #        scalar_sums.append(tf.summary.scalar("min_stacked", min_stacked_loss))
- #        scalar_summary_op = tf.summary.merge(scalar_sums)
- #
- #        images_sums = []
- #        images_sums.append(tf.summary.image('Energy_Map', img_energy_placeholder))
- #        images_sums.append(tf.summary.image('Marker_Maps', img_marker_placeholder))
- #        images_sums.append(tf.summary.image('Prediction', img_pred_placeholder))
- #        images_summary_op = tf.summary.merge(images_sums)
- #
- #
-
-
-
-
-    # leave this for later
-    # print("add-prediciton to tensorboard")
-    # # compute prediction
-    # pred_class = np.argmax(pred_class_logits, axis=3)
-    # dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
-    #
-    # # build images
-    # # rescale
-    # # pred_scaled = pred_foreground[0] + np.abs(np.min(pred_foreground[0]))
-    # # pred_scaled = pred_scaled / np.max(pred_scaled)*255
-    # # np.argmax(, axis=None, out=None)
-    # pred_scaled = np.argmax(pred_foreground[0], axis=-1, out=None)
-    # pred_scaled = np.expand_dims(pred_scaled, -1) * 255
-    #
-    # orig_scaled = np.argmax(blob["foreground"][0], axis=-1, out=None)
-    # orig_scaled = np.expand_dims(orig_scaled, -1) * 255
-    #
-    # conc_array = np.concatenate((pred_scaled, orig_scaled), 0)
-    # energy_array = np.squeeze(conc_array.astype("uint8"))
-    # energy_array = np.expand_dims(np.expand_dims(energy_array, -1), 0)
-    #
-    # # switch bgr to rgb
-    # im_rgb = blob["data"][0][:, :, [2, 1, 0]] + cfg.PIXEL_MEANS[:, :, [2, 1, 0]]
-    # im = Image.fromarray(im_rgb.astype("uint8"))
-    # draw = ImageDraw.Draw(im)
-    # # overlay GT boxes
-    # for row in blob["gt_boxes"][0]:
-    #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
-    # for row in dws_list:
-    #     draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
-    # im_array = np.array(im).astype("uint8")
-    # im_array = np.expand_dims(im_array, 0)
-    #
-    # if len(im_array.shape) < 4:
-    #     im_array = np.expand_dims(im_array, -1)
-
-
-    # if "DeepScores" in args.dataset:
-    #     blob["data"] = np.expand_dims(np.mean(blob["data"], -1), -1)
-    #     # one-hot class labels
-    #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
-    #
-    # if "voc" in args.dataset:
-    #     # one-hot class labels
-    #     blob["class_map"] = np.eye(imdb.num_classes)[blob["class_map"][:, :, :, -1]]
-    #     blob["foreground"] = np.eye(2)[blob["foreground"][:, :, :, -1]]
