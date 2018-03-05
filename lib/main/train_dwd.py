@@ -350,8 +350,11 @@ def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
     #     else:
     #         feed_dict[images_placeholders[i]] = gt_visuals[i]
 
+    # reverse map vis order
+    map_visuals = list(reversed(map_visuals))
     for i in range(len(assign["ds_factors"])):
-        feed_dict[images_placeholders[i]] = np.concatenate(gt_visuals[i], map_visuals[i])
+        feed_dict[images_placeholders[i]] = np.concatenate([gt_visuals[i], map_visuals[i]])
+
 
 
 
@@ -463,7 +466,7 @@ if __name__ == '__main__':
     parser.add_argument("--pad_to", type=int, default=160, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0,help="use this number to pad images")
 
-    parser.add_argument("--prefetch", type=str, default="True", help="use additional process to fetch batches")
+    parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=2, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
