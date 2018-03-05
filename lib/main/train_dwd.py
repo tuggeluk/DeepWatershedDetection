@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import argparse
 import sys
+sys.path.insert(0,'../')
 from main.config import cfg
 
 from models.dwd_net import build_dwd_net
