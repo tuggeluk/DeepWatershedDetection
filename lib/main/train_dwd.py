@@ -180,12 +180,15 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
 
             loss_components.append(acos_inner)
     else:
+        nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
         if assign["stamp_args"]["loss"] == "softmax":
-            loss_components = [tf.losses.mean_squared_error(predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
+            loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-(x+1)],
                                                             labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+
         else:
-            loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x],
-                                                            labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+            loss_components = [tf.losses.mean_squared_error(
+                predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-(x+1)],
+                labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
 
 
     #################################################################################################################
@@ -305,7 +308,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
         input_data = np.concatenate([blob["data"],blob["helper"]],-1)
         feed_dict = {input: input_data}
         for i in range(len(gt_placeholders)):
-            feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders) - i - 1)]
+            feed_dict[gt_placeholders[i]] = blob["gt_map" + str(i)]
 
 
 
@@ -319,7 +322,9 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
         if itr % args.tensorboard_interval == 0 or itr == 1:
             fetch_list = [scalar_summary_op]
             # fetch sub_predicitons
-            [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x]) for x in
+            nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+
+            [fetch_list.append(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-(x+1)]) for x in
              range(len(assign["ds_factors"]))]
 
             summary = sess.run(fetch_list, feed_dict=feed_dict)
@@ -362,7 +367,6 @@ def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
     #         feed_dict[images_placeholders[i]] = gt_visuals[i]
 
     # reverse map vis order
-    map_visuals = list(reversed(map_visuals))
     for i in range(len(assign["ds_factors"])):
         feed_dict[images_placeholders[i]] = np.concatenate([gt_visuals[i], map_visuals[i]])
 
@@ -372,8 +376,13 @@ def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
     for key in feed_dict.keys():
         feed_dict[key] = np.expand_dims(feed_dict[key], 0)
 
-    feed_dict[images_placeholders[len(images_placeholders)-2]] = blob["helper"].astype(np.uint8)
-    feed_dict[images_placeholders[len(images_placeholders)-1]] = blob["data"].astype(np.uint8)
+    feed_dict[images_placeholders[len(images_placeholders)-2]] = (blob["helper"]/np.max(blob["helper"])*255).astype(np.uint8)
+
+    if blob["data"].shape[3] == 1:
+        img_data = np.concatenate([blob["data"],blob["data"],blob["data"]],-1).astype(np.uint8)
+    else:
+        img_data = blob["data"].astype(np.uint8)
+    feed_dict[images_placeholders[len(images_placeholders)-1]] = img_data
 
 
 

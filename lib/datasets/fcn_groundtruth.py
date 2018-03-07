@@ -364,6 +364,10 @@ def get_direction_marker(size, shape, hole):
 
     center = np.asanyarray(size) * 0.5
 
+    # if smaller than one pixel return
+    if np.min(center) < 1:
+        return marker
+
     if shape == "oval":
         # mask out non-oval parts
         y_coords = np.array(range(size[0]))+0.5
@@ -615,7 +619,11 @@ def color_map(img_map, assign,show=False):
             img_map = np.argmax(img_map, -1)
         else:
             img_map = np.squeeze(img_map,-1)
+            # normalize to 0 to 19
+            img_map = img_map/np.max(img_map)*19
+
             img_map = img_map.astype(np.int)
+            print(np.unique(img_map))
 
         colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:, 0:3]
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
@@ -653,8 +661,11 @@ def color_map(img_map, assign,show=False):
 def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     # add mean
     #image += cfg.PIXEL_MEANS[0][0][[0,1,2]]
-    image = image[:,:,[2,1,0]] # Switch to rgb
-    im = Image.fromarray(image.astype("uint8"))
+    if len(image.shape)==3 and  image.shape[2]>=3:
+        image = image[:,:,[2,1,0]] # Switch to rgb
+        im = Image.fromarray(image.astype("uint8"))
+    else:
+        im = Image.fromarray(np.squeeze(image.astype("uint8"),-1))
 
     if fill:
         outline = [None,None]

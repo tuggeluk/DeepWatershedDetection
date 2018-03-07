@@ -90,6 +90,7 @@ def get_minibatch(roidb, args, assign, helper):
     if helper is None:
         # pure noise
         blobs["helper"] = random
+        blobs["helper"] = np.expand_dims(np.expand_dims(blobs["helper"], 0), -1)
     else:
         # adjust level of noise
         x_range = range(blobs["helper"].shape[1])
@@ -112,6 +113,11 @@ def get_minibatch(roidb, args, assign, helper):
     blobs['im_info'] = np.array(
         [[im_blob.shape[1], im_blob.shape[2], im_scales[0]]],
         dtype=np.float32)
+
+    # for deepscores average over last data dimension
+    if "DeepScores" in args.dataset:
+        blobs["data"] = np.average(blobs["data"],-1)
+        blobs["data"] = np.expand_dims(blobs["data"], -1)
 
     return blobs
 
