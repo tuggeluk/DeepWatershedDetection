@@ -76,4 +76,4 @@ if __name__ == '__main__':
 
     parsed = parser.parse_known_args()
 
-    tf.app.run(main=main, argv=parsed)
+    main(parsed)

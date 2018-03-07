@@ -22,8 +22,8 @@ from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy
 nr_classes = None
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
 
-def main(args_list):
-    args = args_list[0]
+def main(parsed):
+    args = parsed[0]
     print(args)
     iteration = 1
 
