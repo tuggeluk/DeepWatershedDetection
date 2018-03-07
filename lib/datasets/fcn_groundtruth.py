@@ -234,7 +234,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 maskout_map = np.argmax(canvas[coords[1]:coords[3],coords[0]:(coords[2])], -1) < np.argmax(stamp,-1)
                 canvas[coords[1]:coords[3], coords[0]:coords[2]][maskout_map] = stamp[maskout_map]
             else:
-                canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.max(canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp)
+                canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.expand_dims(np.max(np.concatenate([canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp],-1),-1),-1)
         elif objectness_settings["overlap_solution"] == "no":
             canvas[coords[1]:coords[3],coords[0]:coords[2]] = stamp
         elif objectness_settings["overlap_solution"] == "nearest":
@@ -274,14 +274,18 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 #         rez_l.append()
                 # else:
                 resized = cv2.resize(canvas, None, None, 1.0 / x, 1.0 / x, cv2.INTER_NEAREST)
-                maps_list.append(np.expand_dims(resized,0))
+                if len(resized.shape) < len(canvas.shape):
+                    maps_list.append(np.expand_dims(np.expand_dims(resized, -1),0))
+                else:
+                    maps_list.append(np.expand_dims(resized, 0))
+
 
     # if do not downsample marker, recursively rebuild for each ds level
     else:
         if (downsample_ind+1) == len(objectness_settings["ds_factors"]):
             return maps_list
         else:
-            return get_markers(size, gt, nr_classes, objectness_settings,helper, downsample_ind+1, maps_list)
+            return get_markers(size, gt, nr_classes, objectness_settings,downsample_ind+1, maps_list)
 
     return maps_list
 
@@ -451,6 +455,9 @@ def stamp_energy(bbox,args,nr_classes):
         marker = np.round(marker).astype(np.int32)
         marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
         # turn into one-hot softmax targets
+    else:
+        # expand last dim
+        marker = np.expand_dims(marker,-1)
 
 
     return marker, coords
@@ -543,12 +550,52 @@ def stamp_class(bbox, args, nr_classes):
     return marker, coords
 
 
+def stamp_bbox(bbox, args, nr_classes):
+
+    #   for bbox == -1 return dim
+    #
+    #   Builds gt for class prediction
+    #
+    #   must be contained by args:
+    #   marker_dim:         if it is not None every object will have the same size marker
+    #   size_percentage:    percentage of the oval axes w.r.t. to the corresponding bounding boxes, only applied if
+    #                       marker_dim is None
+    #   shape:              square or oval
+    #   class_resolution:   "binary" for background/foreground or "class"
+    #
+    #   return patch, and coords
+    if bbox is None:
+        return 2
+
+    if args["marker_dim"] is None:
+        # use bbox size
+        # determine marker size
+        marker_size = (int(args["size_percentage"] * (bbox[3] - bbox[1])), int(args["size_percentage"] * (bbox[2] - bbox[0])))
+    else:
+        marker_size = args["marker_dim"]
+
+
+    coords_offset = np.round(([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5)
+    topleft = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0]]).astype(np.int)
+    coords = [topleft[0],topleft[1],
+              topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
+
+
+    # piggy back on energy marker
+    marker = get_energy_marker(marker_size, args["shape"])
+
+    # expand marker and multiply by bbox size
+    marker = np.expand_dims(marker,-1)
+    bbox_marker = np.concatenate([(bbox[3] - bbox[1])*(marker>0), (bbox[2] - bbox[0])*(marker>0)], -1)
+    return bbox_marker, coords
+
+
 def try_all_assign(data_layer, args, nr_tries = 1):
     for assign in args.training_assignements:
         for i in range(nr_tries):
             batch_not_loaded = True
             while batch_not_loaded:
-                data = data_layer.forward(args, assign)
+                data = data_layer.forward(args, assign,None)
                 batch_not_loaded = len(data["gt_boxes"].shape) != 3
 
             fetched_maps =[]
@@ -556,7 +603,7 @@ def try_all_assign(data_layer, args, nr_tries = 1):
                 if "map" in key:
                     fetched_maps.append(data[key])
 
-            get_gt_visuals(data, assign, data["gt_boxes"][0], show=False)
+            get_gt_visuals(data, assign, data["gt_boxes"][0], show=True)
 
     return None
 
@@ -566,15 +613,19 @@ def color_map(img_map, assign,show=False):
     if assign["stamp_func"][0] == "stamp_energy":
         if assign["stamp_args"]["loss"] == "softmax":
             img_map = np.argmax(img_map, -1)
+        else:
+            img_map = np.squeeze(img_map,-1)
+            img_map = img_map.astype(np.int)
 
         colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:, 0:3]
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 
     if assign["stamp_func"][0] == "stamp_class":
 
+        nr_classes = img_map.shape[-1]
         img_map = np.argmax(img_map, -1)
 
-        colors = np.asarray(cm.nipy_spectral(np.linspace(0, 1, 25)))[:, 0:3]
+        colors = np.asarray(cm.nipy_spectral(np.linspace(0, 1, nr_classes)))[:, 0:3]
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 
     if assign["stamp_func"][0] == "stamp_directions":
@@ -589,6 +640,11 @@ def color_map(img_map, assign,show=False):
         # add zero B channel
         img_map = np.concatenate([img_map, np.zeros(img_map.shape[:-1]+(1,))],-1)
         colored_map = img_map.astype(np.uint8)
+    if assign["stamp_func"][0] == "stamp_bbox":
+        size_map = np.sqrt(img_map[:,:,0]*img_map[:,:,1])
+        size_map = size_map/np.max(size_map)*255
+        colored_map = size_map.astype(np.uint8)
+
     if show:
         Image.fromarray(colored_map).show()
     return colored_map
@@ -596,7 +652,7 @@ def color_map(img_map, assign,show=False):
 
 def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     # add mean
-    image += cfg.PIXEL_MEANS[0][0][[0,1,2]]
+    #image += cfg.PIXEL_MEANS[0][0][[0,1,2]]
     image = image[:,:,[2,1,0]] # Switch to rgb
     im = Image.fromarray(image.astype("uint8"))
 

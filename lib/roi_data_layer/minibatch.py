@@ -62,8 +62,12 @@ def get_minibatch(roidb, args, assign, helper):
 
 
 
+    # from PIL import Image
+    # Image.fromarray(
+
+
     # # build additional gt for FCN
-    # # show_image(im_blob, gt_boxes, gt=True)
+    # show_image(im_blob, gt_boxes, gt=True)
     # blobs['dws_energy'] = objectness_energy(im_blob, gt_boxes)
     # # objectness_energy_high_dym(im_blob, gt_boxes, num_classes)
     # blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
@@ -115,8 +119,8 @@ def get_minibatch(roidb, args, assign, helper):
 def crop_boxes(img_shape, coord):
     crop_coords = coord[0:4]
     crop_coords = np.maximum(crop_coords, 0)
-    crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], img_shape[1])
-    crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], img_shape[2])
+    crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], img_shape[2])
+    crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], img_shape[1])
 
     # if a dimension collapses kill element
     if crop_coords[0] == crop_coords[2] or crop_coords[1]==crop_coords[3]:
