@@ -42,7 +42,7 @@ def main(args_list):
     #
     # Debug stuffs
     #
-    try_all_assign(data_layer,args,2)
+    # try_all_assign(data_layer,args,2)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
     #
