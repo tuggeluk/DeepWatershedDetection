@@ -74,6 +74,6 @@ if __name__ == '__main__':
     parser.add_argument('--combined_assignements', type=list,
                         default=[],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
-    parsed, unparsed = parser.parse_known_args()
+    parsed = parser.parse_known_args()
 
-    tf.app.run(main=main, argv=[parsed]+[sys.argv[0]] + unparsed)
+    tf.app.run(main=main, argv=parsed)
