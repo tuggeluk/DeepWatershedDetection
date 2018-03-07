@@ -1,7 +1,10 @@
+import os
+import sys
+sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from main.train_dwd import main
 import argparse
 import tensorflow as tf
-import sys
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
