@@ -181,16 +181,17 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
             loss_components.append(acos_inner)
     else:
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+        nr_ds_factors = len(assign["ds_factors"])
         if assign["stamp_args"]["loss"] == "softmax":
-            loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-(x+1)],
-                                                            labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+            loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+                                                            labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
         else:
             loss_components = [tf.losses.mean_squared_error(
-                predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-(x+1)],
-                labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
+                predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+                labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
-    1==1
+
     #################################################################################################################
     # debug  losses
     # load batch - only use batches with content
@@ -200,14 +201,20 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     #     blob = data_layer.forward(args, assign)
     #     batch_not_loaded = len(blob["gt_boxes"].shape) != 3
     #
-    #     feed_dict = {input: blob["data"]}
+    #     feed_dict = {input: np.concatenate([blob["data"],blob["data"]],-1)}
     #     for i in range(len(gt_placeholders)):
     #         feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders)-i-1)]
     # sess.run(tf.global_variables_initializer())
     # 1==1
-    # # train step
-    #
+    # # train softmax
     # loss_fetch = sess.run(loss_components, feed_dict=feed_dict)
+    #
+    #
+    # feature_maps_fetch = sess.run(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]], feed_dict=feed_dict)
+    # for map in feature_maps_fetch:
+    #     print(map.shape)
+    #
+    # # train step
     #
     # [split] = sess.run([debug_fetch[str(x)]["split1"]], feed_dict=feed_dict)
     # [pred] = sess.run([network_heads[assign["stamp_func"][0]][x]], feed_dict=feed_dict)
@@ -310,7 +317,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
         input_data = np.concatenate([blob["data"],blob["helper"]],-1)
         feed_dict = {input: input_data}
         for i in range(len(gt_placeholders)):
-            feed_dict[gt_placeholders[i]] = blob["gt_map" + str(i)]
+            feed_dict[gt_placeholders[i]] =  blob["gt_map" + str(len(gt_placeholders)-i-1)]
 
 
 

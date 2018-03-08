@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument("--pad_to", type=int, default=160, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0,help="use this number to pad images")
 
-    parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
+    parser.add_argument("--prefetch", type=str, default="True", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=10, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
@@ -40,23 +40,23 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
-    # # direction markers 0.3 to 0.7 percent, downsample
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
+    # direction markers 0.3 to 0.7 percent, downsample
+                            {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
                             {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                                  'stamp_args':{'marker_dim': (9,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
-    # # class markers
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
-    #
-    # # bbox markers
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "loss": "reg"}}
+    # class markers
+                            {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
+
+    # bbox markers
+                            {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "loss": "reg"}}
 
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
