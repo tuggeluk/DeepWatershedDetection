@@ -22,7 +22,9 @@ class PrefetchWrapper:
 
     def kill(self):
         self.done = True
+        print("trying to join")
         [prc.join() for prc in self.p]
+        print("joined")
         return None
 
     def execute_func(self, fp, prefetch_len,index_lock, *args):

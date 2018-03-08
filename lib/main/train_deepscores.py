@@ -63,10 +63,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 1000},
-                            {"assign": 1, "help": 0, "Itrs": 5000},
-                            {"assign": 2, "help": 0, "Itrs": 1000},
-                            {"assign": 3, "help": 0, "Itrs": 1000}
+                            {"assign": 0, "help": 0, "Itrs": 2},
+                            {"assign": 1, "help": 0, "Itrs": 2},
+                            {"assign": 2, "help": 0, "Itrs": 2},
+                            {"assign": 3, "help": 0, "Itrs": 2}
 
                         ], help="configure how assignements get repeated")
 
