@@ -41,9 +41,9 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # direction markers 0.3 to 0.7 percent, downsample
-                            {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
+    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+    #                          'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+    #                          'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
                             {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
@@ -63,10 +63,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 1000},
-                            {"assign": 1, "help": 0, "Itrs": 5000},
-                            {"assign": 2, "help": 0, "Itrs": 1000},
-                            {"assign": 3, "help": 0, "Itrs": 1000}
+                            {"assign": 0, "help": 0, "Itrs": 5000},  
+                            {"assign": 1, "help": 0, "Itrs": 1000},
+                            {"assign": 2, "help": 0, "Itrs": 1000}
 
                         ], help="configure how assignements get repeated")
 
