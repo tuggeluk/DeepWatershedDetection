@@ -81,13 +81,15 @@ class RoIDataLayer(object):
     """
     batch_size = args.batch_size
     # sync index acquiration
-    lock.acquire()
+    if lock is not None:
+      lock.acquire()
     db_inds = self._get_next_minibatch_inds(batch_size)
-    lock.release()
+    if lock is not None:
+      lock.release()
     minibatch_db = [self._roidb[i] for i in db_inds]
     return get_minibatch(minibatch_db, args, assign, helper)
       
-  def forward(self, args, assign, helper,lock):
+  def forward(self, args, assign, helper=None,lock=None):
     """Get blobs and copy them into this layer's top blob vector."""
     blobs = self._get_next_minibatch(args, assign, helper,lock)
     return blobs

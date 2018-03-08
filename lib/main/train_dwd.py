@@ -79,7 +79,7 @@ def main(parsed):
     # initialize tasks
     preped_assign = []
     for assign in args.training_assignements:
-        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input)
+        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,helper_input,args)
         preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders])
 
 
@@ -132,7 +132,7 @@ def main(parsed):
     # for comb_assign in args.combined_assignements:
     #     train_on_comb_assignment()
 
-def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
+def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
     gt_placeholders = get_gt_placeholders(assign,imdb)
     debug_fetch = dict()
 
@@ -192,8 +192,8 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
 
 
     #################################################################################################################
-        # debug directional loss
-            # load batch - only use batches with content
+    # debug  losses
+    # load batch - only use batches with content
     # batch_not_loaded = True
     # while batch_not_loaded:
     #
@@ -207,6 +207,8 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
     # 1==1
     # # train step
     #
+    # loss_fetch = sess.run(loss_components, feed_dict=feed_dict)
+    #
     # [split] = sess.run([debug_fetch[str(x)]["split1"]], feed_dict=feed_dict)
     # [pred] = sess.run([network_heads[assign["stamp_func"][0]][x]], feed_dict=feed_dict)
     # [mask] = sess.run([debug_fetch[str(x)]["mask"]], feed_dict=feed_dict)
@@ -216,8 +218,8 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input):
     # [inner_2] = sess.run([debug_fetch[str(x)]["inner_2"]], feed_dict=feed_dict)
     # [inner_rounded] = sess.run([debug_fetch[str(x)]["inner_rounded"]], feed_dict=feed_dict)
     # debug_fetch[str(x)].keys()
-        # for i in range(mask_gt_fetch.shape[0]):
-        #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
+    # for i in range(mask_gt_fetch.shape[0]):
+    #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
     #################################################################################################################
 
     # potentially mask out zeros
