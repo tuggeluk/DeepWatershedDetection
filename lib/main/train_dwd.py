@@ -190,7 +190,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
                 predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-(x+1)],
                 labels=gt_placeholders[x]) for x in range(len(assign["ds_factors"]))]
 
-
+    1==1
     #################################################################################################################
     # debug  losses
     # load batch - only use batches with content
