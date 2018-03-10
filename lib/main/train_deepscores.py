@@ -27,10 +27,10 @@ if __name__ == '__main__':
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
-    parser.add_argument("--dataset", type=str, default="DeepScores_2017_train100", help="DeepScores, voc or coco")
+    parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
-    parser.add_argument("--print_interval", type=int, default=1, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
+    parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
+    parser.add_argument("--tensorboard_interval", type=int, default=200, help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000, help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 
@@ -47,25 +47,25 @@ if __name__ == '__main__':
     # energy markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                                 'stamp_args':{'marker_dim': (9,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}}
-    # # class markers
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
-    #
-    # # bbox markers
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "loss": "reg"}}
+                                 'stamp_args':{'marker_dim': (9,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
+    # class markers
+                            {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
+
+    # bbox markers
+                            {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "loss": "reg"}}
 
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 5000},  
-                            {"assign": 1, "help": 0, "Itrs": 1000},
-                            {"assign": 2, "help": 0, "Itrs": 1000}
+                            {"assign": 0, "help": 0, "Itrs": 500000},
+                            {"assign": 1, "help": 0, "Itrs": 10000},
+                            {"assign": 2, "help": 0, "Itrs": 10000}
 
                         ], help="configure how assignements get repeated")
 
