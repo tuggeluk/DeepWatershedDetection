@@ -99,7 +99,7 @@ def main(parsed):
             #load all variables except the ones in scope "deep_watershed"
             pretrained_vars = []
             for var in slim.get_model_variables():
-                if "deep_watershed" not in var.name:
+                if not("deep_watershed" in var.name or "gt_feed_head" in var.name):
                     pretrained_vars.append(var)
 
             print("Loading network pretrained on semantic segmentation")

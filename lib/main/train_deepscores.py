@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
-    parser.add_argument("--pretrain_lvl", type=str, default="class", help="What kind of pretraining to use: no,class,semseg")
+    parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 5000},  
+                            {"assign": 0, "help": 0, "Itrs": 10000},
                             {"assign": 1, "help": 0, "Itrs": 1000},
                             {"assign": 2, "help": 0, "Itrs": 1000}
 
