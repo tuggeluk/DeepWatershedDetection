@@ -627,11 +627,11 @@ def color_map(img_map, assign,show=False):
             img_map = img_map/np.max(img_map)*19
 
             img_map = img_map.astype(np.int)
-            print(np.unique(img_map))
+
 
         colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:, 0:3]
 
-        img_map = np.max(0,img_map)
+        img_map = np.maximum(0,img_map)
 
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 

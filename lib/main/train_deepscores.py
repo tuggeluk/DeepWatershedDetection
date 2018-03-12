@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument("--pad_to", type=int, default=160, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0,help="use this number to pad images")
 
-    parser.add_argument("--prefetch", type=str, default="True", help="use additional process to fetch batches")
+    parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=10, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
