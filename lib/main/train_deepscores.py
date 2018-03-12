@@ -41,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('--training_assignements', type=list,
                         default=[
     # direction markers 0.3 to 0.7 percent, downsample
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+    #                         {'ds_factors': [1,8], 'downsample_marker': True,  'overlap_solution': 'nearest',
     #                          'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
     #                          'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
