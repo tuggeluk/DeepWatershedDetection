@@ -630,6 +630,9 @@ def color_map(img_map, assign,show=False):
             print(np.unique(img_map))
 
         colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:, 0:3]
+
+        img_map = np.max(0,img_map)
+
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 
     if assign["stamp_func"][0] == "stamp_class":
