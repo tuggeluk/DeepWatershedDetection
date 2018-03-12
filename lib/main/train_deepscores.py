@@ -29,8 +29,8 @@ if __name__ == '__main__':
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
-    parser.add_argument("--print_interval", type=int, default=100, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
+    parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
+    parser.add_argument("--tensorboard_interval", type=int, default=200, help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000, help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 

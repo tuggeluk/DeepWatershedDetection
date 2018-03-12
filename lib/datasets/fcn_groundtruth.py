@@ -481,8 +481,11 @@ def get_energy_marker(size, shape):
         else:
             grid_x = np.concatenate((range(sx), range(sx-1, -1, -1)))
 
+
         marker = np.min(np.stack(np.meshgrid(grid_x, grid_y)),0)
-        marker = marker/float(np.max(marker))*(cfg.TRAIN.MAX_ENERGY-1)
+
+        if min(marker.shape) > 0:
+            marker = marker/float(np.max(marker))*(cfg.TRAIN.MAX_ENERGY-1)
         return marker
     if shape == "oval":
         center = np.asanyarray(size) *0.5
@@ -597,6 +600,7 @@ def stamp_bbox(bbox, args, nr_classes):
 def try_all_assign(data_layer, args, nr_tries = 1):
     for assign in args.training_assignements:
         for i in range(nr_tries):
+            print(i)
             batch_not_loaded = True
             while batch_not_loaded:
                 data = data_layer.forward(args, assign,None)

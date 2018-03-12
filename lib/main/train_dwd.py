@@ -42,7 +42,7 @@ def main(parsed):
     #
     # Debug stuffs
     #
-    # try_all_assign(data_layer,args,2)
+    # try_all_assign(data_layer,args,100)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
     #
@@ -261,7 +261,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
 
     # init optimizer
     var_list = [var for var in tf.trainable_variables()]
-    optim = tf.train.RMSPropOptimizer(learning_rate=0.0001, decay=0.995).minimize(loss, var_list=var_list)
+    optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss, var_list=var_list)
 
 
     # init summary operations
