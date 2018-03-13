@@ -39,13 +39,13 @@ def main(parsed):
     # replaces keywords with function handles in training assignements
     save_objectness_function_handles(args,imdb)
 
-    #
+
     # Debug stuffs
     #
-    # try_all_assign(data_layer,args,100)
+    try_all_assign(data_layer,args,100)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
-    #
+
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -121,7 +121,7 @@ def main(parsed):
         do_itr = do_a["Itrs"]
         preped_assign[assign_nr]
         training_help = args.training_help[do_a["help"]]
-        iteration = execute_assign(args,helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+        iteration = execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                                    do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
 
     # execute tasks
@@ -298,7 +298,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     return loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders
 
 
-def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                    do_itr, assign, prepped_assign, iteration,training_help):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
 
@@ -314,8 +314,14 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
             blob = data_layer.forward(args, assign, training_help)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
 
-        input_data = np.concatenate([blob["data"],blob["helper"]],-1)
-        feed_dict = {input: input_data}
+        if blob["helper"] is not None:
+            input_data = np.concatenate([blob["data"],blob["helper"]],-1)
+            feed_dict = {helper_input: input_data}
+        else:
+            #feed_zeros to helper input
+            input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
+            feed_dict = {input: blob["data"], helper_input: input_data}
+
         for i in range(len(gt_placeholders)):
             feed_dict[gt_placeholders[i]] =  blob["gt_map" + str(len(gt_placeholders)-i-1)]
 
@@ -385,7 +391,10 @@ def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
     for key in feed_dict.keys():
         feed_dict[key] = np.expand_dims(feed_dict[key], 0)
 
-    feed_dict[images_placeholders[len(images_placeholders)-2]] = (blob["helper"]/np.max(blob["helper"])*255).astype(np.uint8)
+    if blob["helper"] is not None:
+        feed_dict[images_placeholders[len(images_placeholders)-2]] = (blob["helper"]/np.max(blob["helper"])*255).astype(np.uint8)
+    else:
+        feed_dict[images_placeholders[len(images_placeholders) - 2]] = np.zeros(blob["data"].shape,dtype=np.uint8)
 
     if blob["data"].shape[3] == 1:
         img_data = np.concatenate([blob["data"],blob["data"],blob["data"]],-1).astype(np.uint8)

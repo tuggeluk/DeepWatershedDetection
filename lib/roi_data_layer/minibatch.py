@@ -91,6 +91,9 @@ def get_minibatch(roidb, args, assign, helper):
         # pure noise
         blobs["helper"] = random
         blobs["helper"] = np.expand_dims(np.expand_dims(blobs["helper"], 0), -1)
+        # set helper to None
+        blobs["helper"] = None
+
     else:
         # adjust level of noise
         x_range = range(blobs["helper"].shape[1])

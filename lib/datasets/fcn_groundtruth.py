@@ -12,6 +12,7 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import math
+import sys
 
 marker_size = [4,4]
 
@@ -222,6 +223,9 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"],nr_classes)
     canvas = np.zeros(sampled_size+(last_dim,), dtype=np.float)
 
+    if objectness_settings["stamp_func"][0] == "stamp_energy" and objectness_settings["stamp_args"]["loss"] == "reg":
+        canvas = canvas - 10
+
     used_coords = []
     for bbox in sampled_gt:
         stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
@@ -255,6 +259,10 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         else:
             raise NotImplementedError("overlap solution unkown")
     #color_map(canvas, objectness_settings, True)
+    # set base energy to minus 10
+
+
+
     maps_list.append(np.expand_dims(canvas,0))
     # if downsample marker --> use cv2 to downsample gt
     if objectness_settings["downsample_marker"]:
@@ -624,14 +632,13 @@ def color_map(img_map, assign,show=False):
         else:
             img_map = np.squeeze(img_map,-1)
             # normalize to 0 to 19
+            img_map = img_map-np.min(img_map)
             img_map = img_map/np.max(img_map)*19
 
             img_map = img_map.astype(np.int)
 
 
         colors = np.asarray(cm.rainbow(np.linspace(0, 1, 20)))[:, 0:3]
-
-        img_map = np.maximum(0,img_map)
 
         colored_map = (colors[img_map, :] * 255).astype(np.uint8)
 
@@ -659,9 +666,15 @@ def color_map(img_map, assign,show=False):
         size_map = np.sqrt(img_map[:,:,0]*img_map[:,:,1])
         size_map = size_map/np.max(size_map)*255
         colored_map = size_map.astype(np.uint8)
+        # make colored map have last dim 3
+        colored_map = np.stack([colored_map,colored_map,colored_map],-1)
+
+
 
     if show:
-        Image.fromarray(colored_map).show()
+        im = Image.fromarray(colored_map)
+        im.save(sys.argv[0][:-24]+"gt.png")
+        im.show()
     return colored_map
 
 
@@ -690,6 +703,7 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
         for row in pred_boxes:
             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[1], outline=outline[1])
     if show:
+        im.save(sys.argv[0][:-24] + "inp.png")
         im.show()
     return np.asarray(im).astype("uint8")
 

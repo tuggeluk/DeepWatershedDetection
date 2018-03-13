@@ -48,9 +48,10 @@ def prep_im_for_blob(im, pixel_means, global_scale, args):
   if im_size_max > args.max_edge:
     if not args.crop == "True":
       # scale down if bigger than max size
-      global_scale = float(args.max_edge) / float(im_size_max)
-      im = cv2.resize(im, None, None, fx=global_scale, fy=global_scale,
+      re_scale = (float(args.max_edge) / float(im_size_max))
+      im = cv2.resize(im, None, None, fx=re_scale, fy=re_scale,
                     interpolation=cv2.INTER_LINEAR)
+      global_scale = global_scale*re_scale
       crop_box = [0,0,im.shape[0],im.shape[1]]
     else:
       # Crop image
