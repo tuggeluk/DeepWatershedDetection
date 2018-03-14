@@ -102,7 +102,6 @@ def get_partial_marker(canvas_shape, coords, mark):
 
 
     # if coords are outside of bbox
-    orig_coords = np.asarray(coords)
     crop_coords = np.asarray(coords)
     crop_coords = np.maximum(crop_coords, 0)
     crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], canvas_shape[0]-1)
@@ -224,9 +223,8 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
 
     if objectness_settings["stamp_args"]["loss"] == "softmax":
-        canvas = np.zeros(sampled_size + (last_dim-1,), dtype=np.float)
-        canvas_one_layer = np.ones(sampled_size+ (1,), dtype=np.float)
-        canvas = np.concatenate((canvas_one_layer,canvas),-1)
+        canvas = np.eye(last_dim)[np.zeros(sampled_size, dtype=np.int)]
+
     else:
         canvas = np.zeros(sampled_size + (last_dim,), dtype=np.float)
 
@@ -270,7 +268,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
 
 
-    maps_list.append(np.expand_dims(canvas,0))
+
     # if downsample marker --> use cv2 to downsample gt
     if objectness_settings["downsample_marker"]:
         if objectness_settings["stamp_args"]["loss"] == "softmax":
@@ -294,7 +292,8 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 else:
                     maps_list.append(np.expand_dims(resized, 0))
 
-
+        # one-hot encoding
+        maps_list.append(np.expand_dims(canvas, 0))
     # if do not downsample marker, recursively rebuild for each ds level
     else:
         if (downsample_ind+1) == len(objectness_settings["ds_factors"]):

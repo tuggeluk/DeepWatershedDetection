@@ -98,7 +98,7 @@ def main(parsed):
 
     assign = {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
               'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
-              'stamp_args': {'marker_dim': (9,9), 'size_percentage': 1, "shape": "square", "class_resolution": "class",
+              'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "square", "class_resolution": "class",
                              "loss": "softmax"}}
 
     assign["stamp_func"] = [assign["stamp_func"],stamp_class]
@@ -115,14 +115,14 @@ def main(parsed):
         train_annotations = blob["gt_map0"]
 
 
-        # im_data = np.concatenate([train_images[0], train_images[0], np.expand_dims(train_annotations[0, :, :, 0], -1)*255], -1)
-        # im = Image.fromarray(im_data.astype(np.uint8))
-        # im.save(sys.argv[0][:-31]+"overlayed_gt.png")
-        #
-        # dat_argmax = np.argmax(train_annotations[0], -1)
-        # dat_argmax[dat_argmax == 0] = 255
-        # im_argmax = Image.fromarray(dat_argmax.astype(np.uint8))
-        # im_argmax.save(sys.argv[0][:-31] + "argmax_gt.png")
+        im_data = np.concatenate([train_images[0], train_images[0], np.expand_dims(train_annotations[0, :, :, 0], -1)*255], -1)
+        im = Image.fromarray(im_data.astype(np.uint8))
+        im.save(sys.argv[0][:-31]+"overlayed_gt.png")
+
+        dat_argmax = np.argmax(train_annotations[0], -1)
+        dat_argmax[dat_argmax == 0] = 255
+        im_argmax = Image.fromarray(dat_argmax.astype(np.uint8))
+        im_argmax.save(sys.argv[0][:-31] + "argmax_gt.png")
 
         _, current = sess.run([opt, loss], feed_dict={input: train_images, output: train_annotations})
 
@@ -238,7 +238,7 @@ if __name__ == '__main__':
   parser.add_argument("--batch_size", type=int, default=1,
                       help="batch size for training")
 
-  parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
+  parser.add_argument("--dataset", type=str, default="DeepScores_2017_train100", help="DeepScores, voc or coco")
   parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                       help="DeepScores, voc, coco or no - validation set")
 
