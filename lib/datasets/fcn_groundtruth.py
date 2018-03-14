@@ -221,7 +221,14 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
     #init canvas
     last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"],nr_classes)
-    canvas = np.zeros(sampled_size+(last_dim,), dtype=np.float)
+
+
+    if objectness_settings["stamp_args"]["loss"] == "softmax":
+        canvas = np.zeros(sampled_size + (last_dim-1,), dtype=np.float)
+        canvas_one_layer = np.ones(sampled_size+ (1,), dtype=np.float)
+        canvas = np.concatenate((canvas_one_layer,canvas),-1)
+    else:
+        canvas = np.zeros(sampled_size + (last_dim,), dtype=np.float)
 
     if objectness_settings["stamp_func"][0] == "stamp_energy" and objectness_settings["stamp_args"]["loss"] == "reg":
         canvas = canvas - 10

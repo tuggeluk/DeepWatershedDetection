@@ -42,7 +42,7 @@ def main(parsed):
 
     # Debug stuffs
     #
-    try_all_assign(data_layer,args,100)
+    #try_all_assign(data_layer,args,100)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
 
@@ -72,7 +72,7 @@ def main(parsed):
     print("Initializing Model:" + args.model)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        feed_head, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
+        input, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
 
 
 
@@ -183,7 +183,9 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
         nr_ds_factors = len(assign["ds_factors"])
         if assign["stamp_args"]["loss"] == "softmax":
-            loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+            # loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+            #                                                 labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
+            loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
                                                             labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
         else:
@@ -229,22 +231,22 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
     #################################################################################################################
 
-    # potentially mask out zeros
-    if assign["mask_zeros"]:
-        # only compute loss where GT is not zero intended for "directional donuts"
-        masked_components = []
-        for x in range(len(assign["ds_factors"])):
-            mask = tf.squeeze(gt_placeholders[x] > 0, -1)
-            masked_components.append(tf.boolean_mask(loss_components[x], mask))
-
-        loss_components = masked_components
+    # # potentially mask out zeros
+    # if assign["mask_zeros"]:
+    #     # only compute loss where GT is not zero intended for "directional donuts"
+    #     masked_components = []
+    #     for x in range(len(assign["ds_factors"])):
+    #         mask = tf.squeeze(gt_placeholders[x] > 0, -1)
+    #         masked_components.append(tf.boolean_mask(loss_components[x], mask))
+    #
+    #     loss_components = masked_components
 
 
     # call tf.reduce mean on each loss component
     loss_components = [tf.reduce_mean(x) for x in loss_components]
 
     # replace with loss of last layer if is nan (can happen if last mask has no directions on it)
-    loss_components = [tf.cond(tf.is_nan(x), lambda: loss_components[len(loss_components)-1], lambda: x) for x in loss_components]
+    #loss_components = [tf.cond(tf.is_nan(x), lambda: loss_components[len(loss_components)-1], lambda: x) for x in loss_components]
 
     stacked_components = tf.stack(loss_components)
 
@@ -275,6 +277,8 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
 
     scalar_summary_op = tf.summary.merge(scalar_sums)
 
+
+
     images_sums = []
     images_placeholders = []
 
@@ -298,12 +302,17 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     return loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders
 
 
+
+
+
 def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                    do_itr, assign, prepped_assign, iteration,training_help):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
 
     if args.prefetch == "True":
         data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign, training_help)
+
+
 
     print("training on:" + str(assign))
     print("for " + str(do_itr)+ " iterations")
@@ -318,9 +327,10 @@ def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoi
             input_data = np.concatenate([blob["data"],blob["helper"]],-1)
             feed_dict = {helper_input: input_data}
         else:
-            #feed_zeros to helper input
-            input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
-            feed_dict = {input: blob["data"], helper_input: input_data}
+            # feed_zeros to helper input
+            # input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
+            # feed_dict = {input: blob["data"], helper_input: input_data}
+            feed_dict = {input: blob["data"]}
 
         for i in range(len(gt_placeholders)):
             feed_dict[gt_placeholders[i]] =  blob["gt_map" + str(len(gt_placeholders)-i-1)]
@@ -347,6 +357,15 @@ def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoi
 
             # use predicted feature maps
             # TODO predict boxes
+
+            # debug logits
+            if itr ==1:
+                hist_ph = tf.placeholder(tf.uint8, shape=[1, summary[1].shape[3]])
+                logits_sum = tf.summary.histogram('logits_means', hist_ph)
+
+            h_sum = sess.run([logits_sum], feed_dict={hist_ph: np.mean(summary[1],(1,2))})
+            writer.add_summary(h_sum[0], float(itr))
+
 
             gt_visuals = get_gt_visuals(blob, assign, pred_boxes=None, show=False)
             map_visuals = get_map_visuals(summary[1:], assign, show=False)
