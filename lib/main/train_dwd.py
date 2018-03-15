@@ -42,7 +42,7 @@ def main(parsed):
 
     # Debug stuffs
     #
-    #try_all_assign(data_layer,args,100)
+    # try_all_assign(data_layer,args,100)
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
 
@@ -64,10 +64,11 @@ def main(parsed):
         refinenet_dir = cfg.PRETRAINED_DIR+"/VOC2012/"
 
 
-
-    # initialize helper_input
-    helper_input  = tf.placeholder(tf.float32, shape=[None, None, None, input.shape[-1]+1])
-    feed_head = slim.conv2d(helper_input, input.shape[-1], [3, 3], scope='gt_feed_head')
+    if not (len(args.training_help) == 1 and args.training_help[0] is None):
+        # initialize helper_input
+        helper_input  = tf.placeholder(tf.float32, shape=[None, None, None, input.shape[-1]+1])
+        feed_head = slim.conv2d(helper_input, input.shape[-1], [3, 3], scope='gt_feed_head')
+        input = feed_head
 
     print("Initializing Model:" + args.model)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
@@ -79,7 +80,7 @@ def main(parsed):
     # initialize tasks
     preped_assign = []
     for assign in args.training_assignements:
-        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,helper_input,args)
+        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders])
 
 
@@ -121,7 +122,7 @@ def main(parsed):
         do_itr = do_a["Itrs"]
         preped_assign[assign_nr]
         training_help = args.training_help[do_a["help"]]
-        iteration = execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+        iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                                    do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
 
     # execute tasks
@@ -231,6 +232,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
     #################################################################################################################
 
+    # TODO raplace by weight mask
     # # potentially mask out zeros
     # if assign["mask_zeros"]:
     #     # only compute loss where GT is not zero intended for "directional donuts"
@@ -251,14 +253,12 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     stacked_components = tf.stack(loss_components)
 
 
-
     if assign["layer_loss_aggregate"] == "min":
         loss = tf.reduce_min(stacked_components)
     elif assign["layer_loss_aggregate"] == "avg":
         loss = tf.reduce_mean(stacked_components)
     else:
         raise NotImplementedError("unknown layer aggregate")
-
 
 
     # init optimizer
@@ -305,7 +305,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
 
 
 
-def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                    do_itr, assign, prepped_assign, iteration,training_help):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
 
@@ -325,12 +325,17 @@ def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoi
 
         if blob["helper"] is not None:
             input_data = np.concatenate([blob["data"],blob["helper"]],-1)
-            feed_dict = {helper_input: input_data}
+            feed_dict = {input: input_data}
         else:
-            # feed_zeros to helper input
+            # pad input with zeros
             # input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
             # feed_dict = {input: blob["data"], helper_input: input_data}
-            feed_dict = {input: blob["data"]}
+            if len(args.training_help) == 1:
+                feed_dict = {input: blob["data"]}
+            else:
+                # pad input with zeros
+                input_data = np.concatenate([blob["data"], blob["data"]*0], -1)
+                feed_dict = {input: input_data}
 
         for i in range(len(gt_placeholders)):
             feed_dict[gt_placeholders[i]] =  blob["gt_map" + str(len(gt_placeholders)-i-1)]
@@ -359,12 +364,12 @@ def execute_assign(args,input,helper_input,saver, sess, checkpoint_dir, checkpoi
             # TODO predict boxes
 
             # debug logits
-            if itr ==1:
-                hist_ph = tf.placeholder(tf.uint8, shape=[1, summary[1].shape[3]])
-                logits_sum = tf.summary.histogram('logits_means', hist_ph)
-
-            h_sum = sess.run([logits_sum], feed_dict={hist_ph: np.mean(summary[1],(1,2))})
-            writer.add_summary(h_sum[0], float(itr))
+            # if itr ==1:
+            #     hist_ph = tf.placeholder(tf.uint8, shape=[1, summary[1].shape[3]])
+            #     logits_sum = tf.summary.histogram('logits_means', hist_ph)
+            #
+            # h_sum = sess.run([logits_sum], feed_dict={hist_ph: np.mean(summary[1],(1,2))})
+            # writer.add_summary(h_sum[0], float(itr))
 
 
             gt_visuals = get_gt_visuals(blob, assign, pred_boxes=None, show=False)

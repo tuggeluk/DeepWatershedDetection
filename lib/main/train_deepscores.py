@@ -3,7 +3,7 @@ import sys
 sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from main.train_dwd import main
 import argparse
-import tensorflow as tf
+
 
 
 if __name__ == '__main__':
@@ -30,8 +30,8 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--tensorboard_interval", type=int, default=20, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--save_interval", type=int, default=200, help="after how many iterations are the weights saved")
+    parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
+    parser.add_argument("--save_interval", type=int, default=1000, help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
@@ -40,16 +40,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
-    # direction markers 0.3 to 0.7 percent, downsample
-    #                         {'ds_factors': [1,8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_directions', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': None, 'size_percentage': 0.7,"shape": "oval", 'hole': None, 'loss': "reg"}},
     # energy markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                                  'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                                 'stamp_args':{'marker_dim': (9,9),'size_percentage': 0.8, "shape": "square", "loss": "reg", "energy_shape": "linear"}},
+                                 'stamp_args':{'marker_dim': (9,9),'size_percentage': 0.8, "shape": "oval", "loss": "softmax", "energy_shape": "linear"}},
     # class markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9,9), 'size_percentage': 1, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
 
@@ -63,9 +59,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 1, "help": 0, "Itrs": 25000},
-                            {"assign": 1, "help": 0, "Itrs": 1000},
-                            {"assign": 2, "help": 0, "Itrs": 1000}
+                            {"assign": 1, "help": 0, "Itrs": 5000},
+                            {"assign": 0, "help": 0, "Itrs": 5000},
+                            {"assign": 2, "help": 0, "Itrs": 5000}
 
                         ], help="configure how assignements get repeated")
 
