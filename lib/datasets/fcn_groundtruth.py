@@ -264,7 +264,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         else:
             raise NotImplementedError("overlap solution unkown")
     #color_map(canvas, objectness_settings, True)
-    # set base energy to minus 10
+    # set base energ y to minus 10
 
 
 
