@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument("--prefetch_len", type=int, default=7, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
-    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
@@ -47,26 +47,26 @@ if __name__ == '__main__':
     # class markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
-                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 1, "shape": "square", "class_resolution": "class", "loss": "softmax"}},
+                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 1, "shape": "oval", "class_resolution": "class", "loss": "softmax"}},
 
     # bbox markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "square", "loss": "reg"}}
+                             'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "oval", "loss": "reg"}}
 
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 1, "help": 0, "Itrs": 5000},
-                            {"assign": 0, "help": 0, "Itrs": 5000},
-                            {"assign": 2, "help": 0, "Itrs": 5000}
+                            {"assign": 1, "help": 0, "Itrs": 5},
+                            {"assign": 0, "help": 0, "Itrs": 5},
+                            {"assign": 2, "help": 0, "Itrs": 5}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [1,1,1], "Running_Mean_Length": 5, "Itrs": 10000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parsed = parser.parse_known_args()
 

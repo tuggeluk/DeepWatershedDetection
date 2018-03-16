@@ -73,37 +73,41 @@ def get_minibatch(roidb, args, assign, helper):
     # blobs["class_map"] = fcn_class_labels(im_blob, gt_boxes)
     # blobs["bbox_fcn"] = fcn_bbox_labels(im_blob, gt_boxes)
     # blobs["foreground"] = fcn_foreground(im_blob, gt_boxes)
-    markers_list = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0],assign,0, [])
-    for i in range(len(assign["ds_factors"])):
-        blobs["gt_map" + str(i)] = markers_list[i]
+    for i1 in range(len(assign)):
+        markers_list = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0],assign[i1],0, [])
+        #TODO assign list better
+        for i2 in range(len(assign[i1]["ds_factors"])):
+            blobs["gt_" + str(i2)] = markers_list[i2]
 
     # if downsample is == 0 handle training helpers
 
     # append gt helper
-    helper_assign = {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                         'stamp_func': ['stamp_class',stamp_class], 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                         'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square",
-                                        'hole': None, 'loss': "reg", "class_resolution": "binary"}}
-    blobs["helper"] = np.argmax(get_markers(im_blob.shape, gt_boxes,args.nr_classes[0],helper_assign,0,[])[0],-1)
-    random = np.round(np.random.rand(blobs["helper"].shape[1],blobs["helper"].shape[2]))
+    # helper_assign = {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+    #                      'stamp_func': ['stamp_class',stamp_class], 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+    #                      'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "square",
+    #                                     'hole': None, 'loss': "reg", "class_resolution": "binary"}}
+    # blobs["helper"] = np.argmax(get_markers(im_blob.shape, gt_boxes,args.nr_classes[0],helper_assign,0,[])[0],-1)
+    # random = np.round(np.random.rand(blobs["helper"].shape[1],blobs["helper"].shape[2]))
 
-    if helper is None:
-        # pure noise
-        blobs["helper"] = random
-        blobs["helper"] = np.expand_dims(np.expand_dims(blobs["helper"], 0), -1)
-        # set helper to None
-        blobs["helper"] = None
+    # if helper is None:
+    #     # pure noise
+    #     blobs["helper"] = random
+    #     blobs["helper"] = np.expand_dims(np.expand_dims(blobs["helper"], 0), -1)
+    #
+    #
+    # else:
+    #     # adjust level of noise
+    #     x_range = range(blobs["helper"].shape[1])
+    #     y_range = range(blobs["helper"].shape[2])
+    #
+    #     x_samp = np.random.choice(x_range, int(blobs["helper"].shape[1]*(1-helper["samp_prob"])))
+    #     y_samp = np.random.choice(y_range, int(blobs["helper"].shape[2]*(1-helper["samp_prob"])))
+    #
+    #     blobs["helper"][0][x_samp][:,y_samp] = random[x_samp][:,y_samp]
+    #     blobs["helper"] = np.expand_dims(blobs["helper"],-1)
 
-    else:
-        # adjust level of noise
-        x_range = range(blobs["helper"].shape[1])
-        y_range = range(blobs["helper"].shape[2])
-
-        x_samp = np.random.choice(x_range, int(blobs["helper"].shape[1]*(1-helper["samp_prob"])))
-        y_samp = np.random.choice(y_range, int(blobs["helper"].shape[2]*(1-helper["samp_prob"])))
-
-        blobs["helper"][0][x_samp][:,y_samp] = random[x_samp][:,y_samp]
-        blobs["helper"] = np.expand_dims(blobs["helper"],-1)
+    # set helper to None
+    blobs["helper"] = None
 
     # gt_boxes = gt_boxes[bad_coords == False]
     # crop boxes

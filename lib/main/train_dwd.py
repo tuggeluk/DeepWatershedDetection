@@ -46,6 +46,7 @@ def main(parsed):
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
 
+    data_layer.forward(args, [args.training_assignements[0]], None)
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -116,7 +117,7 @@ def main(parsed):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
-
+    # execute tasks
     for do_a in args.do_assign:
         assign_nr = do_a["assign"]
         do_itr = do_a["Itrs"]
@@ -125,13 +126,19 @@ def main(parsed):
         iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                                    do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
 
-    # execute tasks
+    # execute combined tasks
+
+    for do_comb_a in args.combined_assignements:
+        iteration = execute_combined_assign(do_comb_a)
 
     print("done :)")
 
     # traind on combined assigns
     # for comb_assign in args.combined_assignements:
     #     train_on_comb_assignment()
+
+def execute_combined_assign(do_comb_a):
+    return 0
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
     gt_placeholders = get_gt_placeholders(assign,imdb)
@@ -310,7 +317,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
 
     if args.prefetch == "True":
-        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, assign, training_help)
+        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, [assign], training_help)
 
 
 
@@ -320,7 +327,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
-            blob = data_layer.forward(args, assign, training_help)
+            blob = data_layer.forward(args, [assign], training_help)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
 
         if blob["helper"] is not None:
