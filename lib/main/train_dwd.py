@@ -138,6 +138,18 @@ def main(parsed):
     #     train_on_comb_assignment()
 
 def execute_combined_assign(do_comb_a):
+    # init data layer
+
+    # loss comb scalars_placeholders
+
+    # combined loss
+
+    # init optimizer
+
+    # compute step
+
+
+
     return 0
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
@@ -345,7 +357,8 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
                 feed_dict = {input: input_data}
 
         for i in range(len(gt_placeholders)):
-            feed_dict[gt_placeholders[i]] =  blob["gt_map" + str(len(gt_placeholders)-i-1)]
+            # only one assign
+            feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders)-i-1)]
 
 
 

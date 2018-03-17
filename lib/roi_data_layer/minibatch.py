@@ -76,8 +76,9 @@ def get_minibatch(roidb, args, assign, helper):
     for i1 in range(len(assign)):
         markers_list = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0],assign[i1],0, [])
         #TODO assign list better
+        blobs["gt_assign" + str(i1)] = dict()
         for i2 in range(len(assign[i1]["ds_factors"])):
-            blobs["gt_" + str(i2)] = markers_list[i2]
+            blobs["assign" + str(i1)]["gt_map"+str(i2)] = markers_list[i2]
 
     # if downsample is == 0 handle training helpers
 
