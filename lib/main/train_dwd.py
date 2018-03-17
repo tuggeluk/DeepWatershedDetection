@@ -46,7 +46,7 @@ def main(parsed):
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
 
-    data_layer.forward(args, [args.training_assignements[0]], None)
+    # data_layer.forward(args, [args.training_assignements[0]], None)
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -118,18 +118,24 @@ def main(parsed):
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
     # execute tasks
-    for do_a in args.do_assign:
-        assign_nr = do_a["assign"]
-        do_itr = do_a["Itrs"]
-        preped_assign[assign_nr]
-        training_help = args.training_help[do_a["help"]]
-        iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
-                                   do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
+    # for do_a in args.do_assign:
+    #     assign_nr = do_a["assign"]
+    #     do_itr = do_a["Itrs"]
+    #     preped_assign[assign_nr]
+    #     training_help = args.training_help[do_a["help"]]
+    #     iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+    #                                do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
+
 
     # execute combined tasks
-
     for do_comb_a in args.combined_assignements:
-        iteration = execute_combined_assign(do_comb_a)
+        #iteration = execute_combined_assign(do_comb_a)
+        do_comb_itr = do_comb_a["Itrs"]
+        rm_length = do_comb_a["Running_Mean_Length"]
+        loss_factors = do_comb_a["loss_factors"]
+        orig_assign = [args.training_assignements[i] for i in do_comb_a["assigns"]]
+        preped_assigns = [preped_assign[i] for i in do_comb_a["assigns"]]
+        training_help = None # unused atm
 
     print("done :)")
 
@@ -137,20 +143,134 @@ def main(parsed):
     # for comb_assign in args.combined_assignements:
     #     train_on_comb_assignment()
 
-def execute_combined_assign(do_comb_a):
+
+def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_assigns,loss_factors,do_comb_itr,iteration,input_ph,rm_length,
+                            network_heads,sess,checkpoint_dir,checkpoint_name,saver,writer):
+
     # init data layer
+    if args.prefetch == "True":
+        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, orig_assign, training_help)
 
-    # loss comb scalars_placeholders
-
-    # combined loss
+    # combine losses
+    past_losses = np.ones((len(loss_factors), rm_length), np.float32)
+    loss_scalings_placeholder = tf.placeholder(tf.float32,[len(loss_factors)])
+    loss_tot = None
+    for i in range(len(preped_assigns)):
+        if loss_tot is None:
+            loss_tot = preped_assigns[i][0]*loss_scalings_placeholder[i]
+        else:
+            loss_tot += preped_assigns[i][0] * loss_scalings_placeholder[i]
 
     # init optimizer
-
+    with tf.variable_scope("combined_opt"+str(0)):
+        var_list = [var for var in tf.trainable_variables()]
+        optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot, var_list=var_list)
+        # TODO only initialize vars of THIS optim --> give special scope
+    opt_inizializers = [var.initializer for var in tf.global_variables() if "combined_opt"+str(0) in var.name]
+    sess.run(opt_inizializers)
     # compute step
+    print("training on combined assignments")
+    print("for " + str(do_comb_itr) + " iterations")
+
+    for itr in range(iteration, (iteration + do_comb_itr)):
+        # load batch - only use batches with content
+        batch_not_loaded = True
+        while batch_not_loaded:
+            blob = data_layer.forward(args, orig_assign, training_help)
+            batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+
+        if blob["helper"] is not None:
+            input_data = np.concatenate([blob["data"], blob["helper"]], -1)
+            feed_dict = {input_ph: input_data}
+        else:
+            # pad input with zeros
+            # input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
+            # feed_dict = {input: blob["data"], helper_input: input_data}
+            if len(args.training_help) == 1:
+                feed_dict = {input_ph: blob["data"]}
+            else:
+                # pad input with zeros
+                input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
+                feed_dict = {input_ph: input_data}
 
 
+        for i1 in range(len(preped_assigns)):
+            gt_placeholders = preped_assigns[i1][2]
+            for i2 in range(len(gt_placeholders)):
+                # only one assign
+                feed_dict[gt_placeholders[i2]] = blob["assign"+str(i1)]["gt_map" + str(len(gt_placeholders) - i2 - 1)]
 
-    return 0
+        # compute running mean for losses
+        feed_dict[loss_scalings_placeholder] = loss_factors/np.mean(past_losses,1)
+
+        # train step
+        fetch_list = list()
+        fetch_list.append(optim)
+        fetch_list.append(loss_tot)
+        for preped_a in preped_assigns:
+            fetch_list.append(preped_a[0])
+        fetches = sess.run(fetch_list, feed_dict=feed_dict)
+
+        past_losses[:,:-1] = past_losses[:,1:] # move by one timestep
+        past_losses[:,-1] = fetches[-3:] # add latest loss
+
+        if itr % args.print_interval == 0 or itr == 1:
+            print("loss at itr: " + str(itr))
+            print(fetches[1])
+
+        if itr % args.tensorboard_interval == 0 or itr == 1:
+            for i in range(len(preped_assigns)):
+                _, _, _, scalar_summary_op, images_summary_op, images_placeholders = preped_assigns[i]
+                post_assign_to_tensorboard(orig_assign[i],i,scalar_summary_op,network_heads,feed_dict,itr,sess,writer,blob,images_placeholders,images_summary_op)
+
+        if itr % args.save_interval == 0:
+            print("saving weights")
+            if not os.path.exists(checkpoint_dir):
+                os.makedirs(checkpoint_dir)
+            saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
+
+
+    iteration = (iteration + do_comb_itr)
+    if args.prefetch == "True":
+        data_layer.kill()
+
+    return iteration
+
+
+def post_assign_to_tensorboard(assign,assign_nr,scalar_summary_op,network_heads,feed_dict,itr,sess,writer,blob,images_placeholders,images_summary_op):
+    fetch_list = [scalar_summary_op]
+    # fetch sub_predicitons
+    nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+
+    [fetch_list.append(
+        network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+        in
+        range(len(assign["ds_factors"]))]
+
+    summary = sess.run(fetch_list, feed_dict=feed_dict)
+    writer.add_summary(summary[0], float(itr))
+
+    # use predicted feature maps
+    # TODO predict boxes
+
+    # debug logits
+    # if itr ==1:
+    #     hist_ph = tf.placeholder(tf.uint8, shape=[1, summary[1].shape[3]])
+    #     logits_sum = tf.summary.histogram('logits_means', hist_ph)
+    #
+    # h_sum = sess.run([logits_sum], feed_dict={hist_ph: np.mean(summary[1],(1,2))})
+    # writer.add_summary(h_sum[0], float(itr))
+
+
+    gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
+    map_visuals = get_map_visuals(summary[1:], assign, show=False)
+    images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
+    # save images to tensorboard
+    summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
+    writer.add_summary(summary[0], float(itr))
+    return None
+
+
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
     gt_placeholders = get_gt_placeholders(assign,imdb)
@@ -251,7 +371,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
     #################################################################################################################
 
-    # TODO raplace by weight mask
+    # TODO replace by weight mask
     # # potentially mask out zeros
     # if assign["mask_zeros"]:
     #     # only compute loss where GT is not zero intended for "directional donuts"
@@ -392,7 +512,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
             # writer.add_summary(h_sum[0], float(itr))
 
 
-            gt_visuals = get_gt_visuals(blob, assign, pred_boxes=None, show=False)
+            gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
             map_visuals = get_map_visuals(summary[1:], assign, show=False)
             images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
             # save images to tensorboard
@@ -455,9 +575,6 @@ def get_gt_placeholders(assign, imdb):
     gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes)
     return [tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]]
 
-
-def train_on_comb_assignment():
-    return
 
 
 def get_config_id(assign):
