@@ -136,6 +136,8 @@ def main(parsed):
         orig_assign = [args.training_assignements[i] for i in do_comb_a["assigns"]]
         preped_assigns = [preped_assign[i] for i in do_comb_a["assigns"]]
         training_help = None # unused atm
+        execute_combined_assign(args,data_layer,training_help,orig_assign,preped_assigns,loss_factors,do_comb_itr,iteration,input,rm_length,
+                            network_heads,sess,checkpoint_dir,checkpoint_name,saver,writer)
 
     print("done :)")
 
@@ -201,7 +203,7 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
                 feed_dict[gt_placeholders[i2]] = blob["assign"+str(i1)]["gt_map" + str(len(gt_placeholders) - i2 - 1)]
 
         # compute running mean for losses
-        feed_dict[loss_scalings_placeholder] = loss_factors/np.mean(past_losses,1)
+        feed_dict[loss_scalings_placeholder] = loss_factors/np.maximum(np.mean(past_losses,1),[1.0E-6,1.0E-6,1.0E-6])
 
         # train step
         fetch_list = list()
@@ -217,6 +219,8 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
             print(fetches[1])
+            print(past_losses)
+
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
             for i in range(len(preped_assigns)):
