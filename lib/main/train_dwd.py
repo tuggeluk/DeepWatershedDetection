@@ -167,7 +167,6 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
     with tf.variable_scope("combined_opt"+str(0)):
         var_list = [var for var in tf.trainable_variables()]
         optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot, var_list=var_list)
-        # TODO only initialize vars of THIS optim --> give special scope
     opt_inizializers = [var.initializer for var in tf.global_variables() if "combined_opt"+str(0) in var.name]
     sess.run(opt_inizializers)
     # compute step
