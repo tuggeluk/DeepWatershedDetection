@@ -4,6 +4,7 @@ import tensorflow as tf
 from models.dwd_net import build_dwd_net
 from dws_transform import perform_dws
 from PIL import Image
+from config import cfg
 
 np.random.seed(314)
 tf.set_random_seed(314)
@@ -11,11 +12,16 @@ tf.set_random_seed(314)
 
 class DWSDetector:
     def __init__(self, imdb):
-        self.model_path = "trained_models/RefineNet-Res101"
+        self.model_path = "trained_models/music/RefineNet-Res101/semseg/"
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
+
+        self.energy_loss= "softmax"
+        self.class_loss = "softmax"
+        self.bbox_loss = "reg"
+
         self.tf_session = None
-        self.root_dir = '/home/revan/PycharmProjects/DeepWatershedDetection/'
+        self.root_dir = cfg.ROOT_DIR
         self.sess = tf.Session()
         print('Loading model')
         self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])

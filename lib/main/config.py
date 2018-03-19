@@ -60,6 +60,10 @@ __C.PRETRAINED_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'pretrained'))
 # Place outputs under an experiments directory
 __C.EXP_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'experiments'))
 
+
+# Place outputs under an experiments directory
+__C.OUT_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'output'))
+
 # Use GPU implementation of non-maximum suppression
 __C.USE_GPU_NMS = True
 

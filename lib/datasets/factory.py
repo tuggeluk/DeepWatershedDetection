@@ -24,7 +24,7 @@ for year in ['2007', '2012']:
 
 # Set up musical dataset
 for year in ['2017']:
-  for split in ['train', 'val', 'test', 'debug','train100','train10000']:
+  for split in ['train', 'val', 'test', 'debug','train100','train10000', 'test100',]:
     name = 'DeepScores_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: deep_scores(split, year))
 

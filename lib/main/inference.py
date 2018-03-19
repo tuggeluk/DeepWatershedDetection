@@ -5,16 +5,20 @@ import cPickle
 from PIL import Image
 from datasets.factory import get_imdb
 from dws_detector import DWSDetector, show_image
+from config import cfg
+import argparse
 
 
-def main():
-    imdb = get_imdb('DeepScores_2017_test')
-    net = DWSDetector(imdb)
-    all_boxes = test_net(net, imdb)
+def main(parsed):
+    parsed = parsed[0]
+    imdb = get_imdb(parsed.test_set)
+    # net = DWSDetector(imdb)
+    # all_boxes = test_net(net, imdb)
+    all_boxes = test_net(None, imdb, parsed)
 
 
-def test_net(net, imdb):
-    output_dir = '/home/revan/PycharmProjects/DeepWatershedDetection/output'
+def test_net(net, imdb, parsed):
+    output_dir = cfg.OUT_DIR
     num_images = len(imdb.image_index)
     # all detections are collected into:
     # all_boxes[cls][image] = N x 5 array of detections in
@@ -30,7 +34,7 @@ def test_net(net, imdb):
     for i in range(num_images):
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
-        im = cv2.resize(im, None, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_LINEAR)
+        im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
         boxes = net.classify_img(im)
         # boxes = np.array([[938, 94, 943, 99, 37], [994, 74, 1006, 85, 29], [994, 74, 1006, 85, 29], [994, 211, 1011, 223, 31]])
         # show_image([np.asanyarray(im)], boxes, True, True)
@@ -49,4 +53,13 @@ def test_net(net, imdb):
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
+    parser.add_argument("--test_set", type=str, default="DeepScores_2017_test100", help="dataset to perform inference on")
+
+    # configure output heads used ---> have to match trained model
+
+
+    parsed = parser.parse_known_args()
+
+    main(parsed)
