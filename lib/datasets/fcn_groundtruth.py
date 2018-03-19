@@ -714,10 +714,10 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     return np.asarray(im).astype("uint8")
 
 
-def get_gt_visuals(data,assign,pred_boxes=None,show=False):
+def get_gt_visuals(data,assign,assign_nr,pred_boxes=None,show=False):
     vis = []
     for i in range(len(assign["ds_factors"])):
-        img_map = data["gt_map" + str(i)]
+        img_map = data["assign"+str(assign_nr)]["gt_map" + str(i)]
         colored_map = color_map(img_map[0],assign,show)
         vis.append(colored_map)
 

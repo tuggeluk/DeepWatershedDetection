@@ -66,7 +66,7 @@ if __name__ == '__main__':
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [1,1,1], "Running_Mean_Length": 5, "Itrs": 10000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [5,1,1], "Running_Mean_Length": 5, "Itrs": 30000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parsed = parser.parse_known_args()
 
