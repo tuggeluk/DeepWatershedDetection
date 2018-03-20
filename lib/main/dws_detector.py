@@ -12,11 +12,12 @@ tf.set_random_seed(314)
 
 class DWSDetector:
     def __init__(self, imdb):
-        self.model_path = "trained_models/music/RefineNet-Res101/semseg/"
+        self.model_path = "trained_models/music/RefineNet-Res101/semseg"
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
 
-        self.energy_loss= "softmax"
+        # has to be adjusted according to the training scheme used
+        self.energy_loss = "softmax"
         self.class_loss = "softmax"
         self.bbox_loss = "reg"
 
@@ -37,38 +38,65 @@ class DWSDetector:
         if len(img.shape) < 4:
             img = np.expand_dims(np.expand_dims(img, -1), 0)
 
-        y_mulity = int(np.ceil(img.shape[1] / 320.0))
-        x_mulity = int(np.ceil(img.shape[2] / 320.0))
-        canv = np.ones([y_mulity * 320, x_mulity * 320], dtype=np.uint8) * 255
+        y_mulity = int(np.ceil(img.shape[1] / 160.0))
+        x_mulity = int(np.ceil(img.shape[2] / 160.0))
+        canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
         canv = np.expand_dims(np.expand_dims(canv, -1), 0)
 
         canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
-        pred_energy, pred_class_logits, pred_bbox = self.tf_session.run(
-            [self.network_heads["stamp_energy"]["reg"][0], self.network_heads["stamp_class"]["softmax"][0],
-             self.network_heads["stamp_bbox"]["reg"][0]], feed_dict={self.input: canv})
-        pred_class = np.argmax(pred_class_logits, axis=3)
+        pred_energy, pred_class, pred_bbox = self.tf_session.run(
+            [self.network_heads["stamp_energy"][self.energy_loss][-1], self.network_heads["stamp_class"][self.class_loss][-1],
+             self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
+
+        if self.energy_loss == "softmax":
+            pred_energy = np.argmax(pred_energy, axis=3)
+
+        if self.class_loss == "softmax":
+            pred_class = np.argmax(pred_class, axis=3)
+
+        if self.bbox_loss == "softmax":
+            pred_bbox = np.argmax(pred_bbox, axis=3)
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
+        #save_images(img, dws_list, True, False)
 
         return dws_list
 
 
-def show_image(data, gt_boxes=None, gt=False, text=False):
+def get_images(data, gt_boxes=None, gt=False, text=False):
+    if data.shape[-1] == 1:
+        data = data.squeeze(-1)
+
     from PIL import ImageDraw
-    im = Image.fromarray(data[0].astype("uint8"))
-    im.show()
+    im_input = Image.fromarray(data[0].astype("uint8"))
+    im_gt = None
 
     if gt:
-        draw = ImageDraw.Draw(im)
+        im_gt = Image.fromarray(data[0].astype("uint8"))
+        draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
-            draw.rectangle(((row[0],row[1]),(row[2],row[3])), fill="red")
-        im.show()
+            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
+
     if text:
-        draw = ImageDraw.Draw(im)
+        draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
-            draw.text((row[2],row[3]),row[4], fill="red")
-        im.show()
+            draw.text((row[2], row[3]), row[4], fill="red")
+
+    return im_input, im_gt
+
+
+def show_images(data, gt_boxes=None, gt=False, text=False):
+    im_input, im_gt = get_images(data, gt_boxes, gt, text)
+    im_input.show()
+    im_gt.show()
+
+    return
+
+def save_images(data, gt_boxes=None, gt=False, text=False):
+    im_input, im_gt = get_images(data, gt_boxes, gt, text)
+    im_input.save(cfg.ROOT_DIR+"/input.png")
+    im_gt.save(cfg.ROOT_DIR+"/gt.png")
 
     return

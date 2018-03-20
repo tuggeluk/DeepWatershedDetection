@@ -45,10 +45,10 @@ def perform_dws(dws_energy, class_map, bbox_map, min_size=6, return_ccomp_img = 
 
         # produce bbox element, append to list
         bbox = []
-        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][0]/2.0), 0)))
-        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][1]/2.0), 0)))
-        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][0]/2.0), 0)))
-        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][1]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][1]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][0]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][1]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][0]/2.0), 0)))
         bbox.append(int(labels_inv[key]["class"]))
         bbox_list.append(bbox)
 

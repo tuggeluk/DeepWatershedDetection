@@ -4,7 +4,7 @@ import cv2
 import cPickle
 from PIL import Image
 from datasets.factory import get_imdb
-from dws_detector import DWSDetector, show_image
+from dws_detector import DWSDetector
 from config import cfg
 import argparse
 
@@ -12,9 +12,9 @@ import argparse
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    # net = DWSDetector(imdb)
-    # all_boxes = test_net(net, imdb)
-    all_boxes = test_net(None, imdb, parsed)
+    net = DWSDetector(imdb)
+    all_boxes = test_net(net, imdb, parsed)
+    # all_boxes = test_net(None, imdb, parsed)
 
 
 def test_net(net, imdb, parsed):
