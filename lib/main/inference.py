@@ -3,10 +3,13 @@ import os
 import cv2
 import cPickle
 from PIL import Image
+import sys
+sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from datasets.factory import get_imdb
 from dws_detector import DWSDetector
 from config import cfg
 import argparse
+
 
 
 def main(parsed):
@@ -31,7 +34,10 @@ def test_net(net, imdb, parsed):
     # timers
     det_file = os.path.join(output_dir, 'detections.pkl')
 
+    print(num_images)
     for i in range(num_images):
+        if i%1000 == 0:
+            print i
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
@@ -55,7 +61,7 @@ def test_net(net, imdb, parsed):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_2017_test100", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
 
