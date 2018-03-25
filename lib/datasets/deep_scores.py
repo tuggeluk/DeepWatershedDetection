@@ -227,14 +227,12 @@ class deep_scores(imdb):
   def _do_python_eval(self, output_dir='output'):
     annopath = os.path.join(
       self._devkit_path,
-      'musical' + self._year,
-      'Annotations',
+      'segmentation_detection',
+      'xml_annotations',
       '{:s}.xml')
     imagesetfile = os.path.join(
       self._devkit_path,
-      'musical' + self._year,
-      'ImageSets',
-      'Main',
+      'train_val_test',
       self._image_set + '.txt')
     cachedir = os.path.join(self._devkit_path, 'annotations_cache')
     aps = []

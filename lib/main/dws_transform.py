@@ -6,7 +6,7 @@ from itertools import product
 from utils.ufarray import *
 import numpy as np
 
-def perform_dws(dws_energy, class_map, bbox_map, min_size=6, return_ccomp_img = False):
+def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, return_ccomp_img = False):
     bbox_list = []
 
     dws_energy = np.squeeze(dws_energy)
@@ -14,7 +14,7 @@ def perform_dws(dws_energy, class_map, bbox_map, min_size=6, return_ccomp_img = 
     bbox_map = np.squeeze(bbox_map)
 
     # Treshhold and binarize dws energy
-    binar_energy = (dws_energy <= 0) * 255
+    binar_energy = (dws_energy <= cutoff) * 255
 
     # get connected components
     labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
@@ -29,7 +29,7 @@ def perform_dws(dws_energy, class_map, bbox_map, min_size=6, return_ccomp_img = 
     for key in labels_inv.keys():
         # print(key)
         # print(len(labels_inv[key]))
-        if len(labels_inv[key]) < min_size:
+        if len(labels_inv[key]) < min_ccoponent_size:
             del labels_inv[key]
 
 
@@ -41,14 +41,16 @@ def perform_dws(dws_energy, class_map, bbox_map, min_size=6, return_ccomp_img = 
         # mayority vote for class --> transposed
         labels_inv[key]["class"] = np.bincount(class_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]).argmax()
         # average for box size --> transposed
-        labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
+        #labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
+        labels_inv[key]["bbox_size"] = np.amax(
+            bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]], 0).astype(int)
 
         # produce bbox element, append to list
         bbox = []
-        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][1]/2.0), 0)))
-        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][0]/2.0), 0)))
-        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][1]/2.0), 0)))
-        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][0]/2.0), 0)))
+        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmin
+        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymin
+        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmax
+        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymax
         bbox.append(int(labels_inv[key]["class"]))
         bbox_list.append(bbox)
 

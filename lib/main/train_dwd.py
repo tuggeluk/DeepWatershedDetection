@@ -81,8 +81,8 @@ def main(parsed):
     # initialize tasks
     preped_assign = []
     for assign in args.training_assignements:
-        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
-        preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders])
+        [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders, mask_placholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
+        preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders, mask_placholders])
 
 
 
@@ -118,13 +118,12 @@ def main(parsed):
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
     # execute tasks
-    # for do_a in args.do_assign:
-    #     assign_nr = do_a["assign"]
-    #     do_itr = do_a["Itrs"]
-    #     preped_assign[assign_nr]
-    #     training_help = args.training_help[do_a["help"]]
-    #     iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
-    #                                do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
+    for do_a in args.do_assign:
+        assign_nr = do_a["assign"]
+        do_itr = do_a["Itrs"]
+        training_help = args.training_help[do_a["help"]]
+        iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+                                   do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
 
 
     # execute combined tasks
@@ -277,6 +276,9 @@ def post_assign_to_tensorboard(assign,assign_nr,scalar_summary_op,network_heads,
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
     gt_placeholders = get_gt_placeholders(assign,imdb)
+
+    loss_mask_placeholders = [tf.placeholder(tf.float32, shape=[None, None, 1]) for x in assign["ds_factors"]]
+
     debug_fetch = dict()
 
     if assign["stamp_func"][0] == "stamp_directions":
@@ -385,6 +387,8 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     #
     #     loss_components = masked_components
 
+    for i in range(len(loss_components)):
+        loss_components[i] = tf.multiply(loss_components[i],loss_mask_placeholders[i])
 
     # call tf.reduce mean on each loss component
     loss_components = [tf.reduce_mean(x) for x in loss_components]
@@ -441,7 +445,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     images_sums.append(tf.summary.image('final_predictions_' + str(i)+get_config_id(assign), final_pred_placeholder))
     images_summary_op = tf.summary.merge(images_sums)
 
-    return loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders
+    return loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders, loss_mask_placeholders
 
 
 
@@ -449,7 +453,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
 
 def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                    do_itr, assign, prepped_assign, iteration,training_help):
-    loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders = prepped_assign
+    loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, mask_placeholders = prepped_assign
 
     if args.prefetch == "True":
         data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, [assign], training_help)
@@ -482,7 +486,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
         for i in range(len(gt_placeholders)):
             # only one assign
             feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders)-i-1)]
-
+            feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
 
 
         # train step

@@ -34,7 +34,7 @@ class DWSDetector:
         self.saver.restore(self.sess, self.root_dir + "/" + self.model_path + "/" + self.saved_net)
         self.tf_session = self.sess
 
-    def classify_img(self, img):
+    def classify_img(self, img, cutoff=0, min_ccoponent_size=0):
         if len(img.shape) < 4:
             img = np.expand_dims(np.expand_dims(img, -1), 0)
 
@@ -57,8 +57,8 @@ class DWSDetector:
         if self.bbox_loss == "softmax":
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
-        dws_list = perform_dws(pred_energy, pred_class, pred_bbox)
-        #save_images(img, dws_list, True, False)
+        dws_list = perform_dws(pred_energy, pred_class, pred_bbox,cutoff, min_ccoponent_size)
+        save_images(img, dws_list, True, False)
 
         return dws_list
 

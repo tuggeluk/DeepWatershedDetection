@@ -24,10 +24,10 @@ if __name__ == '__main__':
     parser.add_argument("--prefetch_len", type=int, default=7, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
-    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
-    parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
+    parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     # bbox markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9,9), 'size_percentage': 0.8, "shape": "oval", "loss": "reg"}}
 
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")

@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 import os
 import pickle
 import numpy as np
+from PIL import Image
 
 def parse_rec(filename):
   """ Parse a PASCAL VOC xml file """
@@ -28,6 +29,37 @@ def parse_rec(filename):
                           int(bbox.find('xmax').text),
                           int(bbox.find('ymax').text)]
     objects.append(obj_struct)
+
+  return objects
+
+
+def parse_rec_deepscores(filename):
+  """ Parse a PASCAL VOC xml file """
+
+  tree = ET.parse(filename)
+  objects = []
+
+  # get image size to scale gt bbox
+  im_size = Image.open(filename.replace("xml_annotations", "images_png")[:-4] + ".png").convert('L').size
+  for obj in tree.findall('object'):
+    obj_struct = {}
+    obj_struct['name'] = obj.find('name').text
+    obj_struct['pose'] = "Unspecified"
+    obj_struct['truncated'] = int(0)
+    obj_struct['difficult'] = int(0)
+    bbox = obj.find('bndbox')
+    obj_struct['bbox'] = [(bbox.find('xmin').text),
+                          (bbox.find('ymin').text),
+                          (bbox.find('xmax').text),
+                          (bbox.find('ymax').text)]
+
+    obj_struct['bbox'][0] = int(round(float(obj_struct['bbox'][0]) * im_size[0]))
+    obj_struct['bbox'][1] = int(round(float(obj_struct['bbox'][1]) * im_size[1]))
+    obj_struct['bbox'][2] = int(round(float(obj_struct['bbox'][2]) * im_size[0]))
+    obj_struct['bbox'][3] = int(round(float(obj_struct['bbox'][3]) * im_size[1]))
+
+    objects.append(obj_struct)
+
 
   return objects
 
@@ -107,11 +139,22 @@ def voc_eval(detpath,
     lines = f.readlines()
   imagenames = [x.strip() for x in lines]
 
+  # remove files not present on disk
+  print("remove files not present")
+  present_files = os.listdir(annopath[:-9])
+  present_files = set([x[:-4] for x in present_files])
+  imagenames = set(imagenames)
+  imagenames = list(imagenames.intersection(present_files))
+
+  print("start reading annotations")
   if not os.path.isfile(cachefile):
     # load annotations
     recs = {}
     for i, imagename in enumerate(imagenames):
-      recs[imagename] = parse_rec(annopath.format(imagename))
+      if "DeepScores" in detpath:
+        recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
+      else:
+        recs[imagename] = parse_rec(annopath.format(imagename))
       if i % 100 == 0:
         print('Reading annotation for {:d}/{:d}'.format(
           i + 1, len(imagenames)))

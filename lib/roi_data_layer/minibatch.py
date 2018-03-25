@@ -106,6 +106,23 @@ def get_minibatch(roidb, args, assign, helper):
     #     blobs["helper"][0][x_samp][:,y_samp] = random[x_samp][:,y_samp]
     #     blobs["helper"] = np.expand_dims(blobs["helper"],-1)
 
+    # get loss masks
+    for i1 in range(len(assign)):
+        for i2 in range(len(assign[i1]["ds_factors"])):
+            if assign[i1]["mask_zeros"]:
+                if assign[i1]["stamp_args"]["loss"] == "softmax":
+                    fg_map = np.argmax(blobs["assign" + str(i1)]["gt_map"+str(i2)],-1)
+                else:
+                    fg_map = np.amax(blobs["assign" + str(i1)]["gt_map"+str(i2)],-1)
+                fg_map = np.expand_dims(fg_map,-1)
+                fg_map[fg_map != 0] = 1
+                blobs["assign" + str(i1)]["mask" + str(i2)] = fg_map[0]
+            else:
+                blobs["assign" + str(i1)]["mask"+str(i2)] = np.ones(blobs["assign" + str(i1)]["gt_map"+str(i2)].shape[:-1]+(1,))[0]
+
+
+
+
     # set helper to None
     blobs["helper"] = None
 

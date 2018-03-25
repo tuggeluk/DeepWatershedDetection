@@ -17,7 +17,7 @@ def main(parsed):
     imdb = get_imdb(parsed.test_set)
     net = DWSDetector(imdb)
     all_boxes = test_net(net, imdb, parsed)
-    # all_boxes = test_net(None, imdb, parsed)
+    #all_boxes = test_net(None, imdb, parsed)
 
 
 def test_net(net, imdb, parsed):
@@ -29,29 +29,62 @@ def test_net(net, imdb, parsed):
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
 
-    # output_dir = get_output_dir(imdb, output_dir)
+    #output_dir = get_output_dir(imdb, output_dir)
 
     # timers
     det_file = os.path.join(output_dir, 'detections.pkl')
 
+
     print(num_images)
     for i in range(num_images):
-        if i%1000 == 0:
+        if i%500 == 0:
             print i
+
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-        boxes = net.classify_img(im)
+        # if im.shape[0]*im.shape[1]>3837*2713:
+        #     print(im.shape)
+        #     print(imdb.image_path_at(i).split("/")[-1][:-4])
+        #     list_large.append(imdb.image_path_at(i).split("/")[-1][:-4])
+
+        boxes = net.classify_img(im,3,4)
         # boxes = np.array([[938, 94, 943, 99, 37], [994, 74, 1006, 85, 29], [994, 74, 1006, 85, 29], [994, 211, 1011, 223, 31]])
         # show_image([np.asanyarray(im)], boxes, True, True)
         no_objects = len(boxes)
         for j in range(len(boxes)):
+            # invert scaling for Boxes
+            boxes[j] = np.array(boxes[j])
+            boxes[j][:-1] = (boxes[j][:-1]*(1/parsed.scaling)).astype(np.int)
+
             class_of_symbol = boxes[j][4]
             all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
 
+
+
+    # convert to np array
+    for i1 in range(len(all_boxes)):
+        for i2 in range(len(all_boxes[i1])):
+            all_boxes[i1][i2] = np.asarray(all_boxes[i1][i2])
+
     # inspect all_boxes variable
     with open(det_file, 'wb') as f:
-        cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+         cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+
+
+
+    # print('Read boxes from disk')
+    # det_file = "/home/lukas/detections.pkl"
+    # with open(det_file, 'rb') as f:
+    #     all_boxes = cPickle.load(f)
+
+    # for i1 in range(len(all_boxes)):
+    #     for i2 in range(len(all_boxes[i1])):
+    #         for i3 in range(len(all_boxes[i1][i2])):
+    #             all_boxes[i1][i2][i3][:-1] = all_boxes[i1][i2][i3][:-1] * 2
+    #         all_boxes[i1][i2] = np.asarray(all_boxes[i1][i2])
+    #         #print(all_boxes[i1][i2].shape)
+
 
     print('Evaluating detections')
     imdb.evaluate_detections(all_boxes, output_dir)
@@ -61,7 +94,7 @@ def test_net(net, imdb, parsed):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="DeepScores_2017_debug", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
 
