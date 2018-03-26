@@ -13,22 +13,41 @@ import pickle
 import numpy as np
 from PIL import Image
 
-def parse_rec(filename):
+def parse_rec(filename, muscima, rescale_factor=0.5):
   """ Parse a PASCAL VOC xml file """
-  tree = ET.parse(filename)
-  objects = []
-  for obj in tree.findall('object'):
-    obj_struct = {}
-    obj_struct['name'] = obj.find('name').text
-    obj_struct['pose'] = obj.find('pose').text
-    obj_struct['truncated'] = int(obj.find('truncated').text)
-    obj_struct['difficult'] = int(obj.find('difficult').text)
-    bbox = obj.find('bndbox')
-    obj_struct['bbox'] = [int(bbox.find('xmin').text),
-                          int(bbox.find('ymin').text),
-                          int(bbox.find('xmax').text),
-                          int(bbox.find('ymax').text)]
-    objects.append(obj_struct)
+  if not muscima:
+    tree = ET.parse(filename)
+    for size in tree.findall('size'):
+        width = int(round(float(size[0].text) * rescale_factor))
+        height = int(round(float(size[1].text) * rescale_factor))
+    objects = []
+    for obj in tree.findall('object'):
+      obj_struct = {}
+      obj_struct['name'] = obj.find('name').text
+      # obj_struct['pose'] = obj.find('pose').text
+      bbox = obj.find('bndbox')
+      obj_struct['bbox'] = [int(float(bbox.find('xmin').text) * width),
+                            int(float(bbox.find('ymin').text) * height),
+                            int(float(bbox.find('xmax').text) * width),
+                            int(float(bbox.find('ymax').text) * height)]
+  else:
+    # Parse a muscima xml file
+    tree = ET.parse(filename)
+    objects = []
+    for objs in tree.findall('CropObjects'):
+      for obj in objs.findall('CropObject'):
+        obj_struct = {}
+        obj_struct['name'] = obj.find('ClassName').text
+        obj_struct['bbox'] = [int(int(obj.find('Left').text) * rescale_factor),
+                              int(int(obj.find('Top').text) * rescale_factor),
+                              int((int(obj.find('Left').text) + int(obj.find('Width').text)) * rescale_factor),
+                              int((int(obj.find('Top').text) + int(obj.find('Height').text)) * rescale_factor)]
+        # we want to ignore the large objects
+        if int((int(obj.find('Left').text) + int(obj.find('Width').text)) * rescale_factor) - \
+                int(int(obj.find('Left').text) * rescale_factor) < (400 * rescale_factor) and \
+                int((int(obj.find('Top').text) + int(obj.find('Height').text)) * rescale_factor) - \
+                int(int(obj.find('Top').text) * rescale_factor) < (400 * rescale_factor):
+          objects.append(obj_struct)
 
   return objects
 

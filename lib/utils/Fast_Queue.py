@@ -42,6 +42,19 @@ class Fast_Queue():
     def full(self):
         return self.qq.full() and self.mpq.full()
 
+    def clear(self):
+        while not self.qq.empty():
+            try:
+                self.qq.get(False)
+            except:
+                continue
+        while not self.qq.empty():
+            try:
+                self.mpq.get(False)
+            except:
+                continue
+
+
     # static for not referencing "self" strongly
     # but only weakly-referencing "me"
     @staticmethod
@@ -60,7 +73,7 @@ class Fast_Queue():
                 # print 'daemon done'
 
         def stop(ref):
-            # print 'stop called'
+            print 'stop called'
             srcq.put(sentinel)
 
         # when the FastMyQueue object is GCed, stop the thread

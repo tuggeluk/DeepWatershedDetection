@@ -116,6 +116,8 @@ def get_minibatch(roidb, args, assign, helper):
                     fg_map = np.amax(blobs["assign" + str(i1)]["gt_map"+str(i2)],-1)
                 fg_map = np.expand_dims(fg_map,-1)
                 fg_map[fg_map != 0] = 1
+                fg_map = fg_map/np.sum(fg_map)*fg_map.shape[1]*fg_map.shape[2]
+
                 blobs["assign" + str(i1)]["mask" + str(i2)] = fg_map[0]
             else:
                 blobs["assign" + str(i1)]["mask"+str(i2)] = np.ones(blobs["assign" + str(i1)]["gt_map"+str(i2)].shape[:-1]+(1,))[0]
@@ -139,7 +141,7 @@ def get_minibatch(roidb, args, assign, helper):
         dtype=np.float32)
 
     # for deepscores average over last data dimension
-    if "DeepScores" in args.dataset:
+    if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
         blobs["data"] = np.average(blobs["data"],-1)
         blobs["data"] = np.expand_dims(blobs["data"], -1)
 

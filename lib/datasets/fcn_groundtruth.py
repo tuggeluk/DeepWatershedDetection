@@ -737,6 +737,7 @@ def get_map_visuals(fetched_maps,assign,show=False):
 
 # pil_im = Image.fromarray(im)
 def show_image(data, gt_boxes=None):
+    from PIL import Image, ImageDraw
     if gt_boxes is None:
         im = Image.fromarray(data[0].astype("uint8"))
         im.show()

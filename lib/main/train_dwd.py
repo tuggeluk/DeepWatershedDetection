@@ -46,7 +46,25 @@ def main(parsed):
     # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
     #
 
-    # data_layer.forward(args, [args.training_assignements[0]], None)
+    # def show_image(data, gt_boxes=None):
+    #     from PIL import Image, ImageDraw
+    #     if gt_boxes is None:
+    #         im = Image.fromarray(data[0].astype("uint8"))
+    #         im.show()
+    #     else:
+    #         im = Image.fromarray(data[0].astype("uint8"))
+    #         draw = ImageDraw.Draw(im)
+    #         # overlay GT boxes
+    #         for row in gt_boxes[0]:
+    #             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
+    #         im.show()
+    #     return
+    #
+    # fetched_dat = data_layer.forward(args, [args.training_assignements[0]], None)
+
+    # show_image(fetched_dat["data"],fetched_dat["gt_boxes"])
+    # show_image(fetched_dat["data"], None)
+
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -54,7 +72,7 @@ def main(parsed):
     sess = tf.Session(config=config)
 
     # input and output tensors
-    if "DeepScores" in args.dataset:
+    if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
@@ -96,6 +114,16 @@ def main(parsed):
     if args.continue_training == "True":
         print("Loading checkpoint")
         saver.restore(sess, checkpoint_dir + "/" + checkpoint_name)
+    elif args.pretrain_lvl == "deepscores_to_musicma":
+        pretrained_vars = []
+        for var in slim.get_model_variables():
+            if not ("class_pred" in var.name):
+                pretrained_vars.append(var)
+        print("Loading network pretrained on Deepscores for Muscima")
+        loading_checkpoint_name = cfg.PRETRAINED_DIR+"/DeepScores_to_Muscima/" + "backbone"
+        init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
+        init_fn(sess)
+
     else:
         if args.pretrain_lvl == "semseg":
             #load all variables except the ones in scope "deep_watershed"
@@ -172,12 +200,17 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
     print("training on combined assignments")
     print("for " + str(do_comb_itr) + " iterations")
 
+    # waste elements off queue because queue clear does not work
+    for i in range(7):
+        data_layer.forward(args, orig_assign, training_help)
+
     for itr in range(iteration, (iteration + do_comb_itr)):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
             blob = data_layer.forward(args, orig_assign, training_help)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+
 
         if blob["helper"] is not None:
             input_data = np.concatenate([blob["data"], blob["helper"]], -1)
@@ -196,9 +229,11 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
 
         for i1 in range(len(preped_assigns)):
             gt_placeholders = preped_assigns[i1][2]
+            mask_placeholders = preped_assigns[i1][6]
             for i2 in range(len(gt_placeholders)):
                 # only one assign
                 feed_dict[gt_placeholders[i2]] = blob["assign"+str(i1)]["gt_map" + str(len(gt_placeholders) - i2 - 1)]
+                feed_dict[mask_placeholders[i2]] = blob["assign" + str(i1)]["mask" + str(len(gt_placeholders) - i2 - 1)]
 
         # compute running mean for losses
         feed_dict[loss_scalings_placeholder] = loss_factors/np.maximum(np.mean(past_losses,1),[1.0E-6,1.0E-6,1.0E-6])
@@ -467,7 +502,11 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
         batch_not_loaded = True
         while batch_not_loaded:
             blob = data_layer.forward(args, [assign], training_help)
-            batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+            if int(gt_placeholders[0].shape[-1]) != blob["assign0"]["gt_map0"].shape[-1] or len(blob["gt_boxes"].shape) != 3:
+                print("skipping queue element")
+            else:
+                batch_not_loaded = False
+
 
         if blob["helper"] is not None:
             input_data = np.concatenate([blob["data"],blob["helper"]],-1)
@@ -591,7 +630,7 @@ def get_config_id(assign):
 
 def get_checkpoint_dir(args):
     # assemble path
-    if "DeepScores" in args.dataset:
+    if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
         image_mode = "music"
     else:
         image_mode = "realistic"

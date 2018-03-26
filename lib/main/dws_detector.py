@@ -58,7 +58,7 @@ class DWSDetector:
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox,cutoff, min_ccoponent_size)
-        save_images(img, dws_list, True, False)
+        #save_images(img, dws_list, True, False)
 
         return dws_list
 
