@@ -72,7 +72,12 @@ def main(parsed):
     sess = tf.Session(config=config)
 
     # input and output tensors
-    if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
+    if "DeepScores" in args.dataset:
+        input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
+        refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
+
+    elif "MUSICMA" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
@@ -201,15 +206,16 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
     print("for " + str(do_comb_itr) + " iterations")
 
     # waste elements off queue because queue clear does not work
-    for i in range(7):
+    for i in range(14):
         data_layer.forward(args, orig_assign, training_help)
+
 
     for itr in range(iteration, (iteration + do_comb_itr)):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
             blob = data_layer.forward(args, orig_assign, training_help)
-            batch_not_loaded = len(blob["gt_boxes"].shape) != 3
+            batch_not_loaded = len(blob["gt_boxes"].shape) != 3 or  sum(["assign" in key for key in  blob .keys()]) != len(preped_assigns)
 
 
         if blob["helper"] is not None:
@@ -257,7 +263,7 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
             for i in range(len(preped_assigns)):
-                _, _, _, scalar_summary_op, images_summary_op, images_placeholders = preped_assigns[i]
+                _, _, _, scalar_summary_op, images_summary_op, images_placeholders, _ = preped_assigns[i]
                 post_assign_to_tensorboard(orig_assign[i],i,scalar_summary_op,network_heads,feed_dict,itr,sess,writer,blob,images_placeholders,images_summary_op)
 
         if itr % args.save_interval == 0:
@@ -312,7 +318,7 @@ def post_assign_to_tensorboard(assign,assign_nr,scalar_summary_op,network_heads,
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
     gt_placeholders = get_gt_placeholders(assign,imdb)
 
-    loss_mask_placeholders = [tf.placeholder(tf.float32, shape=[None, None, 1]) for x in assign["ds_factors"]]
+    loss_mask_placeholders = [tf.placeholder(tf.float32, shape=[None, None,1]) for x in assign["ds_factors"]]
 
     debug_fetch = dict()
 
@@ -366,13 +372,26 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
             # loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
             #                                                 labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
             loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-                                                            labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
-
+                                                            labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
+            debug_fetch["loss_components_softmax"] = loss_components
         else:
             loss_components = [tf.losses.mean_squared_error(
                 predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-                labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
+                labels=gt_placeholders[x],reduction="none") for x in range(nr_ds_factors)]
+            debug_fetch["loss_components_mse"] = loss_components
 
+    comp_multy = []
+    for i in range(len(loss_components)):
+        # maybe expand dims
+        if len(loss_components[i][0].shape)==2:
+            cond_result = tf.expand_dims(loss_components[i][0], -1)
+        else:
+            cond_result = loss_components[i][0]
+        comp_multy.append(tf.multiply(cond_result, loss_mask_placeholders[i]))
+        # debug_fetch["loss_components_multy"+str(i)] = tf.multiply(loss_components[i], loss_mask_placeholders[i])
+        # debug_fetch["loss_components_multyaaaa" + str(i)] = tf.multiply(loss_components[i], 3)
+    # call tf.reduce mean on each loss component
+    final_loss_components = [tf.reduce_mean(x) for x in comp_multy]
 
     #################################################################################################################
     # debug  losses
@@ -380,16 +399,29 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     # batch_not_loaded = True
     # while batch_not_loaded:
     #
-    #     blob = data_layer.forward(args, assign)
+    #     blob = data_layer.forward(args, [assign], None)
     #     batch_not_loaded = len(blob["gt_boxes"].shape) != 3
     #
-    #     feed_dict = {input: np.concatenate([blob["data"],blob["data"]],-1)}
+    #     feed_dict = {input: blob["data"]}
     #     for i in range(len(gt_placeholders)):
-    #         feed_dict[gt_placeholders[i]] = blob["gt_map" + str(len(gt_placeholders)-i-1)]
+    #         feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders)-i-1)]
+    #         feed_dict[loss_mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
+    #
     # sess.run(tf.global_variables_initializer())
     # 1==1
     # # train softmax
-    # loss_fetch = sess.run(loss_components, feed_dict=feed_dict)
+    # loss_fetch = sess.run([final_loss_components,comp_multy,
+    #                        loss_components], feed_dict=feed_dict)
+    # loss_comp_final, comp_mul, loss_mse = loss_fetch
+    #
+    # loss_fetch = sess.run([loss_components], feed_dict=feed_dict)
+
+
+    # from PIL import Image
+    # Image.fromarray(np.squeeze(blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)],-1).astype(np.uint8)).show()
+    # Image.fromarray(np.squeeze(blob["data"],-1).astype(np.uint8)[0]).show()
+    # loss_fetch  = np.squeeze((loss_fetch[0][0]/np.amax(loss_fetch[0][0])*255).astype(np.uint8),-1)
+    # Image.fromarray(loss_fetch).show()
     #
     #
     # feature_maps_fetch = sess.run(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]], feed_dict=feed_dict)
@@ -407,9 +439,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     # [inner_2] = sess.run([debug_fetch[str(x)]["inner_2"]], feed_dict=feed_dict)
     # [inner_rounded] = sess.run([debug_fetch[str(x)]["inner_rounded"]], feed_dict=feed_dict)
     # debug_fetch[str(x)].keys()
-    # for i in range(mask_gt_fetch.shape[0]):
-    #     print(np.inner(mask_gt_fetch[i],mask_pred_fetch[i]))
-    #################################################################################################################
+    # #################################################################################################################
 
     # TODO replace by weight mask
     # # potentially mask out zeros
@@ -422,16 +452,12 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     #
     #     loss_components = masked_components
 
-    for i in range(len(loss_components)):
-        loss_components[i] = tf.multiply(loss_components[i],loss_mask_placeholders[i])
 
-    # call tf.reduce mean on each loss component
-    loss_components = [tf.reduce_mean(x) for x in loss_components]
 
     # replace with loss of last layer if is nan (can happen if last mask has no directions on it)
     #loss_components = [tf.cond(tf.is_nan(x), lambda: loss_components[len(loss_components)-1], lambda: x) for x in loss_components]
 
-    stacked_components = tf.stack(loss_components)
+    stacked_components = tf.stack(final_loss_components)
 
 
     if assign["layer_loss_aggregate"] == "min":
@@ -454,7 +480,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     scalar_sums.append(tf.summary.scalar("loss " + get_config_id(assign)+":", loss))
 
     for comp_nr in range(len(loss_components)):
-        scalar_sums.append(tf.summary.scalar("loss_component " + get_config_id(assign) + "Nr"+str(comp_nr)+":", loss_components[comp_nr]))
+        scalar_sums.append(tf.summary.scalar("loss_component " + get_config_id(assign) + "Nr"+str(comp_nr)+":", final_loss_components[comp_nr]))
 
     scalar_summary_op = tf.summary.merge(scalar_sums)
 
@@ -630,8 +656,10 @@ def get_config_id(assign):
 
 def get_checkpoint_dir(args):
     # assemble path
-    if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
+    if "DeepScores" in args.dataset:
         image_mode = "music"
+    elif "MUSICMA" in args.dataset:
+        image_mode = "music_handwritten"
     else:
         image_mode = "realistic"
     tbdir = cfg.EXP_DIR + "/" + image_mode +"/"+"pretrain_lvl_"+args.pretrain_lvl+"/" + args.model

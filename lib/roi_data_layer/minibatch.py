@@ -114,11 +114,10 @@ def get_minibatch(roidb, args, assign, helper):
                     fg_map = np.argmax(blobs["assign" + str(i1)]["gt_map"+str(i2)],-1)
                 else:
                     fg_map = np.amax(blobs["assign" + str(i1)]["gt_map"+str(i2)],-1)
-                fg_map = np.expand_dims(fg_map,-1)
                 fg_map[fg_map != 0] = 1
-                fg_map = fg_map/np.sum(fg_map)*fg_map.shape[1]*fg_map.shape[2]
+                fg_map = fg_map/(np.sum(fg_map)+1)*(fg_map.shape[1]+1)
 
-                blobs["assign" + str(i1)]["mask" + str(i2)] = fg_map[0]
+                blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_map[0],-1)
             else:
                 blobs["assign" + str(i1)]["mask"+str(i2)] = np.ones(blobs["assign" + str(i1)]["gt_map"+str(i2)].shape[:-1]+(1,))[0]
 
