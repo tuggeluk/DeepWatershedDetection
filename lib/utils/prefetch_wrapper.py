@@ -40,7 +40,7 @@ class PrefetchWrapper:
         while not self.done.value:
             #print(self.done.value)
             if q.qsize() < prefetch_len:
-                #print(q.qsize())
+                print(q.qsize())
                 blob = fp(args[0],args[1],args[2],index_lock)
                 #print("trying to put")
                 q.put(blob)

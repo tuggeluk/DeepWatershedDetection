@@ -24,7 +24,7 @@ for year in ['2007', '2012']:
 
 # Set up musical dataset
 for year in ['2017']:
-  for split in ['train', 'val', 'test', 'debug','train100','train10000', 'test100',]:
+  for split in ['train', 'val', 'test', 'debug','train100','train10000', 'test100','traindense','testdense']:
     name = 'DeepScores_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: deep_scores(split, year))
 
@@ -42,7 +42,7 @@ for year in ['2015']:
 
   # Set up for Musicma++
   for year in ['2017']:
-    for split in ['train', 'test', 'val']:
+    for split in ['train', 'test', 'val', "valtest", "valtestbadrm"]:
       name = 'MUSICMA++_{}_{}'.format(year, split)
       __sets[name] = (lambda split=split, year=year: musicma(split, year))
 

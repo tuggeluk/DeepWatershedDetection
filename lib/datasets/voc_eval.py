@@ -38,11 +38,15 @@ def parse_rec(filename, muscima, rescale_factor=0.5):
       for obj in objs.findall('CropObject'):
         obj_struct = {}
         obj_struct['name'] = obj.find('ClassName').text
+        obj_struct['pose'] = "Unspecified"
+        obj_struct['truncated'] = int(0)
+        obj_struct['difficult'] = int(0)
         obj_struct['bbox'] = [int(int(obj.find('Left').text) * rescale_factor),
                               int(int(obj.find('Top').text) * rescale_factor),
                               int((int(obj.find('Left').text) + int(obj.find('Width').text)) * rescale_factor),
                               int((int(obj.find('Top').text) + int(obj.find('Height').text)) * rescale_factor)]
         # we want to ignore the large objects
+
         if int((int(obj.find('Left').text) + int(obj.find('Width').text)) * rescale_factor) - \
                 int(int(obj.find('Left').text) * rescale_factor) < (400 * rescale_factor) and \
                 int((int(obj.find('Top').text) + int(obj.find('Height').text)) * rescale_factor) - \
@@ -172,8 +176,10 @@ def voc_eval(detpath,
     for i, imagename in enumerate(imagenames):
       if "DeepScores" in detpath:
         recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
+      elif "MUSICMA" in detpath:
+        recs[imagename] = parse_rec(annopath.format(imagename),muscima=True,rescale_factor=1)
       else:
-        recs[imagename] = parse_rec(annopath.format(imagename))
+        recs[imagename] = parse_rec(annopath.format(imagename),muscima=False,rescale_factor=1)
       if i % 100 == 0:
         print('Reading annotation for {:d}/{:d}'.format(
           i + 1, len(imagenames)))
@@ -189,6 +195,8 @@ def voc_eval(detpath,
       except:
         recs = pickle.load(f, encoding='bytes')
 
+  if classname == 'notehead-full':
+    print("debug")
   # extract gt objects for this class
   class_recs = {}
   npos = 0
@@ -203,6 +211,9 @@ def voc_eval(detpath,
                              'det': det}
 
   # read dets
+  if "8th_rest" in classname:
+    print("debug")
+  classname = classname.replace("/", "_")
   detfile = detpath.format(classname)
   with open(detfile, 'r') as f:
     lines = f.readlines()

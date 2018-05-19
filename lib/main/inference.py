@@ -43,13 +43,16 @@ def test_net(net, imdb, parsed):
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-        # if im.shape[0]*im.shape[1]>3837*2713:
-        #     print(im.shape)
-        #     print(imdb.image_path_at(i).split("/")[-1][:-4])
-        #     list_large.append(imdb.image_path_at(i).split("/")[-1][:-4])
+        if im.shape[0]*im.shape[1]>3837*2713:
+            print(im.shape)
+            print(imdb.image_path_at(i).split("/")[-1][:-4])
+            continue
 
-        boxes = net.classify_img(im,3,4)
-        # boxes = np.array([[938, 94, 943, 99, 37], [994, 74, 1006, 85, 29], [994, 74, 1006, 85, 29], [994, 211, 1011, 223, 31]])
+        boxes = net.classify_img(im, 1, 4)
+        print(imdb.image_path_at(i))
+        print(len(boxes))
+        print()
+        # boxes = np.array([[938, 94, 943,  99, 37], [994, 74, 1006, 85, 29], [994, 74, 1006, 85, 29], [994, 211, 1011, 223, 31]])
         # show_image([np.asanyarray(im)], boxes, True, True)
         no_objects = len(boxes)
         for j in range(len(boxes)):
@@ -73,10 +76,9 @@ def test_net(net, imdb, parsed):
 
 
 
-    # print('Read boxes from disk')
-    # det_file = "/home/lukas/detections.pkl"
-    # with open(det_file, 'rb') as f:
-    #     all_boxes = cPickle.load(f)
+    print('Read boxes from disk')
+    with open(det_file, 'rb') as f:
+        all_boxes = cPickle.load(f)
 
     # for i1 in range(len(all_boxes)):
     #     for i2 in range(len(all_boxes[i1])):
@@ -87,14 +89,14 @@ def test_net(net, imdb, parsed):
 
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir,0.25)
     return all_boxes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_2017_debug", help="dataset to perform inference on")
+    parser.add_argument("--scaling", type=int, default=1, help="scale factor applied to images after loading")
+    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_valtestbadrm", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
 

@@ -12,7 +12,12 @@ tf.set_random_seed(314)
 
 class DWSDetector:
     def __init__(self, imdb):
-        self.model_path = "trained_models/music/RefineNet-Res101/semseg"
+        if "DeepScores" in imdb.name:
+            self.model_path = "trained_models/music/RefineNet-Res101/semseg"
+        elif "MUSICMA" in imdb.name:
+            self.model_path = "trained_models/music_handwritten/RefineNet-Res101/semseg"
+        else:
+            print("unregonized imdb")
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
 
@@ -58,7 +63,7 @@ class DWSDetector:
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox,cutoff, min_ccoponent_size)
-        #save_images(img, dws_list, True, False)
+        save_images(img, dws_list, True, True)
 
         return dws_list
 
@@ -82,7 +87,7 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
         draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
-            draw.text((row[2], row[3]), row[4], fill="red")
+            draw.text((row[2], row[3]), str(row[4]), fill="red")
 
     return im_input, im_gt
 

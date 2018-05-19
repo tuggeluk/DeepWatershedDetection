@@ -373,6 +373,7 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
             #                                                 labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
             loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
                                                             labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
+            #loss_components = [tf.reduce_mean(x,axis=-1) for x in loss_components]
             debug_fetch["loss_components_softmax"] = loss_components
         else:
             loss_components = [tf.losses.mean_squared_error(
@@ -525,6 +526,8 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
     print("for " + str(do_itr)+ " iterations")
     for itr in range(iteration, (iteration + do_itr)):
         # load batch - only use batches with content
+
+        #print("getting data")
         batch_not_loaded = True
         while batch_not_loaded:
             blob = data_layer.forward(args, [assign], training_help)
@@ -532,7 +535,7 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
                 print("skipping queue element")
             else:
                 batch_not_loaded = False
-
+        #print("have data")
 
         if blob["helper"] is not None:
             input_data = np.concatenate([blob["data"],blob["helper"]],-1)
@@ -553,9 +556,11 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
             feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders)-i-1)]
             feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
 
-
+        #print("start train op")
         # train step
         _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
+
+        #print("finish train op")
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))

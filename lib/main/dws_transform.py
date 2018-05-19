@@ -41,9 +41,17 @@ def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, r
         # mayority vote for class --> transposed
         labels_inv[key]["class"] = np.bincount(class_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]).argmax()
         # average for box size --> transposed
-        #labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
-        labels_inv[key]["bbox_size"] = np.amax(
-            bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]], 0).astype(int)
+        # use trimmed mean
+
+
+        bbox = bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]
+
+        # trim_nr  = bbox.shape[0]/7
+        # bbox = bbox[np.lexsort(np.fliplr(bbox).T)]
+
+        labels_inv[key]["bbox_size"] = np.round(np.average(bbox,0)).astype(int)
+        # labels_inv[key]["bbox_size"] = np.amax(
+        #     bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]], 0).astype(int)
 
         # produce bbox element, append to list
         bbox = []

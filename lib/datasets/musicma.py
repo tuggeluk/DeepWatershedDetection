@@ -200,8 +200,8 @@ class musicma(imdb):
       self._devkit_path,
       'MUSICMA++_' + self._year,
       'ImageSets',
-      'Main',
-      filename)
+      'Main')+"/"+filename
+
     return path
 
   def _write_voc_results_file(self, all_boxes):
@@ -209,20 +209,28 @@ class musicma(imdb):
       if cls == '__background__':
         continue
       print('Writing {} VOC results file'.format(cls))
+
+      cls = cls.replace("/","_")
+
       filename = self._get_voc_results_file_template().format(cls)
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
           dets = all_boxes[cls_ind][im_ind]
-          if dets == []:
+          if len(dets) == 0:
             continue
           # the VOCdevkit expects 1-based indices
-          for k in range(dets[0].shape[0]):
+          for det in dets:
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                    format(index, dets[0][-1],
-                           dets[0][0] + 1, dets[0][1] + 1,
-                           dets[0][2] + 1, dets[0][3] + 1))
+                    format(index, det[-1],
+                           det[0] + 1, det[1] + 1,
+                           det[2] + 1, det[3] + 1))
+            print('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+                    format(index, det[-1],
+                           det[0] + 1, det[1] + 1,
+                           det[2] + 1, det[3] + 1))
 
-  def _do_python_eval(self, output_dir='output'):
+
+  def _do_python_eval(self, output_dir='output',ovthresh=0.5):
     annopath = os.path.join(
       self._devkit_path,
       'MUSICMA++_' + self._year,
@@ -230,9 +238,7 @@ class musicma(imdb):
       '{:s}.xml')
     imagesetfile = os.path.join(
       self._devkit_path,
-      'MUSICMA++_' + self._year,
-      'ImageSets',
-      'Main',
+      'train_val_test',
       self._image_set + '.txt')
     cachedir = os.path.join(self._devkit_path, 'annotations_cache')
     aps = []
@@ -244,9 +250,10 @@ class musicma(imdb):
     for i, cls in enumerate(self._classes):
       if cls == '__background__':
         continue
+      cls = cls.replace("/","_")
       filename = self._get_voc_results_file_template().format(cls)
       rec, prec, ap = voc_eval(
-        filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
+        filename, annopath, imagesetfile, cls, cachedir, ovthresh=ovthresh,
         use_07_metric=use_07_metric)
       aps += [ap]
       print(('AP for {} = {:.4f}'.format(cls, ap)))
@@ -282,9 +289,9 @@ class musicma(imdb):
     print(('Running:\n{}'.format(cmd)))
     status = subprocess.call(cmd, shell=True)
 
-  def evaluate_detections(self, all_boxes, output_dir):
+  def evaluate_detections(self, all_boxes, output_dir, ovthresh):
     self._write_voc_results_file(all_boxes)
-    self._do_python_eval(output_dir)
+    self._do_python_eval(output_dir,ovthresh=ovthresh)
     if self.config['matlab_eval']:
       self._do_matlab_eval(output_dir)
     if self.config['cleanup']:
