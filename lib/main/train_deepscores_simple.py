@@ -38,7 +38,6 @@ def main(parsed):
     # save_objectness_function_handles(args, imdb)
 
 
-
     # tensorflow session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -108,11 +107,11 @@ def main(parsed):
 
         batch_not_loaded = True
         while batch_not_loaded:
-            blob = data_layer.forward(args, assign, None)
+            blob = data_layer.forward(args, [assign], None)
             batch_not_loaded = len(blob["gt_boxes"].shape) != 3
 
         train_images = blob["data"]
-        train_annotations = blob["gt_map0"]
+        train_annotations = blob["assign0"]["gt_map0"]
 
 
         im_data = np.concatenate([train_images[0], train_images[0], np.expand_dims(train_annotations[0, :, :, 0], -1)*255], -1)
@@ -238,7 +237,7 @@ if __name__ == '__main__':
   parser.add_argument("--batch_size", type=int, default=1,
                       help="batch size for training")
 
-  parser.add_argument("--dataset", type=str, default="DeepScores_2017_train100", help="DeepScores, voc or coco")
+  parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
   parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                       help="DeepScores, voc, coco or no - validation set")
 

@@ -24,7 +24,7 @@ if __name__ == '__main__':
     #get_imdb("coco_2017_train")
     #print("looking for voc 2012")
     #get_imdb("voc_2012_train")
-    ds_imdb = get_imdb("deep_scores_2017_train")
+    ds_imdb = get_imdb("DeepScores_2017_debug")
     print('Loaded dataset `{:s}` for training'.format(ds_imdb.name))
 
     roidb = get_training_roidb(ds_imdb)
