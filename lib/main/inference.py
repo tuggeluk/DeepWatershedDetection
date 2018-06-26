@@ -37,7 +37,7 @@ def test_net(net, imdb, parsed):
 
     print(num_images)
     for i in range(num_images):
-        if i%500 == 0:
+        if i%2 == 0:
             print i
 
         im = Image.open(imdb.image_path_at(i)).convert('L')
@@ -51,6 +51,8 @@ def test_net(net, imdb, parsed):
         boxes = net.classify_img(im, 1, 4)
         print(imdb.image_path_at(i))
         print(len(boxes))
+        if len(boxes)>800:
+            boxes = []
         print()
         # boxes = np.array([[938, 94, 943,  99, 37], [994, 74, 1006, 85, 29], [994, 74, 1006, 85, 29], [994, 211, 1011, 223, 31]])
         # show_image([np.asanyarray(im)], boxes, True, True)
@@ -95,8 +97,8 @@ def test_net(net, imdb, parsed):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=1, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_valtestbadrm", help="dataset to perform inference on")
+    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
+    parser.add_argument("--test_set", type=str, default="DeepScores_2017_testdense", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
 

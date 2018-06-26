@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument("--prefetch_len", type=int, default=7, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
-    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_traindense", help="DeepScores, voc or coco")
