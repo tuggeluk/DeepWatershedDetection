@@ -39,33 +39,6 @@ def main(parsed):
     # replaces keywords with function handles in training assignements
     save_objectness_function_handles(args,imdb)
 
-
-    # Debug stuffs
-    #
-    # try_all_assign(data_layer,args,100)
-    # dws_list = perform_dws(data["dws_energy"], data["class_map"], data["bbox_fcn"])
-    #
-
-    # def show_image(data, gt_boxes=None):
-    #     from PIL import Image, ImageDraw
-    #     if gt_boxes is None:
-    #         im = Image.fromarray(data[0].astype("uint8"))
-    #         im.show()
-    #     else:
-    #         im = Image.fromarray(data[0].astype("uint8"))
-    #         draw = ImageDraw.Draw(im)
-    #         # overlay GT boxes
-    #         for row in gt_boxes[0]:
-    #             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
-    #         im.show()
-    #     return
-    #
-    # fetched_dat = data_layer.forward(args, [args.training_assignements[0]], None)
-
-    # show_image(fetched_dat["data"],fetched_dat["gt_boxes"])
-    # show_image(fetched_dat["data"], None)
-
-
     # tensorflow session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -173,10 +146,6 @@ def main(parsed):
 
     print("done :)")
 
-    # traind on combined assigns
-    # for comb_assign in args.combined_assignements:
-    #     train_on_comb_assignment()
-
 
 def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_assigns,loss_factors,do_comb_itr,iteration,input_ph,rm_length,
                             network_heads,sess,checkpoint_dir,checkpoint_name,saver,writer):
@@ -222,9 +191,6 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
             input_data = np.concatenate([blob["data"], blob["helper"]], -1)
             feed_dict = {input_ph: input_data}
         else:
-            # pad input with zeros
-            # input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
-            # feed_dict = {input: blob["data"], helper_input: input_data}
             if len(args.training_help) == 1:
                 feed_dict = {input_ph: blob["data"]}
             else:
@@ -293,18 +259,6 @@ def post_assign_to_tensorboard(assign,assign_nr,scalar_summary_op,network_heads,
     summary = sess.run(fetch_list, feed_dict=feed_dict)
     writer.add_summary(summary[0], float(itr))
 
-    # use predicted feature maps
-    # TODO predict boxes
-
-    # debug logits
-    # if itr ==1:
-    #     hist_ph = tf.placeholder(tf.uint8, shape=[1, summary[1].shape[3]])
-    #     logits_sum = tf.summary.histogram('logits_means', hist_ph)
-    #
-    # h_sum = sess.run([logits_sum], feed_dict={hist_ph: np.mean(summary[1],(1,2))})
-    # writer.add_summary(h_sum[0], float(itr))
-
-
     gt_visuals = get_gt_visuals(blob, assign, assign_nr, pred_boxes=None, show=False)
     map_visuals = get_map_visuals(summary[1:], assign, show=False)
     images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
@@ -312,7 +266,6 @@ def post_assign_to_tensorboard(assign,assign_nr,scalar_summary_op,network_heads,
     summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
     writer.add_summary(summary[0], float(itr))
     return None
-
 
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
@@ -344,21 +297,10 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
             masked_pred = masked_pred/norms
             debug_fetch[str(x)]["masked_pred_normed"] = masked_pred
 
-            # inner product
-            # inner = tf.diag_part(tf.tensordot(masked_gt,tf.transpose(masked_pred),1))
-            # debug_fetch[str(x)]["inner"] = inner
-
             gt_1, gt_2 = tf.split(masked_gt, 2, -1)
             pred_1, pred_2 = tf.split(masked_pred, 2, -1)
             inner_2 = gt_1*pred_1+gt_2*pred_2
             debug_fetch[str(x)]["inner_2"] = inner_2
-            # round to 4 digits after dot
-            # multiplier = tf.constant(10 ** 4, dtype=tf.float32)
-            # inner_rounded = tf.round(inner_2 * multiplier) / multiplier
-            # debug_fetch[str(x)]["inner_rounded"] = inner_rounded
-
-            # cap to [-1,1] due to numerical instability
-
             inner_2 = tf.maximum(tf.constant(-1, dtype=tf.float32),tf.minimum(tf.constant(1, dtype=tf.float32),inner_2))
 
             acos_inner = tf.acos(inner_2)
@@ -369,8 +311,6 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
         nr_ds_factors = len(assign["ds_factors"])
         if assign["stamp_args"]["loss"] == "softmax":
-            # loss_components = [safe_softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-            #                                                 labels=gt_placeholders[x]) for x in range(nr_ds_factors)]
             loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
                                                             labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
             debug_fetch["loss_components_softmax"] = loss_components
@@ -388,77 +328,10 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         else:
             cond_result = loss_components[i][0]
         comp_multy.append(tf.multiply(cond_result, loss_mask_placeholders[i]))
-        # debug_fetch["loss_components_multy"+str(i)] = tf.multiply(loss_components[i], loss_mask_placeholders[i])
-        # debug_fetch["loss_components_multyaaaa" + str(i)] = tf.multiply(loss_components[i], 3)
     # call tf.reduce mean on each loss component
     final_loss_components = [tf.reduce_mean(x) for x in comp_multy]
 
-    #################################################################################################################
-    # debug  losses
-    # load batch - only use batches with content
-    # batch_not_loaded = True
-    # while batch_not_loaded:
-    #
-    #     blob = data_layer.forward(args, [assign], None)
-    #     batch_not_loaded = len(blob["gt_boxes"].shape) != 3
-    #
-    #     feed_dict = {input: blob["data"]}
-    #     for i in range(len(gt_placeholders)):
-    #         feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders)-i-1)]
-    #         feed_dict[loss_mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
-    #
-    # sess.run(tf.global_variables_initializer())
-    # 1==1
-    # # train softmax
-    # loss_fetch = sess.run([final_loss_components,comp_multy,
-    #                        loss_components], feed_dict=feed_dict)
-    # loss_comp_final, comp_mul, loss_mse = loss_fetch
-    #
-    # loss_fetch = sess.run([loss_components], feed_dict=feed_dict)
-
-
-    # from PIL import Image
-    # Image.fromarray(np.squeeze(blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)],-1).astype(np.uint8)).show()
-    # Image.fromarray(np.squeeze(blob["data"],-1).astype(np.uint8)[0]).show()
-    # loss_fetch  = np.squeeze((loss_fetch[0][0]/np.amax(loss_fetch[0][0])*255).astype(np.uint8),-1)
-    # Image.fromarray(loss_fetch).show()
-    #
-    #
-    # feature_maps_fetch = sess.run(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]], feed_dict=feed_dict)
-    # for map in feature_maps_fetch:
-    #     print(map.shape)
-    #
-    # # train step
-    #
-    # [split] = sess.run([debug_fetch[str(x)]["split1"]], feed_dict=feed_dict)
-    # [pred] = sess.run([network_heads[assign["stamp_func"][0]][x]], feed_dict=feed_dict)
-    # [mask] = sess.run([debug_fetch[str(x)]["mask"]], feed_dict=feed_dict)
-    # [masked_gt] = sess.run([debug_fetch[str(x)]["masked_gt"]], feed_dict=feed_dict)
-    # [masked_pred_normed] = sess.run([debug_fetch[str(x)]["masked_pred_normed"]], feed_dict=feed_dict)
-    # [inner] = sess.run([debug_fetch[str(x)]["inner"]], feed_dict=feed_dict)
-    # [inner_2] = sess.run([debug_fetch[str(x)]["inner_2"]], feed_dict=feed_dict)
-    # [inner_rounded] = sess.run([debug_fetch[str(x)]["inner_rounded"]], feed_dict=feed_dict)
-    # debug_fetch[str(x)].keys()
-    # #################################################################################################################
-
-    # TODO replace by weight mask
-    # # potentially mask out zeros
-    # if assign["mask_zeros"]:
-    #     # only compute loss where GT is not zero intended for "directional donuts"
-    #     masked_components = []
-    #     for x in range(len(assign["ds_factors"])):
-    #         mask = tf.squeeze(gt_placeholders[x] > 0, -1)
-    #         masked_components.append(tf.boolean_mask(loss_components[x], mask))
-    #
-    #     loss_components = masked_components
-
-
-
-    # replace with loss of last layer if is nan (can happen if last mask has no directions on it)
-    #loss_components = [tf.cond(tf.is_nan(x), lambda: loss_components[len(loss_components)-1], lambda: x) for x in loss_components]
-
     stacked_components = tf.stack(final_loss_components)
-
 
     if assign["layer_loss_aggregate"] == "min":
         loss = tf.reduce_min(stacked_components)
@@ -509,9 +382,6 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     return loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders, loss_mask_placeholders
 
 
-
-
-
 def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                    do_itr, assign, prepped_assign, iteration,training_help):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, mask_placeholders = prepped_assign
@@ -538,9 +408,6 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
             input_data = np.concatenate([blob["data"],blob["helper"]],-1)
             feed_dict = {input: input_data}
         else:
-            # pad input with zeros
-            # input_data = np.concatenate([blob["data"]*0, blob["data"]*0], -1)
-            # feed_dict = {input: blob["data"], helper_input: input_data}
             if len(args.training_help) == 1:
                 feed_dict = {input: blob["data"]}
             else:
@@ -552,7 +419,6 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
             # only one assign
             feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders)-i-1)]
             feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
-
 
         # train step
         _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
@@ -571,18 +437,6 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
 
             summary = sess.run(fetch_list, feed_dict=feed_dict)
             writer.add_summary(summary[0], float(itr))
-
-            # use predicted feature maps
-            # TODO predict boxes
-
-            # debug logits
-            # if itr ==1:
-            #     hist_ph = tf.placeholder(tf.uint8, shape=[1, summary[1].shape[3]])
-            #     logits_sum = tf.summary.histogram('logits_means', hist_ph)
-            #
-            # h_sum = sess.run([logits_sum], feed_dict={hist_ph: np.mean(summary[1],(1,2))})
-            # writer.add_summary(h_sum[0], float(itr))
-
 
             gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
             map_visuals = get_map_visuals(summary[1:], assign, show=False)
@@ -604,25 +458,11 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
     return iteration
 
 
-
-
-
 def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders):
     feed_dict = dict()
-    # for i in range(len(assign["ds_factors"])*2):
-    #     if i%2 ==0:
-    #         # prediction
-    #         feed_dict[images_placeholders[i]] = map_visuals[i/2]
-    #
-    #     else:
-    #         feed_dict[images_placeholders[i]] = gt_visuals[i]
-
     # reverse map vis order
     for i in range(len(assign["ds_factors"])):
         feed_dict[images_placeholders[i]] = np.concatenate([gt_visuals[i], map_visuals[i]])
-
-
-
 
     for key in feed_dict.keys():
         feed_dict[key] = np.expand_dims(feed_dict[key], 0)
@@ -637,9 +477,6 @@ def get_images_feed_dict(assign,blob,gt_visuals,map_visuals,images_placeholders)
     else:
         img_data = blob["data"].astype(np.uint8)
     feed_dict[images_placeholders[len(images_placeholders)-1]] = img_data
-
-
-
     return feed_dict
 
 
@@ -648,10 +485,8 @@ def get_gt_placeholders(assign, imdb):
     return [tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]]
 
 
-
 def get_config_id(assign):
     return assign["stamp_func"][0]+"_"+ assign["stamp_args"]["loss"]
-
 
 
 def get_checkpoint_dir(args):

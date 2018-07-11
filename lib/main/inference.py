@@ -4,6 +4,7 @@ import cv2
 import cPickle
 from PIL import Image
 import sys
+sys.path.insert(0, '/DeepWatershedDetection/lib')
 sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from datasets.factory import get_imdb
 from dws_detector import DWSDetector
@@ -43,14 +44,12 @@ def test_net(net, imdb, parsed):
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-        # if im.shape[0]*im.shape[1]>3837*2713:
-        #     print(im.shape)
-        #     print(imdb.image_path_at(i).split("/")[-1][:-4])
-        #     list_large.append(imdb.image_path_at(i).split("/")[-1][:-4])
+        if im.shape[0]*im.shape[1]>3837*2713:
+	    continue
 
-        boxes = net.classify_img(im,3,4)
-        # boxes = np.array([[938, 94, 943, 99, 37], [994, 74, 1006, 85, 29], [994, 74, 1006, 85, 29], [994, 211, 1011, 223, 31]])
-        # show_image([np.asanyarray(im)], boxes, True, True)
+        boxes = net.classify_img(im,1,4)
+	if len(boxes) > 800:
+	    boxes = []
         no_objects = len(boxes)
         for j in range(len(boxes)):
             # invert scaling for Boxes
@@ -94,7 +93,7 @@ def test_net(net, imdb, parsed):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_2017_debug", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
 

@@ -52,8 +52,8 @@ def parse_rec(filename, muscima, rescale_factor=0.5):
   return objects
 
 
-def parse_rec_deepscores(filename):
-  """ Parse a PASCAL VOC xml file """
+def parse_rec_deepscores(filename, rescale_factor=0.5):
+  """ Parse a DeepScores xml file """
 
   tree = ET.parse(filename)
   objects = []
@@ -76,9 +76,9 @@ def parse_rec_deepscores(filename):
     obj_struct['bbox'][1] = int(round(float(obj_struct['bbox'][1]) * im_size[1]))
     obj_struct['bbox'][2] = int(round(float(obj_struct['bbox'][2]) * im_size[0]))
     obj_struct['bbox'][3] = int(round(float(obj_struct['bbox'][3]) * im_size[1]))
-
     objects.append(obj_struct)
-
+    with open('bounding_boxes.pickle', 'w') as f:
+      pickle.dump(objects, f)
 
   return objects
 

@@ -12,9 +12,10 @@ tf.set_random_seed(314)
 
 class DWSDetector:
     def __init__(self, imdb):
-        self.model_path = "trained_models/music/RefineNet-Res101/semseg"
+        self.model_path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_0"
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
+	# self.saved_net = "RefineNet-Res101"
 
         # has to be adjusted according to the training scheme used
         self.energy_loss = "softmax"

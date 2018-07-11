@@ -10,6 +10,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+sys.path.insert(0, '/DeepWatershedDetection/lib')
+
 __sets = {}
 from datasets.pascal_voc import pascal_voc
 from datasets.coco import coco

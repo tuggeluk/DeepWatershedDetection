@@ -1,10 +1,9 @@
+# --------------------------------------------------------
 # Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
-# Written by Ross Girshick and Xinlei Chen - Exteded by Lukas Tuggener and Ismail Elezi
+# Written by Ross Girshick and Xinlei Chen - Exteded by Lukas Tuggener
 # --------------------------------------------------------
-
-# NB: Terms width, height etc have not been used consistently, but the results are correct (bounding boxes in the augmented images are visualized)
 
 """Compute minibatch blobs for training a Fast R-CNN network."""
 from __future__ import absolute_import
@@ -12,7 +11,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import pickle 
+import pickle
 import numpy as np
 import numpy.random as npr
 import cv2
@@ -20,11 +19,11 @@ from main.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 from datasets.fcn_groundtruth import get_markers,stamp_class
 import sys
-from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
+
 
 counter = 0
 
-def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
+def get_minibatch(roidb, args, assign, helper):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -36,6 +35,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
 
     # Get the input image blob
     im_blob, im_scales, crop_box = _get_image_blob(roidb, random_scale_inds, args)
+
     blobs = {'data': im_blob}
 
     assert len(im_scales) == 1, "Single batch only"
@@ -57,53 +57,16 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
 
         gt_boxes[:, 0:4] = gt_boxes[:, 0:4] - [crop_box[0][1], crop_box[0][0], crop_box[0][1], crop_box[0][0]]
 
+        # lower coords above 0
+        # bad_coords = np.sum(gt_boxes[:, 0:4][:, [0, 1]] >= 0, 1) + np.sum(gt_boxes[:, 0:4][:, [2, 3]] < cfg.TRAIN.MAX_SIZE, 1) < 4
+
     else:
         gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
 
     gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
-    
-    (batch_size, height, width, channels) = im_blob.shape
-    im_s = RandomImageSampler(height, width)
-    images, bboxes, num_images, small_height, small_width = im_s.sample_image(ignore_symbols)
-   
-    gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
-    # remove nones
-    gt_boxes = [x for x in gt_boxes if x is not None]
- 
-    new_boxes = []
-    new_blob = np.full((batch_size, height + small_height, width, channels), 255)
-    new_blob[:, small_height:, :, :] = im_blob
-    # here we shift bounding boxes of the real image
-    for i in range(len(gt_boxes)):
-        gt_boxes[i][1] += small_height
-        gt_boxes[i][3] += small_height
-    # here we should augment the image on the top of it
-    for i in range(len(images)):
-        im = np.expand_dims(images[i], 0)
-        new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, :] = im * 255
-        # here we shift bounding boxes of the synthetic part of the image
-	if not ignore_symbols:
-            for j in range(len(bboxes[i])):
-                bboxes[i][j][0] += (i * small_width)
-                bboxes[i][j][2] += (i * small_width)
-    	        new_boxes.append(bboxes[i][j]) 
-	else:
-	    bboxes[i][0] += (i * small_width)
-	    bboxes[i][2] += (i * small_width)
-	    new_boxes.append(bboxes[i])
-
-    if not args.pad_to == 0:
-        # pad to fit RefineNet #TODO fix refinenet padding problem
-        y_mulity = int(np.ceil(new_blob.shape[1] / float(args.pad_to)))
-        x_mulity = int(np.ceil(new_blob.shape[2] / float(args.pad_to)))
-        canv = np.ones([args.batch_size, y_mulity * args.pad_to, x_mulity * args.pad_to,3], dtype=np.uint8) * 255
-        canv[:, 0:new_blob.shape[1], 0:new_blob.shape[2], :] = new_blob
-        new_blob = canv
-
-    blobs['data'] = new_blob
 
     for i1 in range(len(assign)):
-        markers_list = get_markers(blobs['data'].shape, gt_boxes, args.nr_classes[0],assign[i1],0, [])
+        markers_list = get_markers(im_blob.shape, gt_boxes, args.nr_classes[0],assign[i1],0, [])
         blobs["assign" + str(i1)] = dict()
         for i2 in range(len(assign[i1]["ds_factors"])):
             blobs["assign" + str(i1)]["gt_map"+str(i2)] = markers_list[i2]
@@ -122,32 +85,31 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
                 blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_map[0],-1)
             else:
                 blobs["assign" + str(i1)]["mask"+str(i2)] = np.ones(blobs["assign" + str(i1)]["gt_map"+str(i2)].shape[:-1]+(1,))[0]
-    print("\n")
-    print("Number of original boxes: " + str(len(gt_boxes)))
+
     # set helper to None
     blobs["helper"] = None
+
+    # gt_boxes = gt_boxes[bad_coords == False]
     # crop boxes
-    # gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
+    gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
     # remove nones
-    # gt_boxes = [x for x in gt_boxes if x is not None]
-    print("Number of augmented boxes: " + str(len(new_boxes)))
-    gt_boxes.extend(new_boxes)
+    gt_boxes = [x for x in gt_boxes if x is not None]
+
     blobs['gt_boxes'] = np.expand_dims(gt_boxes, 0)
-    print("Total number of boxes: " + str(blobs['gt_boxes'].shape[1]))
-    print("\n")
     blobs['im_info'] = np.array(
-        [[new_blob.shape[1], new_blob.shape[2], im_scales[0]]],
+        [[im_blob.shape[1], im_blob.shape[2], im_scales[0]]],
         dtype=np.float32)
 
     # for deepscores average over last data dimension
     if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
         blobs["data"] = np.average(blobs["data"],-1)
         blobs["data"] = np.expand_dims(blobs["data"], -1)
-    if visualize:
-        global counter
-        with open(os.path.join('/DeepWatershedDetection2/visualization/pickle_files', str(counter) + '.pickle'), 'wb') as handle:
-    	    pickle.dump(blobs, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        counter += 1
+
+    global counter
+    with open(os.path.join('/DeepWatershedDetection2/pickle_files', str(counter) + '.pickle'), 'wb') as handle:
+        pickle.dump(blobs, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    counter += 1
+
     return blobs
 
 
@@ -155,7 +117,8 @@ def crop_boxes(img_shape, coord):
     crop_coords = coord[0:4]
     crop_coords = np.maximum(crop_coords, 0)
     crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], img_shape[2])
-    crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], img_shape[1])
+    crop_coords[[3,3]] = np.minimum(crop_coords[[1,3]], img_shape[1])
+
     # if a dimension collapses kill element
     if crop_coords[0] == crop_coords[2] or crop_coords[1]==crop_coords[3]:
         return None
@@ -174,6 +137,7 @@ def _get_image_blob(roidb, scale_inds, args):
     crop_box = []
 
     for i in range(num_images):
+	# print(roidb[i])
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]

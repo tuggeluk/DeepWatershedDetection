@@ -11,7 +11,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import pickle 
 import numpy as np
 import numpy.random as npr
@@ -21,10 +20,10 @@ from utils.blob import prep_im_for_blob, im_list_to_blob
 from datasets.fcn_groundtruth import get_markers,stamp_class
 import sys
 from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
+# import pdb
 
-counter = 0
 
-def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
+def get_minibatch(roidb, args, assign, helper):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -57,6 +56,9 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
 
         gt_boxes[:, 0:4] = gt_boxes[:, 0:4] - [crop_box[0][1], crop_box[0][0], crop_box[0][1], crop_box[0][0]]
 
+        # lower coords above 0
+        # bad_coords = np.sum(gt_boxes[:, 0:4][:, [0, 1]] >= 0, 1) + np.sum(gt_boxes[:, 0:4][:, [2, 3]] < cfg.TRAIN.MAX_SIZE, 1) < 4
+
     else:
         gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
 
@@ -64,33 +66,44 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
     
     (batch_size, height, width, channels) = im_blob.shape
     im_s = RandomImageSampler(height, width)
-    images, bboxes, num_images, small_height, small_width = im_s.sample_image(ignore_symbols)
-   
-    gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
-    # remove nones
-    gt_boxes = [x for x in gt_boxes if x is not None]
- 
-    new_boxes = []
-    new_blob = np.full((batch_size, height + small_height, width, channels), 255)
-    new_blob[:, small_height:, :, :] = im_blob
-    # here we shift bounding boxes of the real image
-    for i in range(len(gt_boxes)):
-        gt_boxes[i][1] += small_height
-        gt_boxes[i][3] += small_height
-    # here we should augment the image on the top of it
-    for i in range(len(images)):
-        im = np.expand_dims(images[i], 0)
-        new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, :] = im * 255
-        # here we shift bounding boxes of the synthetic part of the image
-	if not ignore_symbols:
+    images, bboxes, num_images, where_to_augment, small_height, small_width = im_s.sample_image()
+    
+    if where_to_augment == 'width':
+        new_blob = np.full((batch_size, height, width + small_width, channels), 255)
+	new_blob[:, :, small_width:, :] = im_blob
+        # here we shift bounding boxes of the real image
+        for i in range(len(gt_boxes)):
+            gt_boxes[i][0] += small_width
+            gt_boxes[i][2] += small_width
+        # here we should augment the image on the left part of it
+        for i in range(len(images)):
+            im = np.expand_dims(im, 0)
+            # im = np.repeat(im[:, :, :, np.newaxis], 3, axis=3)
+            new_blob[:, i*small_height:(i+1)*small_height, 0:small_width, :] = im*255
+            # here we shift bounding boxes of the synthetic part of the image
+            for j in range(len(bboxes[i])):
+                bboxes[i][j][1] += (i * small_height * 2)
+                bboxes[i][j][3] += (i * small_height * 2)
+	        np.append(gt_boxes, bboxes[i][j])
+    else:
+	new_boxes = []
+	new_blob = np.full((batch_size, height + small_height, width, channels), 255)
+        new_blob[:, small_height:, :, :] = im_blob
+        # here we shift bounding boxes of the real image
+        for i in range(len(gt_boxes)):
+            gt_boxes[i][1] += small_height
+            gt_boxes[i][3] += small_height
+        # here we should augment the image on the top of it
+        for i in range(len(images)):
+            im = np.expand_dims(images[i], 0)
+            # im = np.repeat(im[:, :, :, np.newaxis], 3, axis=3) # needed only for non resized images
+            new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, :] = im * 255
+            # here we shift bounding boxes of the synthetic part of the image
             for j in range(len(bboxes[i])):
                 bboxes[i][j][0] += (i * small_width)
                 bboxes[i][j][2] += (i * small_width)
-    	        new_boxes.append(bboxes[i][j]) 
-	else:
-	    bboxes[i][0] += (i * small_width)
-	    bboxes[i][2] += (i * small_width)
-	    new_boxes.append(bboxes[i])
+    	    	new_boxes.append(bboxes[i][j])
+
 
     if not args.pad_to == 0:
         # pad to fit RefineNet #TODO fix refinenet padding problem
@@ -122,19 +135,15 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
                 blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_map[0],-1)
             else:
                 blobs["assign" + str(i1)]["mask"+str(i2)] = np.ones(blobs["assign" + str(i1)]["gt_map"+str(i2)].shape[:-1]+(1,))[0]
-    print("\n")
-    print("Number of original boxes: " + str(len(gt_boxes)))
+
     # set helper to None
     blobs["helper"] = None
     # crop boxes
-    # gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
+    gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
     # remove nones
-    # gt_boxes = [x for x in gt_boxes if x is not None]
-    print("Number of augmented boxes: " + str(len(new_boxes)))
+    gt_boxes = [x for x in gt_boxes if x is not None]
     gt_boxes.extend(new_boxes)
     blobs['gt_boxes'] = np.expand_dims(gt_boxes, 0)
-    print("Total number of boxes: " + str(blobs['gt_boxes'].shape[1]))
-    print("\n")
     blobs['im_info'] = np.array(
         [[new_blob.shape[1], new_blob.shape[2], im_scales[0]]],
         dtype=np.float32)
@@ -143,11 +152,6 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=0):
     if "DeepScores" in args.dataset or "MUSICMA" in args.dataset:
         blobs["data"] = np.average(blobs["data"],-1)
         blobs["data"] = np.expand_dims(blobs["data"], -1)
-    if visualize:
-        global counter
-        with open(os.path.join('/DeepWatershedDetection2/visualization/pickle_files', str(counter) + '.pickle'), 'wb') as handle:
-    	    pickle.dump(blobs, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        counter += 1
     return blobs
 
 

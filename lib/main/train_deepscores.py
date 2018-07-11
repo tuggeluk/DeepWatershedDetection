@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.insert(0, '/DeepWatershedDetection/lib')
 sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from main.train_dwd import main
 import argparse
@@ -21,7 +22,7 @@ if __name__ == '__main__':
     parser.add_argument("--pad_with", type=int, default=0,help="use this number to pad images")
 
     parser.add_argument("--prefetch", type=str, default="True", help="use additional process to fetch batches")
-    parser.add_argument("--prefetch_len", type=int, default=7, help="prefetch queue len")
+    parser.add_argument("--prefetch_len", type=int, default=8, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
@@ -48,10 +49,6 @@ if __name__ == '__main__':
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9,9), 'size_percentage': 1, "shape": "oval", "class_resolution": "class", "loss": "softmax"}},
-    # # bbox markers
-    #                         {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
-    #                          'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-    #                          'stamp_args': {'marker_dim': (9,9), 'size_percentage': 1, "shape": "oval", "loss": "reg"}},
 
     # bbox markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
@@ -63,14 +60,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 1, "help": 0, "Itrs": 5},
-                            {"assign": 0, "help": 0, "Itrs": 5},
-                            {"assign": 2, "help": 0, "Itrs": 3000}
+                            {"assign": 0, "help": 0, "Itrs": 3000},
+                            {"assign": 1, "help": 0, "Itrs": 3000},
+                            {"assign": 2, "help": 0, "Itrs": 3000},
+			    {"assign": 0, "help": 0, "Itrs": 2000}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 30000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 3000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parsed = parser.parse_known_args()
 
