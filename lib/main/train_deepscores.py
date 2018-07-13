@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument("--scale_list", type=list, default=[0.5], help="global scaling factor randomly chosen from this list")
     parser.add_argument("--crop", type=str, default="True", help="should images be cropped")
     parser.add_argument("--crop_top_left_bias", type=float, default=0.3, help="fixed probability that the crop will be from the top left corner")
-    parser.add_argument("--max_edge", type=int, default=0, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
+    parser.add_argument("--max_edge", type=int, default=960, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False", help="wether or not to append Horizontally flipped images")
     parser.add_argument("--substract_mean", type=str, default="False", help="wether or not to substract the mean of the VOC images")
     parser.add_argument("--pad_to", type=int, default=160, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")

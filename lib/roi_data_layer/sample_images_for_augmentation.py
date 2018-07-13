@@ -29,7 +29,7 @@ class RandomImageSampler:
         self.absolute_xml_path = os.path.join('/', self.r_path[1], self.pickle_relative_directory, 'xml_data_gt')
         return self.pickle_absolute_directory_path, self.absolute_xml_path
 
-    def sample_image(self, ignore_symbols=1):
+    def sample_image(self, ignore_symbols=1, vertical=0):
 	""" A much more efficient function of sampling small images
 	    inputs: ignore_symbols - if 1 it ignores everything bar the symbol in the center """
         self.pickle_absolute_directory_path, self.absolute_xml_path = self.get_paths()
@@ -42,7 +42,10 @@ class RandomImageSampler:
             num_images = self.check_augment()
             for i in range(num_images):
                 key = random.choice(info.keys())
-		key_num = self.class_to_ind[key]
+                while key == 'timeSig16' or key == 'timeSig12':
+                    key = random.choice(info.keys())
+                key_num = self.class_to_ind[key]
+
                 if key != 'timeSig16' and key != 'timeSig12':
                     im = random.choice(info[key])
                     self.list_of_images.append(im[0])  # images
@@ -53,7 +56,7 @@ class RandomImageSampler:
 			        break
 		    else:
 			self.bounding_boxes.append(im[2])  
-        return self.list_of_images, self.bounding_boxes, num_images, self.small_height, self.small_width
+        return self.list_of_images, self.bounding_boxes, num_images, vertical, self.small_height, self.small_width
 
 
     def sample_n_images(self, ignore_symbols=1, horizontal=12, vertical=1):

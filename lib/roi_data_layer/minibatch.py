@@ -24,7 +24,7 @@ from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
 
 counter = 0
 
-def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0):
+def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=1):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -64,21 +64,19 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0):
     
     (batch_size, height, width, channels) = im_blob.shape
     im_s = RandomImageSampler(height, width)
-    images, bboxes, horizontal, vertical, small_height, small_width = im_s.sample_n_images_proto(ignore_symbols)
+    images, bboxes, horizontal, vertical, small_height, small_width = im_s.sample_image(ignore_symbols)
     gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
     # remove nones
     gt_boxes = [x for x in gt_boxes if x is not None]
  
     new_boxes = []
-    # new_blob = np.full((batch_size, height + small_height, width, channels), 255)
-    new_blob = np.full((batch_size, height + small_height * vertical, width + small_width * horizontal, channels), 255) # comment this line and uncomment the previous one
-    # new_blob[:, small_height:, :, :] = im_blob
+    new_blob = np.full((batch_size, height + small_height, width, channels), 255)
+    # new_blob = np.full((batch_size, height + small_height * vertical, width + small_width * horizontal, channels), 255) # comment this line and uncomment the previous one
+    new_blob[:, small_height:, :, :] = im_blob
     # here we shift bounding boxes of the real image
     for i in range(len(gt_boxes)):
         gt_boxes[i][1] += small_height
         gt_boxes[i][3] += small_height
-	gt_boxes[i][0] += small_width
-	gt_boxes[i][2] += small_width
     # here we should augment the image on the top of it
     for i in range(horizontal):
         for k in range(vertical):
