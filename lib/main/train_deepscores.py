@@ -15,7 +15,13 @@ if __name__ == '__main__':
     parser.add_argument("--scale_list", type=list, default=[0.5], help="global scaling factor randomly chosen from this list")
     parser.add_argument("--crop", type=str, default="True", help="should images be cropped")
     parser.add_argument("--crop_top_left_bias", type=float, default=0.3, help="fixed probability that the crop will be from the top left corner")
-    parser.add_argument("--max_edge", type=int, default=960, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
+    augmentation_type = 'none'
+    if augmentation_type == 'full':
+        parser.add_argument("--augmentation_type", type=str, default=augmentation_type, help="Type of augmentation, none = train on real data; full = train on synthetic data")
+        parser.add_argument("--max_edge", type=int, default=0, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
+    elif augmentation_type == 'up' or augmentation_type == 'none':
+	parser.add_argument("--augmentation_type", type=str, default=augmentation_type, help="Augment synthetic data at the top of the image")
+        parser.add_argument("--max_edge", type=int, default=960, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False", help="wether or not to append Horizontally flipped images")
     parser.add_argument("--substract_mean", type=str, default="False", help="wether or not to substract the mean of the VOC images")
     parser.add_argument("--pad_to", type=int, default=160, help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
@@ -60,15 +66,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 2000},
-                            {"assign": 1, "help": 0, "Itrs": 1000},
-                            {"assign": 2, "help": 0, "Itrs": 1000},
-			    {"assign": 0, "help": 0, "Itrs": 1000}
+                            {"assign": 0, "help": 0, "Itrs": 5000},
+                            {"assign": 1, "help": 0, "Itrs": 3000},
+                            {"assign": 2, "help": 0, "Itrs": 3000},
+			    {"assign": 0, "help": 0, "Itrs": 3000}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 1000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 3000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parsed = parser.parse_known_args()
 

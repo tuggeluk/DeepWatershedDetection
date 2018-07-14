@@ -29,7 +29,7 @@ class RandomImageSampler:
         self.absolute_xml_path = os.path.join('/', self.r_path[1], self.pickle_relative_directory, 'xml_data_gt')
         return self.pickle_absolute_directory_path, self.absolute_xml_path
 
-    def sample_image(self, ignore_symbols=1, vertical=0):
+    def sample_image_up(self, ignore_symbols=1, vertical=0):
 	""" A much more efficient function of sampling small images
 	    inputs: ignore_symbols - if 1 it ignores everything bar the symbol in the center """
         self.pickle_absolute_directory_path, self.absolute_xml_path = self.get_paths()
@@ -45,45 +45,19 @@ class RandomImageSampler:
                 while key == 'timeSig16' or key == 'timeSig12':
                     key = random.choice(info.keys())
                 key_num = self.class_to_ind[key]
-
-                if key != 'timeSig16' and key != 'timeSig12':
-                    im = random.choice(info[key])
-                    self.list_of_images.append(im[0])  # images
-		    if ignore_symbols:
-		        for box in im[2]:
-		            if box[-1] == key_num:
-                    	        self.bounding_boxes.append(box)  # bounding boxes - consider only the symbol in the middle
-			        break
-		    else:
-			self.bounding_boxes.append(im[2])  
-        return self.list_of_images, self.bounding_boxes, num_images, vertical, self.small_height, self.small_width
+                im = random.choice(info[key])
+                self.list_of_images.append(im[0])  # images
+		if ignore_symbols:
+		    for box in im[2]:
+		        if box[-1] == key_num:
+                    	    self.bounding_boxes.append(box)  # bounding boxes - consider only the symbol in the middle
+			    break
+		else:
+	 	    self.bounding_boxes.append(im[2])  
+        return self.list_of_images, self.bounding_boxes, num_images, self.small_height, self.small_width
 
 
-    def sample_n_images(self, ignore_symbols=1, horizontal=12, vertical=1):
-        self.pickle_absolute_directory_path, self.absolute_xml_path = self.get_paths()
-        # get the list of all pickle files
-        pickle_files = os.listdir(self.pickle_absolute_directory_path)
-        # choose one of the pickle files randomly
-        p_file = random.choice(pickle_files)
-        with open(os.path.join(self.pickle_absolute_directory_path, p_file), 'rb') as pickle_file:
-            info = pickle.load(pickle_file)
-            for i in range(horizontal):
-                key = random.choice(info.keys())
-                key_num = self.class_to_ind[key]
-                if key != 'timeSig16' and key != 'timeSig12':
-                    im = random.choice(info[key])
-                    self.list_of_images.append(im[0])  # images
-                    if ignore_symbols:
-                        for box in im[2]:
-                            if box[-1] == key_num:
-                                self.bounding_boxes.append(box)  # bounding boxes - consider only the symbol in the middle
-                                break
-                    else:
-                        self.bounding_boxes.append(im[2])
-        return self.list_of_images, self.bounding_boxes, horizontal, self.small_height, self.small_width
-
-
-    def sample_n_images_proto(self, ignore_symbols=1, horizontal=12, vertical=8):
+    def sample_image_full(self, ignore_symbols=1, horizontal=12, vertical=8):
         self.pickle_absolute_directory_path, self.absolute_xml_path = self.get_paths()
         # get the list of all pickle files
         pickle_files = os.listdir(self.pickle_absolute_directory_path)
@@ -97,16 +71,15 @@ class RandomImageSampler:
 		    while key == 'timeSig16' or key == 'timeSig12':
 		        key = random.choice(info.keys())
                     key_num = self.class_to_ind[key]
-                    if key != 'timeSig16' and key != 'timeSig12':
-                        im = random.choice(info[key])
-                        self.list_of_images.append(im[0])  # images
-                        if ignore_symbols:
-                            for box in im[2]:
-                                if box[-1] == key_num:
-                                    self.bounding_boxes.append(box)  # bounding boxes - consider only the symbol in the middle
-                                    break
-                        else:
-                            self.bounding_boxes.append(im[2])
+                    im = random.choice(info[key])
+                    self.list_of_images.append(im[0])  # images
+                    if ignore_symbols:
+                        for box in im[2]:
+                            if box[-1] == key_num:
+                                self.bounding_boxes.append(box)  # bounding boxes - consider only the symbol in the middle
+                                break
+                    else:
+                        self.bounding_boxes.append(im[2])
         return self.list_of_images, self.bounding_boxes, horizontal, vertical, self.small_height, self.small_width
 
 

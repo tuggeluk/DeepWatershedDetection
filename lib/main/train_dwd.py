@@ -553,7 +553,7 @@ def load_database(args):
         roidb_val = None
 
 
-    data_layer = RoIDataLayer(roidb, imdb.num_classes)
+    data_layer = RoIDataLayer(roidb, imdb.num_classes, augmentation=args.augmentation_type)
 
     if roidb_val is not None:
         data_layer_val = RoIDataLayer(roidb_val, imdb_val.num_classes, random=True)

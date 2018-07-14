@@ -70,21 +70,6 @@ def test_net(net, imdb, parsed):
     with open(det_file, 'wb') as f:
          cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
-
-
-    # print('Read boxes from disk')
-    # det_file = "/home/lukas/detections.pkl"
-    # with open(det_file, 'rb') as f:
-    #     all_boxes = cPickle.load(f)
-
-    # for i1 in range(len(all_boxes)):
-    #     for i2 in range(len(all_boxes[i1])):
-    #         for i3 in range(len(all_boxes[i1][i2])):
-    #             all_boxes[i1][i2][i3][:-1] = all_boxes[i1][i2][i3][:-1] * 2
-    #         all_boxes[i1][i2] = np.asarray(all_boxes[i1][i2])
-    #         #print(all_boxes[i1][i2].shape)
-
-
     print('Evaluating detections')
     imdb.evaluate_detections(all_boxes, output_dir)
     return all_boxes
