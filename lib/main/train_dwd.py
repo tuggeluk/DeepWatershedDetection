@@ -167,6 +167,9 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
     # init optimizer
     with tf.variable_scope("combined_opt"+str(0)):
         var_list = [var for var in tf.trainable_variables()]
+	loss_L2 = tf.add_n([ tf.nn.l2_loss(v) for v in var_list
+                    if 'bias' not in v.name ]) * args.regularization_coefficient
+	loss_tot += loss_L2
         optimizer_type = args.optim
         if args.optim == 'rmsprop':
             optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot, var_list=var_list)
@@ -383,6 +386,9 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
     # init optimizer
     var_list = [var for var in tf.trainable_variables()]
     optimizer_type = args.optim
+    loss_L2 = tf.add_n([ tf.nn.l2_loss(v) for v in var_list
+                    if 'bias' not in v.name ]) * args.regularization_coefficient
+    loss += loss_L2
     if optimizer_type == 'rmsprop':
         optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss, var_list=var_list)
     elif optimizer_type == 'adam':

@@ -37,6 +37,8 @@ if __name__ == '__main__':
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
+    regularization_coefficient = 0
+    parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient, help="Value for regularization parameter")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
@@ -81,7 +83,7 @@ if __name__ == '__main__':
                         default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
-		 'optimizer': optimizer}
+		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}
     parser.add_argument("--dict_info", type=dict, default=dict_info, help="a dictionary containing information about some of the hyperparameters")
 
     parsed = parser.parse_known_args()
