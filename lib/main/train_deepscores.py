@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument("--scale_list", type=list, default=[0.5], help="global scaling factor randomly chosen from this list")
     parser.add_argument("--crop", type=str, default="True", help="should images be cropped")
     parser.add_argument("--crop_top_left_bias", type=float, default=0.3, help="fixed probability that the crop will be from the top left corner")
-    augmentation_type = 'none'
+    augmentation_type = 'up'  # none - no augmentation, up - augmentation on the upper side of the image, full - only augmentation, full synthetic image
     if augmentation_type == 'full':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type, help="Type of augmentation, none = train on real data; full = train on synthetic data")
         parser.add_argument("--max_edge", type=int, default=0, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
@@ -33,12 +33,15 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
-    parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for Adam Optimizer")
+    learning_rate = 1e-4
+    parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
+    optimizer = 'rmsprop' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
+    parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--save_interval", type=int, default=1000, help="after how many iterations are the weights saved")
+    parser.add_argument("--save_interval", type=int, default=500, help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
@@ -64,17 +67,22 @@ if __name__ == '__main__':
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 20000, 20000, 20000, 10000, 30000
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 5000},
-                            {"assign": 1, "help": 0, "Itrs": 3000},
-                            {"assign": 2, "help": 0, "Itrs": 3000},
-			    {"assign": 0, "help": 0, "Itrs": 3000}
+                            {"assign": 0, "help": 0, "Itrs": Itrs0},
+                            {"assign": 1, "help": 0, "Itrs": Itrs1},
+                            {"assign": 2, "help": 0, "Itrs": Itrs2},
+			    {"assign": 0, "help": 0, "Itrs": Itrs0_1}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 3000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+    
+    dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
+		 'optimizer': optimizer}
+    parser.add_argument("--dict_info", type=dict, default=dict_info, help="a dictionary containing information about some of the hyperparameters")
 
     parsed = parser.parse_known_args()
 

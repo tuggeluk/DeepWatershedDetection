@@ -24,7 +24,7 @@ from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
 
 counter = 0
 
-def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=1, augmentation_type='full'):
+def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, augmentation_type='none'):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -91,6 +91,9 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=1, au
 	    if augmentation_type == 'up':
                 im = np.expand_dims(images[i], 0)
                 new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, :] = im * 255
+                # new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, 0] = im * 255
+                # new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, 1] = im * 255
+                # new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, 2] = im * 255  # workaround, delete this and the two rows above, uncomment the row before them
                 # here we shift bounding boxes of the synthetic part of the image
 	        if not ignore_symbols:
                     for j in range(len(bboxes[i])):

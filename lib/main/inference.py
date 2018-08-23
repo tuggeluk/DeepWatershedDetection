@@ -59,8 +59,6 @@ def test_net(net, imdb, parsed):
             class_of_symbol = boxes[j][4]
             all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
 
-
-
     # convert to np array
     for i1 in range(len(all_boxes)):
         for i2 in range(len(all_boxes[i1])):
@@ -81,8 +79,5 @@ if __name__ == '__main__':
     parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
-
-
     parsed = parser.parse_known_args()
-
     main(parsed)

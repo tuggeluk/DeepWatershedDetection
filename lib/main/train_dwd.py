@@ -1,4 +1,3 @@
-
 import os
 import tensorflow as tf
 import numpy as np
@@ -14,12 +13,15 @@ from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
 from utils.prefetch_wrapper import PrefetchWrapper
+from tensorflow.python.ops import array_ops
+import pickle 
 
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox,\
     try_all_assign,get_gt_visuals,get_map_visuals
 
 nr_classes = None
+store_dict = True
 # - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
 
 def main(parsed):
@@ -79,8 +81,6 @@ def main(parsed):
     for assign in args.training_assignements:
         [loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders, mask_placholders] = initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         preped_assign.append([loss, optim, gt_placeholders, scalar_summary_op,images_summary_op, images_placeholders, mask_placholders])
-
-
 
     # init tensorflow session
     saver = tf.train.Saver(max_to_keep=1000)
@@ -167,7 +167,13 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
     # init optimizer
     with tf.variable_scope("combined_opt"+str(0)):
         var_list = [var for var in tf.trainable_variables()]
-        optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot, var_list=var_list)
+        optimizer_type = args.optim
+        if args.optim == 'rmsprop':
+            optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot, var_list=var_list)
+        elif args.optim == 'adam':
+	    optim = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss_tot, var_list=var_list)
+        else:
+            optim = tf.train.MomentumOptimizer(learning_rate=args.learning_rate, momentum=0.9).minimize(loss_tot, va_list=var_list)
     opt_inizializers = [var.initializer for var in tf.global_variables() if "combined_opt"+str(0) in var.name]
     sess.run(opt_inizializers)
     # compute step
@@ -238,7 +244,6 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
                 os.makedirs(checkpoint_dir)
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
 
-
     iteration = (iteration + do_comb_itr)
     if args.prefetch == "True":
         data_layer.kill()
@@ -266,6 +271,37 @@ def post_assign_to_tensorboard(assign,assign_nr,scalar_summary_op,network_heads,
     summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
     writer.add_summary(summary[0], float(itr))
     return None
+
+
+def focal_loss(prediction_tensor, target_tensor, weights=None, alpha=0.25, gamma=2):
+    r"""Compute focal loss for predictions.
+        Multi-labels Focal loss formula:
+            FL = -alpha * (z-p)^gamma * log(p) -(1-alpha) * p^gamma * log(1-p)
+                 ,which alpha = 0.25, gamma = 2, p = sigmoid(x), z = target_tensor.
+    Args:
+     prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+        num_classes] representing the predicted logits for each class
+     target_tensor: A float tensor of shape [batch_size, num_anchors,
+        num_classes] representing one-hot encoded classification targets
+     weights: A float tensor of shape [batch_size, num_anchors]
+     alpha: A scalar tensor for focal loss alpha hyper-parameter
+     gamma: A scalar tensor for focal loss gamma hyper-parameter
+    Returns:
+        loss: A (scalar) tensor representing the value of the loss function
+    """
+    sigmoid_p = tf.nn.sigmoid(prediction_tensor)
+    zeros = array_ops.zeros_like(sigmoid_p, dtype=sigmoid_p.dtype)
+    
+    # For poitive prediction, only need consider front part loss, back part is 0;
+    # target_tensor > zeros <=> z=1, so poitive coefficient = z - p.
+    pos_p_sub = array_ops.where(target_tensor > zeros, target_tensor - sigmoid_p, zeros)
+    
+    # For negative prediction, only need consider back part loss, front part is 0;
+    # target_tensor > zeros <=> z=1, so negative coefficient = 0.
+    neg_p_sub = array_ops.where(target_tensor > zeros, zeros, sigmoid_p)
+    per_entry_cross_ent = - alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(sigmoid_p, 1e-8, 1.0)) \
+                          - (1 - alpha) * (neg_p_sub ** gamma) * tf.log(tf.clip_by_value(1.0 - sigmoid_p, 1e-8, 1.0))
+    return tf.reduce_sum(per_entry_cross_ent)
 
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
@@ -313,6 +349,9 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         if assign["stamp_args"]["loss"] == "softmax":
             loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
                                                             labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
+	    # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+            #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
+
             debug_fetch["loss_components_softmax"] = loss_components
         else:
             loss_components = [tf.losses.mean_squared_error(
@@ -343,8 +382,13 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
 
     # init optimizer
     var_list = [var for var in tf.trainable_variables()]
-    optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss, var_list=var_list)
-
+    optimizer_type = args.optim
+    if optimizer_type == 'rmsprop':
+        optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss, var_list=var_list)
+    elif optimizer_type == 'adam':
+        optim = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss, var_list=var_list)
+    else:
+        optim = tf.train.MomentumOptimizer(learning_rate=args.learning_rate, momentum=0.9).minimize(loss, var_list=var_list)
 
     # init summary operations
     # define summary ops
@@ -368,11 +412,9 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         images_placeholders.append(sub_prediction_placeholder)
         images_sums.append(tf.summary.image('sub_prediction_' + str(i)+"_"+get_config_id(assign), sub_prediction_placeholder))
 
-
     helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
     images_placeholders.append(helper_img)
     images_sums.append(tf.summary.image('helper' + str(i)+get_config_id(assign), helper_img))
-
 
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_placeholders.append(final_pred_placeholder)
@@ -389,8 +431,6 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
     if args.prefetch == "True":
         data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, [assign], training_help)
 
-
-
     print("training on:" + str(assign))
     print("for " + str(do_itr)+ " iterations")
     for itr in range(iteration, (iteration + do_itr)):
@@ -402,7 +442,6 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
                 print("skipping queue element")
             else:
                 batch_not_loaded = False
-
 
         if blob["helper"] is not None:
             input_data = np.concatenate([blob["data"],blob["helper"]],-1)
@@ -450,6 +489,14 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
             if not os.path.exists(checkpoint_dir):
                 os.makedirs(checkpoint_dir)
             saver.save(sess, checkpoint_dir + "/" + checkpoint_name)
+	    global store_dict
+            if store_dict:
+                print("Saving dictionary")
+                dictionary = args.dict_info
+                with open(os.path.join(checkpoint_dir, 'dict' + '.pickle'), 'wb') as handle:
+                    pickle.dump(dictionary, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                store_dict = False # we need to save the dict only once
+
 
     iteration = (iteration + do_itr)
     if args.prefetch == "True":
@@ -502,7 +549,7 @@ def get_checkpoint_dir(args):
         os.makedirs(tbdir)
     runs_dir = os.listdir(tbdir)
     if args.continue_training == "True":
-        tbdir = tbdir + "/" + "run_" + str(len(runs_dir)-1)
+        tbdir = tbdir + "/" + "run_11" #+ str(len(runs_dir)-1)
     else:
         tbdir = tbdir+"/"+"run_"+str(len(runs_dir))
         os.makedirs(tbdir)
@@ -551,7 +598,6 @@ def load_database(args):
     else:
         imdb_val = None
         roidb_val = None
-
 
     data_layer = RoIDataLayer(roidb, imdb.num_classes, augmentation=args.augmentation_type)
 

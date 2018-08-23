@@ -9,7 +9,7 @@ import sys
 class RandomImageSampler:
     def __init__(self, height, width):
         self.root_path = os.path.dirname(os.path.abspath(__file__))
-        self.pickle_relative_directory = 'augmentation_combined'
+        self.pickle_relative_directory = 'new_augmentation_combined'
         self.pickle_absolute_directory_path, self.absolute_xml_path = None, None
         self.list_of_images, self.list_of_files = [], []
         self.bounding_boxes = []
