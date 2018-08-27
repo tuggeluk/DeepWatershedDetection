@@ -292,19 +292,20 @@ def focal_loss(prediction_tensor, target_tensor, weights=None, alpha=0.25, gamma
     Returns:
         loss: A (scalar) tensor representing the value of the loss function
     """
-    sigmoid_p = tf.nn.softmax(prediction_tensor)
-    zeros = array_ops.zeros_like(sigmoid_p, dtype=sigmoid_p.dtype)
+    softmax_p = tf.nn.softmax(prediction_tensor)
+    zeros = array_ops.zeros_like(softmax_p, dtype=softmax_p.dtype)
     
     # For poitive prediction, only need consider front part loss, back part is 0;
     # target_tensor > zeros <=> z=1, so poitive coefficient = z - p.
-    pos_p_sub = array_ops.where(target_tensor > zeros, target_tensor - sigmoid_p, zeros)
+    pos_p_sub = array_ops.where(target_tensor > zeros, target_tensor - softmax_p, zeros)
     # For negative prediction, only need consider back part loss, front part is 0;
     # target_tensor > zeros <=> z=1, so negative coefficient = 0.
-    neg_p_sub = array_ops.where(target_tensor > zeros, zeros, sigmoid_p)
-    per_entry_cross_ent = - alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(sigmoid_p, 1e-8, 1.0)) \
-                          - (1 - alpha) * (neg_p_sub ** gamma) * tf.log(tf.clip_by_value(1.0 - sigmoid_p, 1e-8, 1.0))
-    print(tf.reduce_mean(per_entry_cross_ent))
-    return tf.reduce_mean(per_entry_cross_ent)
+    neg_p_sub = array_ops.where(target_tensor > zeros, zeros, softmax_p)
+    per_entry_cross_ent = - alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(softmax_p, 1e-8, 1.0)) \
+                          - (1 - alpha) * (neg_p_sub ** gamma) * tf.log(tf.clip_by_value(1.0 - softmax_p, 1e-8, 1.0))
+    # print(tf.reduce_mean(per_entry_cross_ent))
+    return per_entry_cross_ent
+    # return tf.reduce_mean(per_entry_cross_ent)
 
 
 def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args):
@@ -350,10 +351,10 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
         nr_ds_factors = len(assign["ds_factors"])
         if assign["stamp_args"]["loss"] == "softmax":
-            loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-                                                            labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
-	    # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-            #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
+            # loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+            #                                                labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
+	    loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+                                                            target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
             debug_fetch["loss_components_softmax"] = loss_components
         else:
