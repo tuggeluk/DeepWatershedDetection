@@ -2,12 +2,13 @@ import os
 import sys
 sys.path.insert(0, '/DeepWatershedDetection/lib')
 sys.path.insert(0,os.path.dirname(__file__)[:-4])
-from main.train_dwd import main
+# from main.train_dwd import main
+import main.train_dwd as dwd
 import argparse
+import numpy.random as ran
 
 
-
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
 
     # default arguments for deep-scores
@@ -33,17 +34,17 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
-    learning_rate = 1e-4
+    learning_rate = ran.uniform(1e-3, 1e-6)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
-    optimizer = 'rmsprop' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
+    optimizer = 'adam' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 0
+    regularization_coefficient = ran.uniform(1e-3, 1e-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient, help="Value for regularization parameter")
     parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
-    parser.add_argument("--save_interval", type=int, default=500, help="after how many iterations are the weights saved")
+    parser.add_argument("--save_interval", type=int, default=5, help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[],help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101", help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
@@ -69,7 +70,7 @@ if __name__ == '__main__':
                         ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 20000, 20000, 20000, 10000, 30000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = ran.randint(5, 20), ran.randint(5, 20), ran.randint(5, 20), ran.randint(5, 10), ran.randint(5, 30)
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
@@ -88,4 +89,8 @@ if __name__ == '__main__':
 
     parsed = parser.parse_known_args()
 
-    main(parsed)
+    dwd.main(parsed)
+
+
+if __name__ == '__main__':
+    main()

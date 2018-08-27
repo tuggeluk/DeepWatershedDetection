@@ -13,8 +13,8 @@ tf.set_random_seed(314)
 
 
 class DWSDetector:
-    def __init__(self, imdb):
-        self.model_path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
+    def __init__(self, imdb, path):
+        self.model_path = path
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
 	# self.saved_net = "RefineNet-Res101"

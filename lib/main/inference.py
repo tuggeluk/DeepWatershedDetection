@@ -16,12 +16,13 @@ import argparse
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    net = DWSDetector(imdb)
-    all_boxes = test_net(net, imdb, parsed)
+    path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
+    net = DWSDetector(imdb, path)
+    all_boxes = test_net(net, imdb, parsed, path)
     #all_boxes = test_net(None, imdb, parsed)
 
 
-def test_net(net, imdb, parsed):
+def test_net(net, imdb, parsed, path):
     output_dir = cfg.OUT_DIR
     num_images = len(imdb.image_index)
     # all detections are collected into:
@@ -69,7 +70,7 @@ def test_net(net, imdb, parsed):
          cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir, path)
     return all_boxes
 
 

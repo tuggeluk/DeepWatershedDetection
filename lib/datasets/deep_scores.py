@@ -224,7 +224,7 @@ class deep_scores(imdb):
                            dets[k, 0] + 1, dets[k, 1] + 1,
                            dets[k, 2] + 1, dets[k, 3] + 1))
 
-  def _do_python_eval(self, output_dir='output'):
+  def _do_python_eval(self, output_dir='output', path=None):
     annopath = os.path.join(
       self._devkit_path,
       'segmentation_detection',
@@ -255,8 +255,25 @@ class deep_scores(imdb):
     print(('Mean AP = {:.4f}'.format(np.mean(aps))))
     print('~~~~~~~~')
     print('Results:')
-    for ap in aps:
-      print(('{:.3f}'.format(ap)))
+    # open the file where we want to save the results
+    if path is not None:
+      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res.txt'),"w+")
+      len_ap = len(aps)
+      sum_aps = 0
+      present = 0
+      for i in range(len_ap):
+        print(('{:.3f}'.format(aps[i])))
+        if i not in [26, 32,  35, 36, 39, 45, 48, 67, 68, 74, 89, 99, 102, 118]:
+          if aps[i] == float('NaN'):
+            res_file.write(0 + "\n")
+          else:
+            res_file.write(('{:.3f}'.format(aps[i])) + "\n")
+            sum_aps += aps[i]
+          present += 1
+      res_file.write('\n\n\n')
+      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+      res_file.close()
+
     print(('{:.3f}'.format(np.mean(aps))))
     print('~~~~~~~~')
     print('')
@@ -282,9 +299,9 @@ class deep_scores(imdb):
     print(('Running:\n{}'.format(cmd)))
     status = subprocess.call(cmd, shell=True)
 
-  def evaluate_detections(self, all_boxes, output_dir):
+  def evaluate_detections(self, all_boxes, output_dir, path=None):
     self._write_voc_results_file(all_boxes)
-    self._do_python_eval(output_dir)
+    self._do_python_eval(output_dir, path)
     if self.config['matlab_eval']:
       self._do_matlab_eval(output_dir)
     if self.config['cleanup']:
