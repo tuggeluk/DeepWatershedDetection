@@ -40,4 +40,21 @@ from the help. Some of the most important ones are explained here:
 
 
 #### Model Evaluation
-...
+In order to evaluate a model run:
+
+cd DeepWatershedDetection/lib/main
+python inference.py
+
+On the main method, give the path of the model we are using to evaluate
+
+
+#### Recent changes
+- a large part of the code is cleaned, made more human readable and partially optimized.
+- implements data augmentation (see WORMS paper from Elezi, Tugginer, Pelillo and Stadelmann).
+- implements l2-regularization.
+- implements random search for hyperparameter optimization.
+- in addition to rmsprop, the nets now can be trained using adam and sgd with momentum.
+- implements focal loss.
+- you do not need to track the information on hyperparameters and results, all the needed information is stored on the same folder where is the net.
+- run.sh allows sequential running.
+- a lot of visualization code, for both debugging and testing purposes
