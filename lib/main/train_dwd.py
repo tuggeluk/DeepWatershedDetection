@@ -351,10 +351,10 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
         nr_ds_factors = len(assign["ds_factors"])
         if assign["stamp_args"]["loss"] == "softmax":
-            # loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-            #                                                labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
-	    loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-                                                            target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
+            loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+                                                            labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
+	    # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+            #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
             debug_fetch["loss_components_softmax"] = loss_components
         else:

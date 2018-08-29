@@ -23,6 +23,7 @@ import uuid
 from datasets.voc_eval import voc_eval
 from main.config import cfg
 import random
+import math
 
 
 
@@ -264,7 +265,7 @@ class deep_scores(imdb):
       for i in range(len_ap):
         print(('{:.3f}'.format(aps[i])))
         if i not in [26, 32,  35, 36, 39, 45, 48, 67, 68, 74, 89, 99, 102, 118]:
-          if aps[i] == float('NaN'):
+          if math.isnan(aps[i]):
             res_file.write(0 + "\n")
           else:
             res_file.write(('{:.3f}'.format(aps[i])) + "\n")
