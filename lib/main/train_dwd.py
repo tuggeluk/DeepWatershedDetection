@@ -28,9 +28,7 @@ def main(parsed):
     args = parsed[0]
     print(args)
     iteration = 1
-
     np.random.seed(cfg.RNG_SEED)
-
     # load database
     imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val = load_database(args)
 
@@ -45,7 +43,6 @@ def main(parsed):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
-
     # input and output tensors
     if "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
@@ -73,8 +70,6 @@ def main(parsed):
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
         input, model=args.model,num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
-
-
 
     # initialize tasks
     preped_assign = []
@@ -131,10 +126,8 @@ def main(parsed):
         iteration = execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                                    do_itr,args.training_assignements[assign_nr],preped_assign[assign_nr],iteration,training_help)
 
-
     # execute combined tasks
     for do_comb_a in args.combined_assignements:
-        #iteration = execute_combined_assign(do_comb_a)
         do_comb_itr = do_comb_a["Itrs"]
         rm_length = do_comb_a["Running_Mean_Length"]
         loss_factors = do_comb_a["loss_factors"]
@@ -149,7 +142,6 @@ def main(parsed):
 
 def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_assigns,loss_factors,do_comb_itr,iteration,input_ph,rm_length,
                             network_heads,sess,checkpoint_dir,checkpoint_name,saver,writer):
-
     # init data layer
     if args.prefetch == "True":
         data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, orig_assign, training_help)
@@ -206,7 +198,6 @@ def execute_combined_assign(args,data_layer,training_help,orig_assign,preped_ass
                 # pad input with zeros
                 input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
                 feed_dict = {input_ph: input_data}
-
 
         for i1 in range(len(preped_assigns)):
             gt_placeholders = preped_assigns[i1][2]
@@ -408,8 +399,6 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
 
     scalar_summary_op = tf.summary.merge(scalar_sums)
 
-
-
     images_sums = []
     images_placeholders = []
 
@@ -503,7 +492,6 @@ def execute_assign(args,input,saver, sess, checkpoint_dir, checkpoint_name, data
                 with open(os.path.join(checkpoint_dir, 'dict' + '.pickle'), 'wb') as handle:
                     pickle.dump(dictionary, handle, protocol=pickle.HIGHEST_PROTOCOL)
                 store_dict = False # we need to save the dict only once
-
 
     iteration = (iteration + do_itr)
     if args.prefetch == "True":

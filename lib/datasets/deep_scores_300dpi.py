@@ -26,9 +26,9 @@ import random
 import math
 
 
-class deep_scores(imdb):
+class deep_scores_300dpi(imdb):
   def __init__(self, image_set, year, devkit_path=None):
-    imdb.__init__(self, 'DeepScores' + year + '_' + image_set)
+    imdb.__init__(self, 'DeepScores_300dpi_' + year + '_' + image_set)
     self._year = year
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
@@ -322,6 +322,6 @@ class deep_scores(imdb):
 
 if __name__ == '__main__':
 
-  d = deep_scores('trainval', '2017')
+  d = deep_scores_300dpi('trainval', '2017')
   res = d.roidb
 

@@ -77,7 +77,7 @@ def test_net(net, imdb, parsed, path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_test", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()

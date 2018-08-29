@@ -46,7 +46,11 @@ def main():
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
     regularization_coefficient = rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient, help="Value for regularization parameter")
-    parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
+    dataset = "DeepScores_300dpi_2017_train"
+    if dataset == "DeepScores_2017_train":
+        parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
+    elif dataset == "DeepScores_300dpi_2017_train":
+        parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train", help="DeepScores, voc or coco")
     parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
