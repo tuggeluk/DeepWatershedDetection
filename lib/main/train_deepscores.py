@@ -22,12 +22,12 @@ def main():
     parser.add_argument("--scale_list", type=list, default=[0.5], help="global scaling factor randomly chosen from this list")
     parser.add_argument("--crop", type=str, default="True", help="should images be cropped")
     parser.add_argument("--crop_top_left_bias", type=float, default=0.3, help="fixed probability that the crop will be from the top left corner")
-    augmentation_type = 'up'  # none - no augmentation, up - augmentation on the upper side of the image, full - only augmentation, full synthetic image
+    augmentation_type = 'none'  # none - no augmentation, up - augmentation on the upper side of the image, full - only augmentation, full synthetic image
     if augmentation_type == 'full':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type, help="Type of augmentation, none = train on real data; full = train on synthetic data")
         parser.add_argument("--max_edge", type=int, default=0, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     elif augmentation_type == 'up' or augmentation_type == 'none':
-	parser.add_argument("--augmentation_type", type=str, default=augmentation_type, help="Augment synthetic data at the top of the image")
+        parser.add_argument("--augmentation_type", type=str, default=augmentation_type, help="Augment synthetic data at the top of the image")
         parser.add_argument("--max_edge", type=int, default=960, help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False", help="wether or not to append Horizontally flipped images")
     parser.add_argument("--substract_mean", type=str, default="False", help="wether or not to substract the mean of the VOC images")
@@ -39,19 +39,20 @@ def main():
 
     parser.add_argument("--batch_size", type=int, default=1, help="batch size for training") # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
-    parser.add_argument("--pretrain_lvl", type=str, default="semseg", help="What kind of pretraining to use: no,class,semseg")
-    learning_rate = rnd(3, 4) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
+    parser.add_argument("--pretrain_lvl", type=str, default="DeepScores_to_300dpi", help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
+    learning_rate = 1e-4 # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
-    optimizer = 'adam' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
+    optimizer = 'rmsprop' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 0 # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient, help="Value for regularization parameter")
     dataset = "DeepScores_300dpi_2017_train"
     if dataset == "DeepScores_2017_train":
-        parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
+    	parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
+	parser.add_argument("--dataset_validation", type=str, default="DeepScores_300dpi_2017_debug", help="DeepScores, voc, coco or no - validation set")
     elif dataset == "DeepScores_300dpi_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train", help="DeepScores, voc or coco")
-    parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+    	parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10, help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=50, help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=500, help="after how many iterations are the weights saved")
@@ -83,15 +84,15 @@ def main():
     Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = ran.randint(5000, 20000), ran.randint(5000, 20000), ran.randint(5000, 20000), ran.randint(5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": Itrs0},
-                            {"assign": 1, "help": 0, "Itrs": Itrs1},
-                            {"assign": 2, "help": 0, "Itrs": Itrs2},
-			    {"assign": 0, "help": 0, "Itrs": Itrs0_1}
+                            {"assign": 0, "help": 0, "Itrs": 1000},
+                            {"assign": 1, "help": 0, "Itrs": 1000},
+                            {"assign": 2, "help": 0, "Itrs": 1000},
+			    {"assign": 0, "help": 0, "Itrs": 1000}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 1000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
 		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}

@@ -44,7 +44,11 @@ def main(parsed):
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
     # input and output tensors
-    if "DeepScores" in args.dataset:
+    if "DeepScores_300dpi" in args.dataset:
+	input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
+        refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
+    elif "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
@@ -96,7 +100,15 @@ def main(parsed):
         loading_checkpoint_name = cfg.PRETRAINED_DIR+"/DeepScores_to_Muscima/" + "backbone"
         init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
         init_fn(sess)
-
+    elif args.pretrain_lvl == "DeepScores_to_300dpi":
+        pretrained_vars = []
+        for var in slim.get_model_variables():
+            if not ("class_pred" in var.name):
+                pretrained_vars.append(var)
+        print("Loading network pretrained on Deepscores for Muscima")
+        loading_checkpoint_name = cfg.PRETRAINED_DIR+"/DeepScores_to_300dpi/" + "backbone"
+        init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
+        init_fn(sess)
     else:
         if args.pretrain_lvl == "semseg":
             #load all variables except the ones in scope "deep_watershed"
@@ -342,10 +354,10 @@ def initialize_assignement(assign,imdb,network_heads,sess,data_layer,input,args)
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
         nr_ds_factors = len(assign["ds_factors"])
         if assign["stamp_args"]["loss"] == "softmax":
-            # loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-            #                                                labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
-	    loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-                                                            target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
+            loss_components = [tf.nn.softmax_cross_entropy_with_logits(logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+                                                            labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
+	    # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+            #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
             debug_fetch["loss_components_softmax"] = loss_components
         else:
@@ -533,6 +545,8 @@ def get_config_id(assign):
 
 def get_checkpoint_dir(args):
     # assemble path
+    if "300dpi" in args.dataset:
+	image_mode = "300dpi"
     if "DeepScores" in args.dataset:
         image_mode = "music"
     elif "MUSICMA" in args.dataset:
@@ -544,7 +558,7 @@ def get_checkpoint_dir(args):
         os.makedirs(tbdir)
     runs_dir = os.listdir(tbdir)
     if args.continue_training == "True":
-        tbdir = tbdir + "/" + "run_11" #+ str(len(runs_dir)-1)
+        tbdir = tbdir + "/" + str(len(runs_dir)-1)
     else:
         tbdir = tbdir+"/"+"run_"+str(len(runs_dir))
         os.makedirs(tbdir)

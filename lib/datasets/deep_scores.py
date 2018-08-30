@@ -265,7 +265,7 @@ class deep_scores(imdb):
         print(('{:.3f}'.format(aps[i])))
         if i not in [26, 32,  35, 36, 39, 45, 48, 67, 68, 74, 89, 99, 102, 118]:
           if math.isnan(aps[i]):
-            res_file.write(0 + "\n")
+            res_file.write(str(0) + "\n")
           else:
             res_file.write(('{:.3f}'.format(aps[i])) + "\n")
             sum_aps += aps[i]

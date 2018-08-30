@@ -30,9 +30,7 @@ def test_net(net, imdb, parsed, path):
     # (x1, y1, x2, y2, class)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
-
     #output_dir = get_output_dir(imdb, output_dir)
-
     # timers
     det_file = os.path.join(output_dir, 'detections.pkl')
 
@@ -77,7 +75,7 @@ def test_net(net, imdb, parsed, path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_test", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_train", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
