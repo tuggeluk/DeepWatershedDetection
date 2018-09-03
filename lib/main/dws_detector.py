@@ -5,16 +5,19 @@ from models.dwd_net import build_dwd_net
 from dws_transform import perform_dws
 from PIL import Image
 from config import cfg
+import sys
+import cv2
 
 np.random.seed(314)
 tf.set_random_seed(314)
 
 
 class DWSDetector:
-    def __init__(self, imdb):
-        self.model_path = "trained_models/music/RefineNet-Res101/semseg"
+    def __init__(self, imdb, path):
+        self.model_path = path
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
+	# self.saved_net = "RefineNet-Res101"
 
         # has to be adjusted according to the training scheme used
         self.energy_loss = "softmax"
@@ -33,6 +36,7 @@ class DWSDetector:
         print("Loading weights")
         self.saver.restore(self.sess, self.root_dir + "/" + self.model_path + "/" + self.saved_net)
         self.tf_session = self.sess
+	self.counter = 0	
 
     def classify_img(self, img, cutoff=0, min_ccoponent_size=0):
         if len(img.shape) < 4:
@@ -58,7 +62,8 @@ class DWSDetector:
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox,cutoff, min_ccoponent_size)
-        #save_images(img, dws_list, True, False)
+        save_images(img, dws_list, True, False, self.counter)
+	self.counter += 1
 
         return dws_list
 
@@ -76,6 +81,7 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
         draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
+	    # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
 
     if text:
@@ -94,9 +100,9 @@ def show_images(data, gt_boxes=None, gt=False, text=False):
 
     return
 
-def save_images(data, gt_boxes=None, gt=False, text=False):
+def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
     im_input, im_gt = get_images(data, gt_boxes, gt, text)
-    im_input.save(cfg.ROOT_DIR+"/input.png")
-    im_gt.save(cfg.ROOT_DIR+"/gt.png")
+    # im_input.save(cfg.ROOT_DIR + "/output_images/images_output/" + str(counter) + '.png')
+    im_gt.save(cfg.ROOT_DIR + "/output_images/images_output/" + str(counter) + '.png')
 
     return

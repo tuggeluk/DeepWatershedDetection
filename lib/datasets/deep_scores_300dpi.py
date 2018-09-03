@@ -24,11 +24,12 @@ from datasets.voc_eval import voc_eval
 from main.config import cfg
 import random
 import math
+import sys
 
 
-class deep_scores(imdb):
+class deep_scores_300dpi(imdb):
   def __init__(self, image_set, year, devkit_path=None):
-    imdb.__init__(self, 'DeepScores' + year + '_' + image_set)
+    imdb.__init__(self, 'DeepScores_300dpi' + year + '_' + image_set)
     self._year = year
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
@@ -105,7 +106,7 @@ class deep_scores(imdb):
     """
     Return the default path where PASCAL VOC is expected to be installed.
     """
-    return os.path.join(cfg.DATA_DIR, 'DeepScores_' + self._year)
+    return os.path.join(cfg.DATA_DIR, 'DeepScores_300dpi_' + self._year)
 
   def gt_roidb(self):
     """
@@ -257,7 +258,7 @@ class deep_scores(imdb):
     print('Results:')
     # open the file where we want to save the results
     if path is not None:
-      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res.txt'),"w+")
+      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res_train.txt'),"w+")
       len_ap = len(aps)
       sum_aps = 0
       present = 0
@@ -322,6 +323,6 @@ class deep_scores(imdb):
 
 if __name__ == '__main__':
 
-  d = deep_scores('trainval', '2017')
+  d = deep_scores_300dpi('trainval', '2017')
   res = d.roidb
 

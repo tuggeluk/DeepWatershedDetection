@@ -2,7 +2,7 @@
 # Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
-# Written by Ross Girshick and Xinlei Chen
+# Written by Ross Girshick and Xinlei Chen - extended by Ismail Elezi
 # --------------------------------------------------------
 
 """The data layer used during training to train a Fast R-CNN network.
@@ -21,13 +21,14 @@ import time
 class RoIDataLayer(object):
   """Fast R-CNN data layer used for training."""
 
-  def __init__(self, roidb, num_classes, random=False):
+  def __init__(self, roidb, num_classes, random=False, augmentation='none'):
     """Set the roidb to be used by this layer during training."""
     self._roidb = roidb
     self._num_classes = num_classes
     # Also set a random flag
     self._random = random
     self._shuffle_roidb_inds()
+    self.augmentation = augmentation
 
   def _shuffle_roidb_inds(self):
     """Randomly permute the training roidb."""
@@ -39,22 +40,6 @@ class RoIDataLayer(object):
       millis = int(round(time.time() * 1000)) % 4294967295
       np.random.seed(millis)
 
-    # use batches if size 1 anyways
-    # if cfg.TRAIN.ASPECT_GROUPING:
-    #   widths = np.array([r['width'] for r in self._roidb])
-    #   heights = np.array([r['height'] for r in self._roidb])
-    #   horz = (widths >= heights)
-    #   vert = np.logical_not(horz)
-    #   horz_inds = np.where(horz)[0]
-    #   vert_inds = np.where(vert)[0]
-    #   inds = np.hstack((
-    #       np.random.permutation(horz_inds),
-    #       np.random.permutation(vert_inds)))
-    #   inds = np.reshape(inds, (-1, 2))
-    #   row_perm = np.random.permutation(np.arange(inds.shape[0]))
-    #   inds = np.reshape(inds[row_perm, :], (-1,))
-    #   self._perm = inds
-    # else:
     self._perm = np.random.permutation(np.arange(len(self._roidb)))
     # Restore the random state
     if self._random:
@@ -87,7 +72,7 @@ class RoIDataLayer(object):
     if lock is not None:
       lock.release()
     minibatch_db = [self._roidb[i] for i in db_inds]
-    return get_minibatch(minibatch_db, args, assign, helper)
+    return get_minibatch(minibatch_db, args, assign, helper, augmentation_type=self.augmentation)
       
   def forward(self, args, assign, helper=None,lock=None):
     """Get blobs and copy them into this layer's top blob vector."""

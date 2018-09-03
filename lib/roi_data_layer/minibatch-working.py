@@ -24,7 +24,7 @@ from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
 
 counter = 0
 
-def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, augmentation_type='none'):
+def get_minibatch(roidb, args, assign, helper, ignore_symbols=1, visualize=1):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -63,67 +63,34 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
     gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
     
     (batch_size, height, width, channels) = im_blob.shape
-    
-    # get the RandomImageSampler object to do augmentation
-    if augmentation_type == 'up':
-	im_s = RandomImageSampler(height, width)
-        images, bboxes, horizontal, small_height, small_width = im_s.sample_image_up(ignore_symbols)
-	new_blob = np.full((batch_size, height + small_height, width, channels), 255)
-        new_blob[:, small_height:, :, :] = im_blob
-    elif augmentation_type == 'full':
-	im_s = RandomImageSampler(height, width)
-        images, bboxes, horizontal, vertical, small_height, small_width = im_s.sample_image_full(ignore_symbols)
-	new_blob = np.full((batch_size, height + small_height * vertical, width + small_width * horizontal, channels), 255)
-
-    # remove nones, boxes which are outside of the images
+    im_s = RandomImageSampler(height, width)
+    images, bboxes, num_images, small_height, small_width = im_s.sample_n_images(ignore_symbols)
     gt_boxes = [crop_boxes(blobs["data"].shape,box) for box in gt_boxes]
+    # remove nones
     gt_boxes = [x for x in gt_boxes if x is not None]
  
-    new_boxes = [] # initialize a list of new_boxes where we put all the boxes of augmented images
-
-    if augmentation_type != 'none':
-        # here we shift bounding boxes of the real image
-        for i in range(len(gt_boxes)):
-            gt_boxes[i][1] += small_height
-            gt_boxes[i][3] += small_height
-        # here we should augment the image on the top of it
-        for i in range(horizontal):
-	    if augmentation_type == 'up':
-                im = np.expand_dims(images[i], 0)
-                new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, :] = im * 255
-                # new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, 0] = im * 255
-                # new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, 1] = im * 255
-                # new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, 2] = im * 255  # workaround, delete this and the two rows above, uncomment the row before them
-                # here we shift bounding boxes of the synthetic part of the image
-	        if not ignore_symbols:
-                    for j in range(len(bboxes[i])):
-                        bboxes[i][j][0] += (i * small_width)
-                        bboxes[i][j][2] += (i * small_width)
-    	                new_boxes.append(bboxes[i][j]) 
-	        else:
-	            bboxes[i][0] += (i * small_width)
-	            bboxes[i][2] += (i * small_width)
-	            new_boxes.append(bboxes[i])
-	    elif augmentation_type == 'full':
-                for k in range(vertical):
-                    im = np.expand_dims(images[i * vertical + k], 0)
-                    new_blob[:, k*small_height:(k+1) * small_height, i*small_width:(i+1) * small_width, :] = im * 255
-                    # here we shift bounding boxes of the synthetic part of the image
-	            if not ignore_symbols:
-                        for j in range(len(bboxes[i * vertical + k])):
-                            bboxes[i * vertical + k][j][0] += (i * small_width)
-                            bboxes[i * vertical + k][j][2] += (i * small_width)
-		            bboxes[i * vertical + k][j][1] += (k * small_height)
-		            bboxes[i * vertical + k][j][3] += (k * small_height)
-    	                    new_boxes.append(bboxes[i * vertical + k][j]) 
-	            else:
-	                bboxes[i * vertical + k][0] += (i * small_width)
-	                bboxes[i * vertical + k][2] += (i * small_width)
-                        bboxes[i * vertical + k][1] += (k * small_height)
-                        bboxes[i * vertical + k][3] += (k * small_height)
-	                new_boxes.append(bboxes[i * vertical + k])
-    else:
-        new_blob = im_blob
+    new_boxes = []
+    # new_blob = np.full((batch_size, height + small_height, width, channels), 255)
+    new_blob = np.full((batch_size, height + small_height, width + small_width * len(images), channels), 255) # comment this line and uncomment the previous one
+    # new_blob[:, small_height:, :, :] = im_blob
+    # here we shift bounding boxes of the real image
+    for i in range(len(gt_boxes)):
+        gt_boxes[i][1] += small_height
+        gt_boxes[i][3] += small_height
+    # here we should augment the image on the top of it
+    for i in range(len(images)):
+        im = np.expand_dims(images[i], 0)
+        new_blob[:, 0:small_height, i*small_width:(i+1) * small_width, :] = im * 255
+        # here we shift bounding boxes of the synthetic part of the image
+	if not ignore_symbols:
+            for j in range(len(bboxes[i])):
+                bboxes[i][j][0] += (i * small_width)
+                bboxes[i][j][2] += (i * small_width)
+    	        new_boxes.append(bboxes[i][j]) 
+	else:
+	    bboxes[i][0] += (i * small_width)
+	    bboxes[i][2] += (i * small_width)
+	    new_boxes.append(bboxes[i])
 
     if not args.pad_to == 0:
         # pad to fit RefineNet #TODO fix refinenet padding problem
