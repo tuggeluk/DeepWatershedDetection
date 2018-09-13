@@ -18,6 +18,7 @@ from datasets.pascal_voc import pascal_voc
 from datasets.coco import coco
 from datasets.deep_scores import deep_scores
 from datasets.deep_scores_300dpi import deep_scores_300dpi
+from datasets.deep_scores_ipad import deep_scores_ipad
 from datasets.musicma import musicma
 
 # Set up voc_<year>_<split> 
@@ -38,6 +39,11 @@ for year in ['2017']:
     name = 'DeepScores_300dpi_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: deep_scores_300dpi(split, year))
 
+# Set up DeepScores_300dpi dataset
+for year in ['2017']:
+  for split in ['train', 'val', 'test', 'debug']:
+    name = 'DeepScores_ipad_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: deep_scores_ipad(split, year))
 
 # Set up coco_2014_<split>
 for year in ['2014']:
@@ -51,18 +57,17 @@ for year in ['2015']:
     name = 'coco_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: coco(split, year))
 
-  # Set up for Musicma++
-  for year in ['2017']:
-    for split in ['train', 'test', 'val']:
-      name = 'MUSICMA++_{}_{}'.format(year, split)
-      __sets[name] = (lambda split=split, year=year: musicma(split, year))
+# Set up for Musicma++
+for year in ['2017']:
+  for split in ['train', 'test', 'val']:
+    name = 'MUSICMA++_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: musicma(split, year))
 
 # Set up coco_2014_<split>
 for year in ['2017']:
   for split in ['train', 'val']:
     name = 'coco_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: coco(split, year))
-
 
 
 def get_imdb(name):

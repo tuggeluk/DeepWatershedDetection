@@ -27,9 +27,9 @@ import math
 import sys
 
 
-class deep_scores_300dpi(imdb):
+class deep_scores_ipad(imdb):
   def __init__(self, image_set, year, devkit_path=None):
-    imdb.__init__(self, 'DeepScores_300dpi' + year + '_' + image_set)
+    imdb.__init__(self, 'DeepScores_ipad' + year + '_' + image_set)
     self._year = year
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
@@ -106,7 +106,7 @@ class deep_scores_300dpi(imdb):
     """
     Return the default path where PASCAL VOC is expected to be installed.
     """
-    return os.path.join(cfg.DATA_DIR, 'DeepScores_300dpi_' + self._year)
+    return os.path.join(cfg.DATA_DIR, 'DeepScores_ipad_' + self._year)
 
   def gt_roidb(self):
     """
@@ -264,7 +264,7 @@ class deep_scores_300dpi(imdb):
       present = 0
       for i in range(len_ap):
         print(('{:.3f}'.format(aps[i])))
-        if i not in [32, 41, 75, 76, 90]:
+        if i not in [26, 32,  35, 36, 39, 45, 48, 67, 68, 74, 89, 99, 102, 118]:
           if math.isnan(aps[i]):
             res_file.write(str(0) + "\n")
           else:
@@ -323,6 +323,6 @@ class deep_scores_300dpi(imdb):
 
 if __name__ == '__main__':
 
-  d = deep_scores_300dpi('trainval', '2017')
+  d = deep_scores_ipad('trainval', '2017')
   res = d.roidb
 

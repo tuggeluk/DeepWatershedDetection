@@ -263,7 +263,7 @@ class deep_scores(imdb):
       present = 0
       for i in range(len_ap):
         print(('{:.3f}'.format(aps[i])))
-        if i not in [26, 32,  35, 36, 39, 45, 48, 67, 68, 74, 89, 99, 102, 118]:
+        if i not in [34]:
           if math.isnan(aps[i]):
             res_file.write(str(0) + "\n")
           else:

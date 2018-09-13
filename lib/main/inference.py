@@ -16,7 +16,8 @@ import argparse
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
+    path = "/experiments/music/pretrain_lvl_DeepScores_to_300dpi/RefineNet-Res101/run_3"
+    # path = "/pretrained/DeepScores_to_ipad"
     net = DWSDetector(imdb, path)
     all_boxes = test_net(net, imdb, parsed, path)
     #all_boxes = test_net(None, imdb, parsed)
@@ -43,10 +44,14 @@ def test_net(net, imdb, parsed, path):
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
+        number_of_big_images = 0
         if im.shape[0]*im.shape[1]>3837*2713:
+	    number_of_big_images += 1
+	    print("Number of big images: " + str(number_of_big_images))
 	    continue
+	    
 
-        boxes = net.classify_img(im,1,4)
+        boxes = net.classify_img(im, 5, 4)
 	if len(boxes) > 800:
 	    boxes = []
         no_objects = len(boxes)
@@ -75,7 +80,7 @@ def test_net(net, imdb, parsed, path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_train", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="DeepScores_2017_val", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
