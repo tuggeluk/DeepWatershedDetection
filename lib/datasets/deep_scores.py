@@ -235,46 +235,49 @@ class deep_scores(imdb):
       'train_val_test',
       self._image_set + '.txt')
     cachedir = os.path.join(self._devkit_path, 'annotations_cache')
-    aps = []
     # The PASCAL VOC metric changed in 2010
     use_07_metric = True if int(self._year) < 2010 else False
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
     if not os.path.isdir(output_dir):
       os.mkdir(output_dir)
-    for i, cls in enumerate(self._classes):
-      if cls == '__background__':
-        continue
-      filename = self._get_voc_results_file_template().format(cls)
-      rec, prec, ap = voc_eval(
-        filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
-        use_07_metric=use_07_metric)
-      aps += [ap]
-      print(('AP for {} = {:.4f}'.format(cls, ap)))
-      with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
-        pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
-    print(('Mean AP = {:.4f}'.format(np.mean(aps))))
-    print('~~~~~~~~')
-    print('Results:')
-    # open the file where we want to save the results
-    if path is not None:
-      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res.txt'),"w+")
-      len_ap = len(aps)
-      sum_aps = 0
-      present = 0
-      for i in range(len_ap):
-        print(('{:.3f}'.format(aps[i])))
-        if i not in [34]:
-          if math.isnan(aps[i]):
-            res_file.write(str(0) + "\n")
-          else:
-            res_file.write(('{:.3f}'.format(aps[i])) + "\n")
-            sum_aps += aps[i]
-          present += 1
-      res_file.write('\n\n\n')
-      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
-      res_file.close()
 
-    print(('{:.3f}'.format(np.mean(aps))))
+    ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    for ovthresh in ovthresh_list:
+      aps = []
+      for i, cls in enumerate(self._classes):
+        if cls == '__background__':
+          continue
+        filename = self._get_voc_results_file_template().format(cls)
+        rec, prec, ap = voc_eval(
+          filename, annopath, imagesetfile, cls, cachedir, ovthresh=ovthresh,
+          use_07_metric=use_07_metric)
+        aps += [ap]
+        print(('AP for {} = {:.4f}'.format(cls, ap)))
+        with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
+          pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+      print(('Mean AP = {:.4f}'.format(np.mean(aps))))
+      print('~~~~~~~~')
+      print('Results:')
+      # open the file where we want to save the results
+      if path is not None:
+        res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
+        len_ap = len(aps)
+        sum_aps = 0
+        present = 0
+        for i in range(len_ap):
+          print(('{:.3f}'.format(aps[i])))
+          if i not in [68, 34, 35, 36, 90, 102, 39, 42, 75, 45, 48, 99, 20, 117, 118, 89, 25, 26, 74]:
+            if math.isnan(aps[i]):
+              res_file.write(str(0) + "\n")
+            else:
+              res_file.write(('{:.3f}'.format(aps[i])) + "\n")
+              sum_aps += aps[i]
+            present += 1
+        res_file.write('\n\n\n')
+        res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+        res_file.close()
+
+      print(('{:.3f}'.format(np.mean(aps))))
     print('~~~~~~~~')
     print('')
     print('--------------------------------------------------------------')

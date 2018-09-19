@@ -1,4 +1,4 @@
-# --------------------------------------------------------
+
 # Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
@@ -174,11 +174,14 @@ class musicma(imdb):
       y1 = objs[ix]['bbox'][1]
       x2 = objs[ix]['bbox'][2]
       y2 = objs[ix]['bbox'][3]
-      cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
-      boxes[ix, :] = [x1, y1, x2, y2]
-      gt_classes[ix] = cls
-      overlaps[ix, cls] = 1.0
-      seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
+      try:
+        cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
+        boxes[ix, :] = [x1, y1, x2, y2]
+        gt_classes[ix] = cls
+        overlaps[ix, cls] = 1.0
+        seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
+      except KeyError:
+	pass
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
 
@@ -216,7 +219,10 @@ class musicma(imdb):
           if dets == []:
             continue
           # the VOCdevkit expects 1-based indices
-          for k in range(dets[0].shape[0]):
+          # print(dets)
+	  # print(type(dets))
+	  for k in range(dets.shape[0]):
+          # for k in range(dets[0].shape[0]):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
                     format(index, dets[0][-1],
                            dets[0][0] + 1, dets[0][1] + 1,
@@ -282,7 +288,7 @@ class musicma(imdb):
     print(('Running:\n{}'.format(cmd)))
     status = subprocess.call(cmd, shell=True)
 
-  def evaluate_detections(self, all_boxes, output_dir):
+  def evaluate_detections(self, all_boxes, output_dir, path=None):
     self._write_voc_results_file(all_boxes)
     self._do_python_eval(output_dir)
     if self.config['matlab_eval']:
@@ -305,6 +311,6 @@ class musicma(imdb):
 
 if __name__ == '__main__':
 
-  d = musicma('test', '2017')
+  d = musicma('trainval', '2017')
   res = d.roidb
 
