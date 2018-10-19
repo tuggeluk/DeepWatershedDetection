@@ -1,4 +1,4 @@
-
+# --------------------------------------------------------
 # Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
@@ -36,7 +36,10 @@ class musicma(imdb):
       else devkit_path
     self._data_path = os.path.join(self._devkit_path, 'MUSICMA++_2017')
     self._split_path = os.path.join(self._devkit_path, 'train_val_test')
-    self._classes = list(pa.read_csv(self._devkit_path + "/MUSICMA_classification/class_names.csv", header=None)[1])
+
+    classes = pa.read_csv(self._devkit_path + "/MUSICMA_classification/class_names.csv", header=None)
+    classes[classes[2] != "x"][1]
+    self._classes = list(classes[classes[2] != "x"][1])
     for i in range(len(self._classes)):
         self._classes[i] = self._classes[i].lower().strip()
 
@@ -113,7 +116,6 @@ class musicma(imdb):
   def gt_roidb(self):
     """
     Return the database of ground-truth regions of interest.
-
     This function loads/saves from/to a cache file to speed up future calls.
     """
     cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
@@ -174,14 +176,11 @@ class musicma(imdb):
       y1 = objs[ix]['bbox'][1]
       x2 = objs[ix]['bbox'][2]
       y2 = objs[ix]['bbox'][3]
-      try:
-        cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
-        boxes[ix, :] = [x1, y1, x2, y2]
-        gt_classes[ix] = cls
-        overlaps[ix, cls] = 1.0
-        seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
-      except KeyError:
-	pass
+      cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
+      boxes[ix, :] = [x1, y1, x2, y2]
+      gt_classes[ix] = cls
+      overlaps[ix, cls] = 1.0
+      seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
 
@@ -216,17 +215,38 @@ class musicma(imdb):
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
           dets = all_boxes[cls_ind][im_ind]
-          if dets == []:
+          if list(dets) == []:
             continue
           # the VOCdevkit expects 1-based indices
-          # print(dets)
-	  # print(type(dets))
-	  for k in range(dets.shape[0]):
           # for k in range(dets[0].shape[0]):
+          #   f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+          #           format(index, dets[0][-1],
+          #                  dets[0][0] + 1, dets[0][1] + 1,
+          #                  dets[0][2] + 1, dets[0][3] + 1))
+
+          for k in range(len(dets)):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                    format(index, dets[0][-1],
-                           dets[0][0] + 1, dets[0][1] + 1,
-                           dets[0][2] + 1, dets[0][3] + 1))
+                    format(index, dets[k][-1],
+                           dets[k][0] + 1, dets[k][1] + 1,
+                           dets[k][2] + 1, dets[k][3] + 1))
+
+  # def _write_voc_results_file(self, all_boxes):
+  #  for cls_ind, cls in enumerate(self.classes):
+  #     if cls == '__background__':
+  #       continue
+  #     print('Writing {} VOC results file'.format(cls))
+  #     filename = self._get_voc_results_file_template().format(cls)
+  #     with open(filename, 'wt') as f:
+  #       for im_ind, index in enumerate(self.image_index):
+  #         dets = all_boxes[cls_ind][im_ind]
+  #         if list(dets) == []:
+  #           continue
+  #         # the VOCdevkit expects 1-based indices
+  #         for k in range(dets[0].shape[0]):
+  #           f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+  #                   format(index, dets[0][-1],
+  #                          dets[0][0] + 1, dets[0][1] + 1,
+  #                          dets[0][2] + 1, dets[0][3] + 1))
 
   def _do_python_eval(self, output_dir='output'):
     annopath = os.path.join(
@@ -236,9 +256,7 @@ class musicma(imdb):
       '{:s}.xml')
     imagesetfile = os.path.join(
       self._devkit_path,
-      'MUSICMA++_' + self._year,
-      'ImageSets',
-      'Main',
+      'train_val_test',
       self._image_set + '.txt')
     cachedir = os.path.join(self._devkit_path, 'annotations_cache')
     aps = []
@@ -250,6 +268,8 @@ class musicma(imdb):
     for i, cls in enumerate(self._classes):
       if cls == '__background__':
         continue
+      if cls == "notehead-full":
+        print("nh-full")
       filename = self._get_voc_results_file_template().format(cls)
       rec, prec, ap = voc_eval(
         filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
@@ -288,7 +308,7 @@ class musicma(imdb):
     print(('Running:\n{}'.format(cmd)))
     status = subprocess.call(cmd, shell=True)
 
-  def evaluate_detections(self, all_boxes, output_dir, path=None):
+  def evaluate_detections(self, all_boxes, output_dir):
     self._write_voc_results_file(all_boxes)
     self._do_python_eval(output_dir)
     if self.config['matlab_eval']:
@@ -298,7 +318,10 @@ class musicma(imdb):
         if cls == '__background__':
           continue
         filename = self._get_voc_results_file_template().format(cls)
-        os.remove(filename)
+        try:
+          os.remove(filename)
+        except:
+          continue
 
   def competition_mode(self, on):
     if on:
@@ -311,6 +334,5 @@ class musicma(imdb):
 
 if __name__ == '__main__':
 
-  d = musicma('trainval', '2017')
+  d = musicma('test', '2017')
   res = d.roidb
-

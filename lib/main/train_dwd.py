@@ -43,15 +43,13 @@ def main(parsed):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
+
     # input and output tensors
     if "DeepScores_300dpi" in args.dataset:
-	input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
-        refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
-    if "DeepScores_ipad" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
+
     elif "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
@@ -109,20 +107,10 @@ def main(parsed):
         for var in slim.get_model_variables():
             if not ("class_pred" in var.name):
                 pretrained_vars.append(var)
-        print("Loading network pretrained on Deepscores for 300dpi")
+        print("Loading network pretrained on Deepscores for Muscima")
         loading_checkpoint_name = cfg.PRETRAINED_DIR+"/DeepScores_to_300dpi/" + "backbone"
         init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
         init_fn(sess)
-    elif args.pretrain_lvl == "DeepScores_to_ipad":
-        pretrained_vars = []
-        for var in slim.get_model_variables():
-            if not ("class_pred" in var.name):
-                pretrained_vars.append(var)
-        print("Loading network pretrained on Deepscores for ipad")
-        loading_checkpoint_name = cfg.PRETRAINED_DIR+"/DeepScores_to_ipad/" + "backbone"
-        init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
-        init_fn(sess)
-
     else:
         if args.pretrain_lvl == "semseg":
             #load all variables except the ones in scope "deep_watershed"
@@ -559,6 +547,8 @@ def get_config_id(assign):
 
 def get_checkpoint_dir(args):
     # assemble path
+    if "300dpi" in args.dataset:
+	image_mode = "300dpi"
     if "DeepScores" in args.dataset:
         image_mode = "music"
     elif "MUSICMA" in args.dataset:

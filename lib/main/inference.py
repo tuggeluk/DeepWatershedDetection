@@ -16,8 +16,7 @@ import argparse
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    # path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_8"
-    path = "/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_0"
+    path = "experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_2"
     net = DWSDetector(imdb, path)
     all_boxes = test_net(net, imdb, parsed, path)
     #all_boxes = test_net(None, imdb, parsed)
@@ -44,14 +43,10 @@ def test_net(net, imdb, parsed, path):
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-        number_of_big_images = 0
         if im.shape[0]*im.shape[1]>3837*2713:
-	    number_of_big_images += 1
-	    print("Number of big images: " + str(number_of_big_images))
 	    continue
-	    
 
-        boxes = net.classify_img(im, 5, 4)
+        boxes = net.classify_img(im,1,4)
 	if len(boxes) > 800:
 	    boxes = []
         no_objects = len(boxes)
@@ -73,7 +68,7 @@ def test_net(net, imdb, parsed, path):
          cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir, path)
+    imdb.evaluate_detections(all_boxes, output_dir)
     return all_boxes
 
 

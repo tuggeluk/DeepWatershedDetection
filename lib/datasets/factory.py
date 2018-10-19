@@ -75,6 +75,7 @@ def get_imdb(name):
   print(name)
   if name not in __sets:
     raise KeyError('Unknown dataset: {}'.format(name))
+  print(__sets[name]())
   return __sets[name]()
 
 

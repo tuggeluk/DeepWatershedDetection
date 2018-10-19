@@ -13,7 +13,7 @@ import pickle
 import numpy as np
 from PIL import Image
 
-def parse_rec(filename, muscima=True, rescale_factor=0.5):
+def parse_rec(filename, muscima, rescale_factor=1):
   """ Parse a PASCAL VOC xml file """
   if not muscima:
     tree = ET.parse(filename)
@@ -123,17 +123,14 @@ def voc_eval(detpath,
              classname,
              cachedir,
              ovthresh=0.5,
-             use_07_metric=False,
-	     deepscores=False):
+             use_07_metric=False):
   """rec, prec, ap = voc_eval(detpath,
                               annopath,
                               imagesetfile,
                               classname,
                               [ovthresh],
                               [use_07_metric])
-
   Top level function that does the PASCAL VOC evaluation.
-
   detpath: Path to detections
       detpath.format(classname) should produce the detection results file.
   annopath: Path to annotations
@@ -149,6 +146,9 @@ def voc_eval(detpath,
   # assumes annotations are in annopath.format(imagename)
   # assumes imagesetfile is a text file with each line an image name
   # cachedir caches the annotations in a pickle file
+
+  if classname == "notehead-full":
+    print("nh-full")
 
   # first load gt
   if not os.path.isdir(cachedir):
@@ -173,8 +173,10 @@ def voc_eval(detpath,
     for i, imagename in enumerate(imagenames):
       if "DeepScores" in detpath:
         recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
+      elif "MUSICMA" in detpath:
+        recs[imagename] = parse_rec(annopath.format(imagename), muscima = True)
       else:
-        recs[imagename] = parse_rec(annopath.format(imagename))
+        recs[imagename] = parse_rec(annopath.format(imagename), musicma = False)
       if i % 100 == 0:
         print('Reading annotation for {:d}/{:d}'.format(
           i + 1, len(imagenames)))
@@ -195,18 +197,21 @@ def voc_eval(detpath,
   npos = 0
   for imagename in imagenames:
     R = [obj for obj in recs[imagename] if obj['name'] == classname]
+    # if len(R) == 0:
+    #   continue
+
     bbox = np.array([x['bbox'] for x in R])
-    if deepscores:
-      difficult = np.array([x['difficult'] for x in R]).astype(np.bool)
-      det = [False] * len(R)
-      npos = npos + sum(~difficult)
-      class_recs[imagename] = {'bbox': bbox,
-                               'difficult': difficult,
-                               'det': det}
+
+    if len(R) > 0 and "difficult" not in x.keys():
+      difficult = np.zeros(len(R)).astype(np.bool)
     else:
-      det = [False] * len(R)
-      class_recs[imagename] = {'bbox': bbox,
-                               'det': det}
+      difficult = np.array([x['difficult'] for x in R]).astype(np.bool)
+
+    det = [False] * len(R)
+    npos = npos + sum(~difficult)
+    class_recs[imagename] = {'bbox': bbox,
+                             'difficult': difficult,
+                             'det': det}
 
   # read dets
   detfile = detpath.format(classname)
