@@ -36,7 +36,10 @@ class musicma(imdb):
       else devkit_path
     self._data_path = os.path.join(self._devkit_path, 'MUSICMA++_2017')
     self._split_path = os.path.join(self._devkit_path, 'train_val_test')
-    self._classes = list(pa.read_csv(self._devkit_path + "/MUSICMA_classification/class_names.csv", header=None)[1])
+
+    classes = pa.read_csv(self._devkit_path + "/MUSICMA_classification/class_names.csv", header=None)
+    classes[classes[2] != "x"][1]
+    self._classes = list(classes[classes[2] != "x"][1])
     for i in range(len(self._classes)):
         self._classes[i] = self._classes[i].lower().strip()
 
@@ -213,14 +216,38 @@ class musicma(imdb):
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
           dets = all_boxes[cls_ind][im_ind]
-          if dets == []:
+          if list(dets) == []:
             continue
           # the VOCdevkit expects 1-based indices
-          for k in range(dets[0].shape[0]):
+          # for k in range(dets[0].shape[0]):
+          #   f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+          #           format(index, dets[0][-1],
+          #                  dets[0][0] + 1, dets[0][1] + 1,
+          #                  dets[0][2] + 1, dets[0][3] + 1))
+
+          for k in range(len(dets)):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                    format(index, dets[0][-1],
-                           dets[0][0] + 1, dets[0][1] + 1,
-                           dets[0][2] + 1, dets[0][3] + 1))
+                    format(index, dets[k][-1],
+                           dets[k][0] + 1, dets[k][1] + 1,
+                           dets[k][2] + 1, dets[k][3] + 1))
+
+  # def _write_voc_results_file(self, all_boxes):
+  #  for cls_ind, cls in enumerate(self.classes):
+  #     if cls == '__background__':
+  #       continue
+  #     print('Writing {} VOC results file'.format(cls))
+  #     filename = self._get_voc_results_file_template().format(cls)
+  #     with open(filename, 'wt') as f:
+  #       for im_ind, index in enumerate(self.image_index):
+  #         dets = all_boxes[cls_ind][im_ind]
+  #         if list(dets) == []:
+  #           continue
+  #         # the VOCdevkit expects 1-based indices
+  #         for k in range(dets[0].shape[0]):
+  #           f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+  #                   format(index, dets[0][-1],
+  #                          dets[0][0] + 1, dets[0][1] + 1,
+  #                          dets[0][2] + 1, dets[0][3] + 1))
 
   def _do_python_eval(self, output_dir='output'):
     annopath = os.path.join(
@@ -230,9 +257,7 @@ class musicma(imdb):
       '{:s}.xml')
     imagesetfile = os.path.join(
       self._devkit_path,
-      'MUSICMA++_' + self._year,
-      'ImageSets',
-      'Main',
+      'train_val_test',
       self._image_set + '.txt')
     cachedir = os.path.join(self._devkit_path, 'annotations_cache')
     aps = []
@@ -244,6 +269,8 @@ class musicma(imdb):
     for i, cls in enumerate(self._classes):
       if cls == '__background__':
         continue
+      if cls == "notehead-full":
+        print("nh-full")
       filename = self._get_voc_results_file_template().format(cls)
       rec, prec, ap = voc_eval(
         filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
@@ -292,7 +319,10 @@ class musicma(imdb):
         if cls == '__background__':
           continue
         filename = self._get_voc_results_file_template().format(cls)
-        os.remove(filename)
+        try:
+          os.remove(filename)
+        except:
+          continue
 
   def competition_mode(self, on):
     if on:

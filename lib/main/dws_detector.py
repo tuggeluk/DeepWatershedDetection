@@ -17,7 +17,7 @@ class DWSDetector:
         self.model_path = path
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
-	# self.saved_net = "RefineNet-Res101"
+	    # self.saved_net = "RefineNet-Res101"
 
         # has to be adjusted according to the training scheme used
         self.energy_loss = "softmax"

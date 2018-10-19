@@ -43,11 +43,13 @@ def main(parsed):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
+
     # input and output tensors
     if "DeepScores_300dpi" in args.dataset:
-	input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR+"/DeepScores_semseg/"
+
     elif "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         resnet_dir = cfg.PRETRAINED_DIR+"/DeepScores/"

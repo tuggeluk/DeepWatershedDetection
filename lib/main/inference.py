@@ -16,7 +16,7 @@ import argparse
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
+    path = "experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
     net = DWSDetector(imdb, path)
     all_boxes = test_net(net, imdb, parsed, path)
     #all_boxes = test_net(None, imdb, parsed)
@@ -68,14 +68,14 @@ def test_net(net, imdb, parsed, path):
          cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir, path)
+    imdb.evaluate_detections(all_boxes, output_dir)
     return all_boxes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_train", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_val", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
