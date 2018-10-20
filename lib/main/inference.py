@@ -1,16 +1,14 @@
 import numpy as np
 import os
 import cv2
-import cPickle
+import pickle as cPickle
 from PIL import Image
 import sys
-sys.path.insert(0, '/DeepWatershedDetection/lib')
-sys.path.insert(0,os.path.dirname(__file__)[:-4])
-from datasets.factory import get_imdb
-from dws_detector import DWSDetector
-from config import cfg
-import argparse
 
+from datasets.factory import get_imdb
+from main.dws_detector import DWSDetector
+from main.config import cfg
+import argparse
 
 
 def main(parsed):
@@ -19,7 +17,7 @@ def main(parsed):
     path = "experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
     net = DWSDetector(imdb, path)
     all_boxes = test_net(net, imdb, parsed, path)
-    #all_boxes = test_net(None, imdb, parsed)
+    # all_boxes = test_net(None, imdb, parsed)
 
 
 def test_net(net, imdb, parsed, path):
@@ -30,30 +28,30 @@ def test_net(net, imdb, parsed, path):
     # (x1, y1, x2, y2, class)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
-    #output_dir = get_output_dir(imdb, output_dir)
+    # output_dir = get_output_dir(imdb, output_dir)
     # timers
     det_file = os.path.join(output_dir, 'detections.pkl')
 
-
     print(num_images)
     for i in range(num_images):
-        if i%500 == 0:
-            print i
+        if i % 500 == 0:
+            print(i)
 
         im = Image.open(imdb.image_path_at(i)).convert('L')
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-        if im.shape[0]*im.shape[1]>3837*2713:
-	    continue
+        if im.shape[0] * im.shape[1] > 3837 * 2713:
+            continue
 
-        boxes = net.classify_img(im,1,4)
-	if len(boxes) > 800:
-	    boxes = []
+        boxes = net.classify_img(im, 1, 4)
+
+        if len(boxes) > 800:
+            boxes = []
         no_objects = len(boxes)
         for j in range(len(boxes)):
             # invert scaling for Boxes
             boxes[j] = np.array(boxes[j])
-            boxes[j][:-1] = (boxes[j][:-1]*(1/parsed.scaling)).astype(np.int)
+            boxes[j][:-1] = (boxes[j][:-1] * (1 / parsed.scaling)).astype(np.int)
 
             class_of_symbol = boxes[j][4]
             all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
@@ -65,7 +63,7 @@ def test_net(net, imdb, parsed, path):
 
     # inspect all_boxes variable
     with open(det_file, 'wb') as f:
-         cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
     imdb.evaluate_detections(all_boxes, output_dir)

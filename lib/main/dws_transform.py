@@ -20,13 +20,13 @@ def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, r
     labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
     # invert labels dict
     labels_inv = {}
-    for k, v in labels.iteritems():
+    for k, v in labels.items():
         labels_inv[v] = labels_inv.get(v, [])
         labels_inv[v].append(k)
 
 
     # filter components that are too small
-    for key in labels_inv.keys():
+    for key in list(labels_inv):
         # print(key)
         # print(len(labels_inv[key]))
         if len(labels_inv[key]) < min_ccoponent_size:
