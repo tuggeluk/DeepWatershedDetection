@@ -1,5 +1,5 @@
 import multiprocessing as mp
-import Queue as Queue_
+import queue as Queue_
 from threading import Thread
 import _multiprocessing as _mp
 import weakref
@@ -19,7 +19,7 @@ class Fast_Queue():
 
     def __del__(self):
         if self.debug:
-            print 'del'
+            print('del')
 
     def put(self, item):
         """
@@ -73,7 +73,7 @@ class Fast_Queue():
                 # print 'daemon done'
 
         def stop(ref):
-            print 'stop called'
+            print('stop called')
             srcq.put(sentinel)
 
         # when the FastMyQueue object is GCed, stop the thread
