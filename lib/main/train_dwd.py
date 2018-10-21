@@ -374,6 +374,11 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
             # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
             #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
+
+            for x in range(nr_ds_factors):
+                debug_fetch["logits_" + str(x)] = network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                    nr_feature_maps - nr_ds_factors + x]
+                debug_fetch["labels" + str(x)] = gt_placeholders[x]
             debug_fetch["loss_components_softmax"] = loss_components
         else:
             loss_components = [tf.losses.mean_squared_error(
@@ -401,6 +406,26 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
         loss = tf.reduce_mean(stacked_components)
     else:
         raise NotImplementedError("unknown layer aggregate")
+
+    # ---------------------------------------------------------------------
+    # Debug code -- THIS HAS TO BE COMMENTED OUT UNLESS FOR DEBUGGING
+    #
+    # sess.run(tf.global_variables_initializer())
+    # blob = data_layer.forward(args, [assign], None)
+    #
+    # feed_dict = {input: blob["data"]}
+    #
+    # del debug_fetch["loss_components_softmax"]
+    # for i in range(len(gt_placeholders)):
+    #     # only one assign
+    #     feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
+    #     feed_dict[loss_mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
+    #
+    # # train step
+    # loss_fetch = sess.run(debug_fetch, feed_dict=feed_dict)
+
+    # end debug code
+    # ---------------------------------------------------------------------
 
     # init optimizer
     var_list = [var for var in tf.trainable_variables()]
@@ -439,7 +464,7 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
         images_sums.append(
             tf.summary.image('sub_prediction_' + str(i) + "_" + get_config_id(assign), sub_prediction_placeholder))
 
-    helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 1])
+    helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_placeholders.append(helper_img)
     images_sums.append(tf.summary.image('helper' + str(i) + get_config_id(assign), helper_img))
 
