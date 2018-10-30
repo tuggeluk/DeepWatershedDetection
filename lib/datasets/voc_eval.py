@@ -83,6 +83,38 @@ def parse_rec_deepscores(filename, rescale_factor=0.5):
   return objects
 
 
+def parse_rec_dota(filename, rescale_factor=0.5):
+    objects = []
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        splitlines = [x.strip().split(' ')  for x in lines]
+        i = 0
+        for splitline in splitlines:
+            if i < 2:
+              i += 1
+              continue
+            object_struct = {}
+            object_struct['name'] = splitline[8]
+            if (len(splitline) == 9):
+                object_struct['difficult'] = 0
+            elif (len(splitline) == 10):
+                object_struct['difficult'] = int(splitline[9])
+            # object_struct['difficult'] = 0
+            object_struct['bbox'] = [int(float(splitline[0]) * rescale_factor),
+                                         int(float(splitline[1]) * rescale_factor),
+                                         int(float(splitline[4]) * rescale_factor),
+                                         int(float(splitline[5]) * rescale_factor)]
+            w = int(float(splitline[4]) * rescale_factor) - int(float(splitline[0]) * rescale_factor)
+            h = int(float(splitline[5]) * rescale_factor) - int(float(splitline[1]) * rescale_factor)
+            object_struct['area'] = w * h
+            #print('area:', object_struct['area'])
+            # if object_struct['area'] < (15 * 15):
+            #     #print('area:', object_struct['area'])
+            #     object_struct['difficult'] = 1
+            objects.append(object_struct)
+    return objects
+
+
 def voc_ap(rec, prec, use_07_metric=False):
   """ ap = voc_ap(rec, prec, [use_07_metric])
   Compute VOC AP given precision and recall.
@@ -175,6 +207,8 @@ def voc_eval(detpath,
         recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
       elif "MUSICMA" in detpath:
         recs[imagename] = parse_rec(annopath.format(imagename), muscima = True)
+      elif "Dota" in detpath:
+        recs[imagename] = parse_rec_dota(annopath.format(imagename))
       else:
         recs[imagename] = parse_rec(annopath.format(imagename), musicma = False)
       if i % 100 == 0:
