@@ -16,22 +16,16 @@ import argparse
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    path = "experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_2"
+    path = "/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_12"
+    # path = "/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101/run_5"
     net = DWSDetector(imdb, path)
     all_boxes = test_net(net, imdb, parsed, path)
-    #all_boxes = test_net(None, imdb, parsed)
-
 
 def test_net(net, imdb, parsed, path):
     output_dir = cfg.OUT_DIR
     num_images = len(imdb.image_index)
-    # all detections are collected into:
-    # all_boxes[cls][image] = N x 5 array of detections in
-    # (x1, y1, x2, y2, class)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
-    #output_dir = get_output_dir(imdb, output_dir)
-    # timers
     det_file = os.path.join(output_dir, 'detections.pkl')
 
 
@@ -39,10 +33,13 @@ def test_net(net, imdb, parsed, path):
     for i in range(num_images):
         if i%500 == 0:
             print i
-
-        im = Image.open(imdb.image_path_at(i)).convert('L')
+        if "realistic" not in path:
+            im = Image.open(imdb.image_path_at(i)).convert('L')
+        else:
+            im = Image.open(imdb.image_path_at(i))
         im = np.asanyarray(im)
         im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
+	print(im.shape)
         if im.shape[0]*im.shape[1]>3837*2713:
 	    continue
 
@@ -68,14 +65,15 @@ def test_net(net, imdb, parsed, path):
          cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir, path)
     return all_boxes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
+    parser.add_argument("--scaling", type=int, default=1, help="scale factor applied to images after loading")
     parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
+    # parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
