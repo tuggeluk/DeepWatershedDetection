@@ -20,6 +20,7 @@ from datasets.deep_scores import deep_scores
 from datasets.deep_scores_300dpi import deep_scores_300dpi
 from datasets.deep_scores_ipad import deep_scores_ipad
 from datasets.musicma import musicma
+from datasets.dota import dota
 
 # Set up voc_<year>_<split> 
 for year in ['2007', '2012']:
@@ -68,6 +69,12 @@ for year in ['2017']:
   for split in ['train', 'val']:
     name = 'coco_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: coco(split, year))
+
+# Set up for Dota_2018_<split>
+for year in ['2018']:
+  for split in ['train', 'val', 'test', 'debug']:
+    name = 'Dota_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: dota(split, year))
 
 
 def get_imdb(name):
