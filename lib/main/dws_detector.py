@@ -28,7 +28,10 @@ class DWSDetector:
         self.root_dir = cfg.ROOT_DIR
         self.sess = tf.Session()
         print('Loading model')
-        self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        if "realistic" in self.model_path:
+            self.input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
+        else:
+            self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
                                                pretrained_dir="", substract_mean=False)
         self.saver = tf.train.Saver(max_to_keep=1000)
@@ -44,10 +47,14 @@ class DWSDetector:
 
         y_mulity = int(np.ceil(img.shape[1] / 160.0))
         x_mulity = int(np.ceil(img.shape[2] / 160.0))
-        canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
+        if "realistic" not in self.model_path:
+            canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
+        else:
+            canv = np.ones([y_mulity * 160, x_mulity * 160, 3], dtype=np.uint8) * 255
         canv = np.expand_dims(np.expand_dims(canv, -1), 0)
-
         canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
+        if "realistic" in self.model_path:
+            canv = canv[:,:,:,:,0]
         pred_energy, pred_class, pred_bbox = self.tf_session.run(
             [self.network_heads["stamp_energy"][self.energy_loss][-1], self.network_heads["stamp_class"][self.class_loss][-1],
              self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
