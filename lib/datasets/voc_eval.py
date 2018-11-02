@@ -83,6 +83,38 @@ def parse_rec_deepscores(filename, rescale_factor=0.5):
   return objects
 
 
+def parse_rec_dota(filename, rescale_factor=0.5):
+    objects = []
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        splitlines = [x.strip().split(' ')  for x in lines]
+        i = 0
+        for splitline in splitlines:
+            if i < 2:
+              i += 1
+              continue
+            object_struct = {}
+            object_struct['name'] = splitline[8]
+            if (len(splitline) == 9):
+                object_struct['difficult'] = 0
+            elif (len(splitline) == 10):
+                object_struct['difficult'] = int(splitline[9])
+            # object_struct['difficult'] = 0
+            object_struct['bbox'] = [int(float(splitline[0]) * rescale_factor),
+                                         int(float(splitline[1]) * rescale_factor),
+                                         int(float(splitline[4]) * rescale_factor),
+                                         int(float(splitline[5]) * rescale_factor)]
+            w = int(float(splitline[4]) * rescale_factor) - int(float(splitline[0]) * rescale_factor)
+            h = int(float(splitline[5]) * rescale_factor) - int(float(splitline[1]) * rescale_factor)
+            object_struct['area'] = w * h
+            #print('area:', object_struct['area'])
+            # if object_struct['area'] < (15 * 15):
+            #     #print('area:', object_struct['area'])
+            #     object_struct['difficult'] = 1
+            objects.append(object_struct)
+    return objects
+
+
 def voc_ap(rec, prec, use_07_metric=False):
   """ ap = voc_ap(rec, prec, [use_07_metric])
   Compute VOC AP given precision and recall.
@@ -130,9 +162,7 @@ def voc_eval(detpath,
                               classname,
                               [ovthresh],
                               [use_07_metric])
-
   Top level function that does the PASCAL VOC evaluation.
-
   detpath: Path to detections
       detpath.format(classname) should produce the detection results file.
   annopath: Path to annotations
@@ -162,13 +192,11 @@ def voc_eval(detpath,
   imagenames = [x.strip() for x in lines]
 
   # remove files not present on disk
-  print("remove files not present")
   present_files = os.listdir(annopath[:-9])
   present_files = set([x[:-4] for x in present_files])
   imagenames = set(imagenames)
   imagenames = list(imagenames.intersection(present_files))
 
-  print("start reading annotations")
   if not os.path.isfile(cachefile):
     # load annotations
     recs = {}
@@ -177,6 +205,10 @@ def voc_eval(detpath,
         recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
       elif "MUSICMA" in detpath:
         recs[imagename] = parse_rec(annopath.format(imagename), muscima = True)
+
+      elif "Dota" in detpath:
+        recs[imagename] = parse_rec_dota(annopath.format(imagename))
+
       else:
         recs[imagename] = parse_rec(annopath.format(imagename), musicma = False)
       if i % 100 == 0:
@@ -203,6 +235,7 @@ def voc_eval(detpath,
     #   continue
 
     bbox = np.array([x['bbox'] for x in R])
+
 
     if len(R) > 0 and "difficult" not in R[0].keys():
       difficult = np.zeros(len(R)).astype(np.bool)

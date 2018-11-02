@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.insert(0, '/DeepWatershedDetection/lib')
 sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from main.train_dwd import main
 import argparse
@@ -70,7 +71,7 @@ if __name__ == '__main__':
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 30000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": 3000}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     parsed = parser.parse_known_args()
 

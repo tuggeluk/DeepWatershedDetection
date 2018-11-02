@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import pdb
 import os
 import pandas as pa
 from datasets.imdb import imdb
@@ -24,7 +25,7 @@ from datasets.voc_eval import voc_eval
 from main.config import cfg
 import random
 from datasets.voc_eval import parse_rec
-
+import math
 
 
 class musicma(imdb):
@@ -41,7 +42,11 @@ class musicma(imdb):
     classes[classes[2] != "x"][1]
     self._classes = list(classes[classes[2] != "x"][1])
     for i in range(len(self._classes)):
-        self._classes[i] = self._classes[i].lower().strip()
+        if self.classes[i][:3] == 'let':
+            self._classes[i] = self._classes[i].strip()
+        else:
+            self._classes[i] = self._classes[i].lower().strip()
+	print(self._classes[i])
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._image_ext = '.png'
@@ -116,7 +121,6 @@ class musicma(imdb):
   def gt_roidb(self):
     """
     Return the database of ground-truth regions of interest.
-
     This function loads/saves from/to a cache file to speed up future calls.
     """
     cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
@@ -177,11 +181,16 @@ class musicma(imdb):
       y1 = objs[ix]['bbox'][1]
       x2 = objs[ix]['bbox'][2]
       y2 = objs[ix]['bbox'][3]
-      cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
-      boxes[ix, :] = [x1, y1, x2, y2]
-      gt_classes[ix] = cls
-      overlaps[ix, cls] = 1.0
-      seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
+      pdb.set_trace()
+      if objs[ix]['name'] not in ['ledger_line', 'multi-measure_rest', 'multi-staff_brace', 'multi-staff_bracket', 'staff_grouping']:
+        if objs[ix]['name'][:3] == 'let':
+            cls = self._class_to_ind[objs[ix]['name'].strip()]
+        else:
+            cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
+        boxes[ix, :] = [x1, y1, x2, y2]
+        gt_classes[ix] = cls
+        overlaps[ix, cls] = 1.0
+        seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
 
@@ -216,14 +225,9 @@ class musicma(imdb):
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
           dets = all_boxes[cls_ind][im_ind]
-          if list(dets) == []:
-            continue
-          # the VOCdevkit expects 1-based indices
-          # for k in range(dets[0].shape[0]):
-          #   f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-          #           format(index, dets[0][-1],
-          #                  dets[0][0] + 1, dets[0][1] + 1,
-          #                  dets[0][2] + 1, dets[0][3] + 1))
+
+          if list(dets) == []: continue
+
 
           for k in range(len(dets)):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
@@ -231,25 +235,8 @@ class musicma(imdb):
                            dets[k][0] + 1, dets[k][1] + 1,
                            dets[k][2] + 1, dets[k][3] + 1))
 
-  # def _write_voc_results_file(self, all_boxes):
-  #  for cls_ind, cls in enumerate(self.classes):
-  #     if cls == '__background__':
-  #       continue
-  #     print('Writing {} VOC results file'.format(cls))
-  #     filename = self._get_voc_results_file_template().format(cls)
-  #     with open(filename, 'wt') as f:
-  #       for im_ind, index in enumerate(self.image_index):
-  #         dets = all_boxes[cls_ind][im_ind]
-  #         if list(dets) == []:
-  #           continue
-  #         # the VOCdevkit expects 1-based indices
-  #         for k in range(dets[0].shape[0]):
-  #           f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-  #                   format(index, dets[0][-1],
-  #                          dets[0][0] + 1, dets[0][1] + 1,
-  #                          dets[0][2] + 1, dets[0][3] + 1))
 
-  def _do_python_eval(self, output_dir='output'):
+  def _do_python_eval(self, output_dir='output', path=None):
     annopath = os.path.join(
       self._devkit_path,
       'MUSICMA++_' + self._year,
@@ -266,25 +253,42 @@ class musicma(imdb):
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
     if not os.path.isdir(output_dir):
       os.mkdir(output_dir)
-    for i, cls in enumerate(self._classes):
-      if cls == '__background__':
-        continue
-      if cls == "notehead-full":
-        print("nh-full")
-      filename = self._get_voc_results_file_template().format(cls)
-      rec, prec, ap = voc_eval(
-        filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
-        use_07_metric=use_07_metric)
-      aps += [ap]
-      print(('AP for {} = {:.4f}'.format(cls, ap)))
-      with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
-        pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
-    print(('Mean AP = {:.4f}'.format(np.mean(aps))))
-    print('~~~~~~~~')
-    print('Results:')
-    for ap in aps:
-      print(('{:.3f}'.format(ap)))
-    print(('{:.3f}'.format(np.mean(aps))))
+
+    #pdb.set_trace()
+    ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    for ovthresh in ovthresh_list:
+      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
+      aps = []
+      sum_aps, present = 0, 0
+      #pdb.set_trace()
+      for i, cls in enumerate(self._classes):
+        if cls in ['tuple_bracket_line', 'other-clef', 'dotted_horizontal_spanner', 'letter_other', 'trill_wobble', 'numeral_0', 'letter_E', 'letter_S', 'curved-line_(tie-or-slur)', 'letter_g', 'arpeggio_wobble', 'transposition_text']:# or cls[:3] == 'let':
+          continue
+        #pdb.set_trace()
+        filename = self._get_voc_results_file_template().format(cls)
+        rec, prec, ap = voc_eval(
+          filename, annopath, imagesetfile, cls, cachedir, ovthresh=ovthresh,
+          use_07_metric=use_07_metric)
+        aps += [ap]
+        print(('AP for {} = {:.4f}'.format(cls, ap)))
+        with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
+          pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+        if math.isnan(ap):
+          res_file.write(cls + " " + ap + "\n")
+        else:
+          res_file.write(cls + " " + '{:.3f}'.format(ap) + "\n")
+          sum_aps += ap
+        present += 1
+      res_file.write('\n\n\n')
+      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+      res_file.close()
+
+      print(('Mean AP = {:.4f}'.format(np.mean(aps))))
+      print('~~~~~~~~')
+      print('Results:')
+      print(('{:.3f}'.format(np.mean(aps))))
+
+
     print('~~~~~~~~')
     print('')
     print('--------------------------------------------------------------')
@@ -309,9 +313,9 @@ class musicma(imdb):
     print(('Running:\n{}'.format(cmd)))
     status = subprocess.call(cmd, shell=True)
 
-  def evaluate_detections(self, all_boxes, output_dir):
+  def evaluate_detections(self, all_boxes, output_dir, path=None):
     self._write_voc_results_file(all_boxes)
-    self._do_python_eval(output_dir)
+    self._do_python_eval(output_dir, path)
     if self.config['matlab_eval']:
       self._do_matlab_eval(output_dir)
     if self.config['cleanup']:
@@ -337,4 +341,3 @@ if __name__ == '__main__':
 
   d = musicma('test', '2017')
   res = d.roidb
-

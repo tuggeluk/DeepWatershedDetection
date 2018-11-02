@@ -28,10 +28,14 @@ class DWSDetector:
         self.root_dir = cfg.ROOT_DIR
         self.sess = tf.Session()
         print('Loading model')
-        self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name,
-                                                         num_classes=imdb.num_classes,
-                                                         pretrained_dir="", substract_mean=False)
+
+        if "realistic" in self.model_path:
+            self.input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
+        else:
+            self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+        self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
+                                               pretrained_dir="", substract_mean=False)
+
         self.saver = tf.train.Saver(max_to_keep=1000)
         self.sess.run(tf.global_variables_initializer())
         print("Loading weights")
@@ -45,10 +49,14 @@ class DWSDetector:
 
         y_mulity = int(np.ceil(img.shape[1] / 160.0))
         x_mulity = int(np.ceil(img.shape[2] / 160.0))
-        canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
+        if "realistic" not in self.model_path:
+            canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
+        else:
+            canv = np.ones([y_mulity * 160, x_mulity * 160, 3], dtype=np.uint8) * 255
         canv = np.expand_dims(np.expand_dims(canv, -1), 0)
-
         canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
+        if "realistic" in self.model_path:
+            canv = canv[:,:,:,:,0]
         pred_energy, pred_class, pred_bbox = self.tf_session.run(
             [self.network_heads["stamp_energy"][self.energy_loss][-1],
              self.network_heads["stamp_class"][self.class_loss][-1],
@@ -63,9 +71,11 @@ class DWSDetector:
         if self.bbox_loss == "softmax":
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
+
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
         save_images(img, dws_list, True, False, self.counter)
         self.counter += 1
+
 
         return dws_list
 
@@ -90,7 +100,7 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
         draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
-            draw.text((row[2], row[3]), row[4], fill="red")
+            draw.text((row[2], row[3]), str(row[4]), fill="red")
 
     return im_input, im_gt
 

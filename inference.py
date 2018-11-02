@@ -1,29 +1,37 @@
 import numpy as np
 import os
 import cv2
-import pickle as cPickle
+import cPickle
 from PIL import Image
 import sys
-
+sys.path.insert(0, '/DeepWatershedDetection/lib')
+sys.path.insert(0,os.path.dirname(__file__)[:-4])
 from datasets.factory import get_imdb
-from main.dws_detector import DWSDetector
-from main.config import cfg
+from dws_detector import DWSDetector
+from config import cfg
 import argparse
 import time
+
 
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
+    if parsed.dataset == 'DeepScores':
+        path = os.path.join("/experiments/music/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
+    elif parsed.dataset == "DeepScored_300dpi":
+        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/RefineNet-Res101", parsed.net_id)
+    elif parsed.dataset == "MUSCIMA":
+        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
+    elif parsed.dataset == "Dota":
+        path = os.path.join("/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
 
-    path = "/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_12"
-    # path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_3"
-    # path = "/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101/run_5"
     debug = False
     if not debug:
         net = DWSDetector(imdb, path)
         all_boxes = test_net(net, imdb, parsed, path)
     else:
         all_boxes = test_net(False, imdb, parsed, path, debug)
+ 
 
 def test_net(net, imdb, parsed, path, debug=False):
     """
@@ -39,11 +47,10 @@ def test_net(net, imdb, parsed, path, debug=False):
     num_images = len(imdb.image_index)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
-
     det_file = os.path.join(output_dir, 'detections.pkl')
 
-    print(num_images)
 
+    print(num_images)
     total_time = []
     if not debug:
         for i in range(num_images):
@@ -92,18 +99,25 @@ def test_net(net, imdb, parsed, path, debug=False):
         with open(det_file, "rb") as f:
             all_boxes = cPickle.load(f)
 
-
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir, path)
     return all_boxes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_val", help="dataset to perform inference on")
-
+    parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
+    parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores300dpi, DeepScores_300dpi, MUSCIMA, Dota")
+    dataset = 'DeepScores_300dpi'
+    if dataset == 'MUSCIMA':
+        parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
+    elif dataset == 'DeepScores':
+        parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
+    elif dataset == 'DeepScores_300dpi':
+        parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_test", help="dataset to perform inference on")
+    elif dataset == 'Dota':
+        parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
+    parser.add_argument("--net_id", type=str, default="run_2", help="the id of the net you want to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
