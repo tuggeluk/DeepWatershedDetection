@@ -58,7 +58,7 @@ def count(classes, num_syms_per_class):
 
 
 def main():
-    dataset = 'Muscima'
+    dataset = 'DeepScores_300dpi'
     if dataset == 'Muscima':
         classes = list(pa.read_csv(
             "/DeepWatershedDetection/data/MUSICMA++_2017/MUSICMA_classification/class_names.csv", header=None)[1])
@@ -85,7 +85,7 @@ def main():
 
         elif dataset == 'DeepScores_300dpi':
             classes = list(pa.read_csv(
-                "/DeepWatershedDetection/data/DeepScores_3000dpi_2017/DeepScores_classification/class_names.csv", header=None)[1])
+                "/DeepWatershedDetection/data/DeepScores_300dpi_2017/DeepScores_classification/class_names.csv", header=None)[1])
             train_set_file = '/DeepWatershedDetection/data/DeepScores_300dpi_2017/train_val_test/train.txt'
             test_set_file = '/DeepWatershedDetection/data/DeepScores_300dpi_2017/train_val_test/test.txt'
             xml_annotations_path = '/DeepWatershedDetection/data/DeepScores_300dpi_2017/segmentation_detection/xml_annotations'
