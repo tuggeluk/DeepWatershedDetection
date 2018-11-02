@@ -2,9 +2,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from models.dwd_net import build_dwd_net
-from dws_transform import perform_dws
+from main.dws_transform import perform_dws
 from PIL import Image
-from config import cfg
+from main.config import cfg
 import sys
 import cv2
 
@@ -17,7 +17,7 @@ class DWSDetector:
         self.model_path = path
         self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
-	# self.saved_net = "RefineNet-Res101"
+        # self.saved_net = "RefineNet-Res101"
 
         # has to be adjusted according to the training scheme used
         self.energy_loss = "softmax"
@@ -28,18 +28,20 @@ class DWSDetector:
         self.root_dir = cfg.ROOT_DIR
         self.sess = tf.Session()
         print('Loading model')
+
         if "realistic" in self.model_path:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         else:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
                                                pretrained_dir="", substract_mean=False)
+
         self.saver = tf.train.Saver(max_to_keep=1000)
         self.sess.run(tf.global_variables_initializer())
         print("Loading weights")
         self.saver.restore(self.sess, self.root_dir + "/" + self.model_path + "/" + self.saved_net)
         self.tf_session = self.sess
-	self.counter = 0	
+        self.counter = 0
 
     def classify_img(self, img, cutoff=0, min_ccoponent_size=0):
         if len(img.shape) < 4:
@@ -56,7 +58,8 @@ class DWSDetector:
         if "realistic" in self.model_path:
             canv = canv[:,:,:,:,0]
         pred_energy, pred_class, pred_bbox = self.tf_session.run(
-            [self.network_heads["stamp_energy"][self.energy_loss][-1], self.network_heads["stamp_class"][self.class_loss][-1],
+            [self.network_heads["stamp_energy"][self.energy_loss][-1],
+             self.network_heads["stamp_class"][self.class_loss][-1],
              self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
 
         if self.energy_loss == "softmax":
@@ -68,9 +71,11 @@ class DWSDetector:
         if self.bbox_loss == "softmax":
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
-        dws_list = perform_dws(pred_energy, pred_class, pred_bbox,cutoff, min_ccoponent_size)
-        save_images(img, dws_list, True, True, self.counter)
-	self.counter += 1
+
+        dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
+        save_images(img, dws_list, True, False, self.counter)
+        self.counter += 1
+
 
         return dws_list
 
@@ -88,7 +93,7 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
         draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
-	    # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
+            # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
 
     if text:
@@ -106,6 +111,7 @@ def show_images(data, gt_boxes=None, gt=False, text=False):
     im_gt.show()
 
     return
+
 
 def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
     im_input, im_gt = get_images(data, gt_boxes, gt, text)

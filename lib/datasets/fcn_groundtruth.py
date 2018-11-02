@@ -293,7 +293,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                     maps_list.append(np.expand_dims(resized, 0))
 
         # one-hot encoding
-        maps_list.append(np.expand_dims(canvas, 0))
+        maps_list.insert(0,np.expand_dims(canvas, 0))
     # if do not downsample marker, recursively rebuild for each ds level
     else:
         if (downsample_ind+1) == len(objectness_settings["ds_factors"]):

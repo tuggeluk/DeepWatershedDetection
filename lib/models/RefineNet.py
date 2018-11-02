@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.contrib import slim
-import resnet_v1
+import models.resnet_v1 as resnet_v1
 
 import os, sys
 
@@ -196,7 +196,7 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
     	raise ValueError("Unsupported ResNet model '%s'. This function only supports ResNet 101 and ResNet 152" % (preset_model))
 
     
-    net_name = end_points.keys()[0].split("/")[0]
+    net_name = list(end_points.keys())[0].split("/")[0]
 
     f = [end_points['pool5'], end_points['pool4'],
          end_points['pool3'], end_points['pool2']]

@@ -18,6 +18,7 @@ from tensorflow.python.ops import array_ops
 import pickle
 import pdb
 
+
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, \
     try_all_assign, get_gt_visuals, get_map_visuals
 
@@ -117,8 +118,6 @@ def main(parsed):
         init_fn(sess)
     else:
         if args.pretrain_lvl == "semseg":
-            print("We are definitely here")
-            sys.exit(0)
             # load all variables except the ones in scope "deep_watershed"
             pretrained_vars = []
             for var in slim.get_model_variables():
@@ -609,7 +608,7 @@ def get_checkpoint_dir(args):
         os.makedirs(tbdir)
     runs_dir = os.listdir(tbdir)
     if args.continue_training == "True":
-        tbdir = tbdir + "/" + str(len(runs_dir) - 1)
+        tbdir = tbdir + "/" + "run_" + str(len(runs_dir) - 1)
     else:
         tbdir = tbdir + "/" + "run_" + str(len(runs_dir))
         os.makedirs(tbdir)

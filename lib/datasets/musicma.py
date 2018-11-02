@@ -225,13 +225,16 @@ class musicma(imdb):
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
           dets = all_boxes[cls_ind][im_ind]
+
           if list(dets) == []: continue
+
 
           for k in range(len(dets)):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
                     format(index, dets[k][-1],
                            dets[k][0] + 1, dets[k][1] + 1,
                            dets[k][2] + 1, dets[k][3] + 1))
+
 
   def _do_python_eval(self, output_dir='output', path=None):
     annopath = os.path.join(
@@ -250,6 +253,7 @@ class musicma(imdb):
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
     if not os.path.isdir(output_dir):
       os.mkdir(output_dir)
+
     #pdb.set_trace()
     ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     for ovthresh in ovthresh_list:
@@ -283,6 +287,7 @@ class musicma(imdb):
       print('~~~~~~~~')
       print('Results:')
       print(('{:.3f}'.format(np.mean(aps))))
+
 
     print('~~~~~~~~')
     print('')

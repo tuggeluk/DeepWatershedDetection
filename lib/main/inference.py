@@ -1,21 +1,20 @@
 import numpy as np
 import os
 import cv2
-import cPickle
+import pickle as cPickle
 from PIL import Image
 import sys
-sys.path.insert(0, '/DeepWatershedDetection/lib')
-sys.path.insert(0,os.path.dirname(__file__)[:-4])
+
 from datasets.factory import get_imdb
-from dws_detector import DWSDetector
-from config import cfg
+from main.dws_detector import DWSDetector
+from main.config import cfg
 import argparse
 import time
-
 
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
+
     path = "/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_12"
     # path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_3"
     # path = "/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101/run_5"
@@ -40,10 +39,11 @@ def test_net(net, imdb, parsed, path, debug=False):
     num_images = len(imdb.image_index)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
+
     det_file = os.path.join(output_dir, 'detections.pkl')
 
-
     print(num_images)
+
     total_time = []
     if not debug:
         for i in range(num_images):
@@ -92,16 +92,18 @@ def test_net(net, imdb, parsed, path, debug=False):
         with open(det_file, "rb") as f:
             all_boxes = cPickle.load(f)
 
+
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir, path)
+    imdb.evaluate_detections(all_boxes, output_dir)
     return all_boxes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
-    # parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
+
+    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
+    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_val", help="dataset to perform inference on")
+
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()

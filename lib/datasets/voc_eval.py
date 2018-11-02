@@ -205,8 +205,10 @@ def voc_eval(detpath,
         recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
       elif "MUSICMA" in detpath:
         recs[imagename] = parse_rec(annopath.format(imagename), muscima = True)
+
       elif "Dota" in detpath:
         recs[imagename] = parse_rec_dota(annopath.format(imagename))
+
       else:
         recs[imagename] = parse_rec(annopath.format(imagename), musicma = False)
       if i % 100 == 0:
@@ -234,7 +236,8 @@ def voc_eval(detpath,
 
     bbox = np.array([x['bbox'] for x in R])
 
-    if len(R) > 0 and "difficult" not in x.keys():
+
+    if len(R) > 0 and "difficult" not in R[0].keys():
       difficult = np.zeros(len(R)).astype(np.bool)
     else:
       difficult = np.array([x['difficult'] for x in R]).astype(np.bool)

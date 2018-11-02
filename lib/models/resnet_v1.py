@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.contrib import slim
-import resnet_utils
+import models.resnet_utils as resnet_utils
 
 resnet_arg_scope = resnet_utils.resnet_arg_scope
 
