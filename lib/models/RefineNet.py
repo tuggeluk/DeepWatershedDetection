@@ -162,7 +162,8 @@ def RefineBlock(high_inputs=None,low_inputs=None):
 
 
 
-def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True):
+def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True,
+                    individual_upsamp="False"):
     """
     Builds the RefineNet model. 
 
@@ -198,37 +199,60 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
     
     net_name = list(end_points.keys())[0].split("/")[0]
 
-    f = [end_points['pool5'], end_points['pool4'],
-         end_points['pool3'], end_points['pool2']]
+    if individual_upsamp == "True":
+        f = [end_points['pool5'], end_points['pool4'],
+             end_points['pool3'], end_points['pool2']]
 
-    g = [None, None, None, None]
-    h = [None, None, None, None]
+        us_stages = ["energy", "classes", "bbox"]
+        g_list = list()
+        for stage in us_stages:
+            g = [None, None, None, None]
+            h = [None, None, None, None]
 
-    for i in range(4):
-        h[i]=slim.conv2d(f[i], 256, 1)
+            for i in range(4):
+                h[i] = slim.conv2d(f[i], 256, 1)
 
-    g[0]=RefineBlock(high_inputs=None,low_inputs=h[0])
-    g[1]=RefineBlock(g[0],h[1])
-    g[2]=RefineBlock(g[1],h[2])
-    g[3]=RefineBlock(g[2],h[3])
+            g[0] = RefineBlock(high_inputs=None, low_inputs=h[0])
+            g[1] = RefineBlock(g[0], h[1])
+            g[2] = RefineBlock(g[1], h[2])
+            g[3] = RefineBlock(g[2], h[3])
 
-    g[3]=Upsampling(g[3],scale=4)
+            g[3] = Upsampling(g[3], scale=4)
+            g_list.append(g)
 
-    # if upscaling_method.lower() == "conv":
-    #     net = ConvUpscaleBlock(net, 256, kernel_size=[3, 3], scale=2)
-    #     net = ConvBlock(net, 256)
-    #     net = ConvUpscaleBlock(net, 128, kernel_size=[3, 3], scale=2)
-    #     net = ConvBlock(net, 128)
-    #     net = ConvUpscaleBlock(net, 64, kernel_size=[3, 3], scale=2)
-    #     net = ConvBlock(net, 64)
-    # elif upscaling_method.lower() == "bilinear":
-    #     net = Upsampling(net, label_size)
-
-    if num_classes is not None:
-        net = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
-        return net, init_fn
+        return g_list, init_fn
     else:
-        return g, init_fn
+        f = [end_points['pool5'], end_points['pool4'],
+             end_points['pool3'], end_points['pool2']]
+
+        g = [None, None, None, None]
+        h = [None, None, None, None]
+
+        for i in range(4):
+            h[i] = slim.conv2d(f[i], 256, 1)
+
+        g[0] = RefineBlock(high_inputs=None, low_inputs=h[0])
+        g[1] = RefineBlock(g[0], h[1])
+        g[2] = RefineBlock(g[1], h[2])
+        g[3] = RefineBlock(g[2], h[3])
+
+        g[3] = Upsampling(g[3], scale=4)
+
+        # if upscaling_method.lower() == "conv":
+        #     net = ConvUpscaleBlock(net, 256, kernel_size=[3, 3], scale=2)
+        #     net = ConvBlock(net, 256)
+        #     net = ConvUpscaleBlock(net, 128, kernel_size=[3, 3], scale=2)
+        #     net = ConvBlock(net, 128)
+        #     net = ConvUpscaleBlock(net, 64, kernel_size=[3, 3], scale=2)
+        #     net = ConvBlock(net, 64)
+        # elif upscaling_method.lower() == "bilinear":
+        #     net = Upsampling(net, label_size)
+
+        if num_classes is not None:
+            net = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
+            return net, init_fn
+        else:
+            return g, init_fn
 
 
 def mean_image_subtraction(inputs, means=[123.68, 116.78, 103.94]):

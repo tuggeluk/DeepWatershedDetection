@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  # code only works with batchsize 1!
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
-    parser.add_argument("--pretrain_lvl", type=str, default="semseg",
+    parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
@@ -82,10 +82,12 @@ def main():
                         help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[], help="ignore, will be overwritten by program")
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res101",
+    parser.add_argument('--model', type=str, default="RefineNet-Res152",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
 
     parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput")
+
+    parser.add_argument('--individual_upsamp', type=str, default="True", help="sample gt into imput")
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
@@ -112,10 +114,13 @@ def main():
         5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 10000},
-                            {"assign": 1, "help": 0, "Itrs": 10000},
-                            {"assign": 2, "help": 0, "Itrs": 10000},
-                            {"assign": 0, "help": 0, "Itrs": 10000}
+                            {"assign": 0, "help": 0, "Itrs": 100000},
+                            {"assign": 1, "help": 0, "Itrs": 100000},
+                            {"assign": 2, "help": 0, "Itrs": 100000},
+                            {"assign": 0, "help": 0, "Itrs": 100000},
+                            {"assign": 1, "help": 0, "Itrs": 100000},
+                            {"assign": 2, "help": 0, "Itrs": 100000},
+                            {"assign": 0, "help": 0, "Itrs": 100000}
 
                         ], help="configure how assignements get repeated")
 

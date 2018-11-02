@@ -78,7 +78,7 @@ def main(parsed):
     print("Initializing Model:" + args.model)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False)
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp)
 
     # initialize tasks
     preped_assign = []
