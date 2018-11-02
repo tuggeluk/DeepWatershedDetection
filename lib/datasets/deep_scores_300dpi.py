@@ -241,12 +241,13 @@ class deep_scores_300dpi(imdb):
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
     if not os.path.isdir(output_dir):
       os.mkdir(output_dir)
-
     ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     for ovthresh in ovthresh_list:
+      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
       aps = []
+      sum_aps, present = 0, 0
       for i, cls in enumerate(self._classes):
-        if cls == '__background__':
+        if cls in ['clef15', 'noteheadDoubleWholeSmall', 'flag64thUp', 'articTenutoBelow', 'rest64th', 'flag8thDownSmall', 'restHBar', 'caesura', 'restLonga', 'restMaxima', 'rest32nd', 'dynamicRinforzando2', 'noteheadWholeSmall', 'dynamicPPP', 'flag128thUp', 'flag64thDown', 'articStaccatissimoAbove', 'articStaccatissimoBelow', 'restDoubleWhole', 'noteheadDoubleWhole', 'articMarcatoBelow', 'fingering5', 'fingering4', 'fingering1', 'fingering0', 'fingering3', 'fingering2', 'timeSig9', 'timeSig5', 'timeSig0', 'flag128thDown', 'timeSig16', 'timeSig12', 'dynamicPPPPP', 'rest128th', 'dynamicFortePiano', 'flag32ndUp', 'noteheadHalfSmall', 'flag8thUpSmall', 'articMarcatoAbove']:
           continue
         filename = self._get_voc_results_file_template().format(cls)
         rec, prec, ap = voc_eval(
@@ -256,30 +257,20 @@ class deep_scores_300dpi(imdb):
         print(('AP for {} = {:.4f}'.format(cls, ap)))
         with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
           pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+        if math.isnan(ap):
+          res_file.write(cls + " " + str(0) + "\n")
+        else:
+          res_file.write(cls + " " + '{:.3f}'.format(ap) + "\n")
+          sum_aps += ap
+        present += 1
+      res_file.write('\n\n\n')
+      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+      res_file.close()
+
       print(('Mean AP = {:.4f}'.format(np.mean(aps))))
       print('~~~~~~~~')
       print('Results:')
-      # open the file where we want to save the results
-      if path is not None:
-        res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
-        len_ap = len(aps)
-        sum_aps = 0
-        present = 0
-        for i in range(len_ap):
-          print(('{:.3f}'.format(aps[i])))
-          if i not in [16, 20, 24, 25, 26, 27, 28, 32, 34, 35, 36, 39, 41, 42, 43, 45, 47, 48, 49, 55, 57, 67, 68, 73, 74, 75, 76, 82, 83, 84, 85, 89, 98, 101, 102, 108, 110, 113, 117, 123]:
-            if math.isnan(aps[i]):
-              res_file.write(str(0) + "\n")
-            else:
-              res_file.write(('{:.3f}'.format(aps[i])) + "\n")
-              sum_aps += aps[i]
-            present += 1
-        res_file.write('\n\n\n')
-        res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
-        res_file.close()
-
       print(('{:.3f}'.format(np.mean(aps))))
-
     print('~~~~~~~~')
     print('')
     print('--------------------------------------------------------------')
@@ -288,6 +279,7 @@ class deep_scores_300dpi(imdb):
     print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
     print('-- Thanks, The Management')
     print('--------------------------------------------------------------')
+
 
   def _do_matlab_eval(self, output_dir='output'):
     print('-----------------------------------------------------')
