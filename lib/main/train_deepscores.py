@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
     regularization_coefficient = 0#rnd(6, 8) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient, help="Value for regularization parameter")
-    dataset = "Dota_2018_train"
+    dataset = "MUSCIMA++_2017_train"
     if dataset == "Dota_2018_train":
         parser.add_argument("--dataset", type=str, default="Dota_2018_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="Dota_2018_debug", help="DeepScores, voc, coco or no - validation set")

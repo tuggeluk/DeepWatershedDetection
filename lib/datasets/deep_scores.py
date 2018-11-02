@@ -243,9 +243,11 @@ class deep_scores(imdb):
 
     ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     for ovthresh in ovthresh_list:
+      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
       aps = []
+      sum_aps, present = 0, 0
       for i, cls in enumerate(self._classes):
-        if cls == '__background__':
+        if cls == '__background__' or cls in ['noteheadDoubleWholeSmall', 'flag8thDownSmall', 'restMaxima', 'dynamicRinforzando2', 'flag64thDown', 'articStaccatissimoBelow', 'noteheadDoubleWhole', 'timeSig16', 'timeSig12', 'dynamicPPPPP', 'flag8thUpSmall']:
           continue
         filename = self._get_voc_results_file_template().format(cls)
         rec, prec, ap = voc_eval(
@@ -255,28 +257,19 @@ class deep_scores(imdb):
         print(('AP for {} = {:.4f}'.format(cls, ap)))
         with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
           pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+        if math.isnan(ap):
+          res_file.write(cls + " " + str(0) + "\n")
+        else:
+          res_file.write(cls + " " + '{:.3f}'.format(ap) + "\n")
+          sum_aps += ap
+        present += 1
+      res_file.write('\n\n\n')
+      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+      res_file.close()
+
       print(('Mean AP = {:.4f}'.format(np.mean(aps))))
       print('~~~~~~~~')
       print('Results:')
-      # open the file where we want to save the results
-      if path is not None:
-        res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
-        len_ap = len(aps)
-        sum_aps = 0
-        present = 0
-        for i in range(len_ap):
-          print(('{:.3f}'.format(aps[i])))
-          if i not in [68, 34, 35, 36, 90, 102, 39, 42, 75, 45, 48, 99, 20, 117, 118, 89, 25, 26, 74]:
-            if math.isnan(aps[i]):
-              res_file.write(str(0) + "\n")
-            else:
-              res_file.write(('{:.3f}'.format(aps[i])) + "\n")
-              sum_aps += aps[i]
-            present += 1
-        res_file.write('\n\n\n')
-        res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
-        res_file.close()
-
       print(('{:.3f}'.format(np.mean(aps))))
     print('~~~~~~~~')
     print('')

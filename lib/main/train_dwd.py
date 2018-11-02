@@ -16,6 +16,7 @@ from roi_data_layer.layer import RoIDataLayer
 from utils.prefetch_wrapper import PrefetchWrapper
 from tensorflow.python.ops import array_ops
 import pickle
+import pdb
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, \
     try_all_assign, get_gt_visuals, get_map_visuals

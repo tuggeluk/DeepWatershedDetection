@@ -5,7 +5,7 @@ import pandas as pa
 import sys
 
 
-def count_symbols(classes, set_file):
+def count_symbols_muscima(classes, set_file):
     # create and initialize the dictionary
     num_syms_per_class = {}
     for k in classes: num_syms_per_class[k] = 0
@@ -24,8 +24,25 @@ def count_symbols(classes, set_file):
     return num_syms_per_class
 
 
+def count_symbols(classes, set_file):
+    # create and initialize the dictionary
+    num_syms_per_class = {}
+    for k in classes: num_syms_per_class[k] = 0
+    xml_annotations_path = '/DeepWatershedDetection/data/MUSICMA++_2017/MUSICMA++_2017/xml_annotations'
+    with open(set_file) as f:
+        content = f.readlines()
+    content = [x.strip() for x in content]
+
+    for f in content:
+        tree_read = ET.parse(os.path.join(xml_annotations_path, f + '.xml'))
+        for obj in tree_read.findall('object'):
+            obj_name = obj.find('name').text
+            num_syms_per_class[obj_name] += 1
+    return num_syms_per_class
+
+
 def count_zeros(classes, class_to_ind, dataset):
-    num_syms_per_class = count_symbols(classes, dataset)
+    num_syms_per_class = count_symbols_muscima(classes, dataset)
     zeros = []
     for k in classes:
         if num_syms_per_class[k] == 0:
@@ -50,17 +67,32 @@ def main():
         else:
             classes_lower.append(k)
     class_to_ind = dict(list(zip(classes_lower, list(range(len(classes))))))
-
+    #class_to_ind = dict(list(zip(classes, list(range(len(classes))))))
+    # print(class_to_ind)
     train_set_file = '/DeepWatershedDetection/data/MUSICMA++_2017/train_val_test/train.txt'
     test_set_file = '/DeepWatershedDetection/data/MUSICMA++_2017/train_val_test/test.txt'
 
     zeros_test, num_syms_per_class_test = count_zeros(classes_lower, class_to_ind, test_set_file)
     zeros_train, num_syms_per_class_train = count_zeros(classes_lower, class_to_ind, train_set_file)
-    print(num_syms_per_class_test)
-    print(num_syms_per_class_train)
+    num_syms_per_class_total = {}
+    for k in num_syms_per_class_test:
+        num_syms_per_class_total[k] = num_syms_per_class_test[k] + num_syms_per_class_train[k]
+    #zeros_test, num_syms_per_class_test = count_zeros(classes, class_to_ind, test_set_file)
+    #zeros_train, num_syms_per_class_train = count_zeros(classes, class_to_ind, train_set_file)
 
-    zeros_combined = list(set(zeros_test).intersection(zeros_train))
+    print(num_syms_per_class_test)
+    print("\n\n\n\n\n")
+    print(num_syms_per_class_train)
+    print("\n\n\n\n\n")
+    print(num_syms_per_class_total)
+
+    zeros_combined = list(set(zeros_test).union(zeros_train))
     print(zeros_combined)
+    list_of_zeros = []
+    for k in class_to_ind:
+        if class_to_ind[k] in zeros_combined:
+            list_of_zeros.append(k)
+    print(list_of_zeros)
 
 
 if __name__ == '__main__':

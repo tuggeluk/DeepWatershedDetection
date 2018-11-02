@@ -2,13 +2,12 @@
 # Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
-# Written by Ismail Elezi based on Ross Girshick and Xinlei Chen's code for pascal_voc dataset
+# Written by Ismail Elezi and Lukas Tuggener based on Ross Girshick and Xinlei Chen's code for pascal_voc dataset
 # --------------------------------------------------------
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import pdb
 import os
 import pandas as pa
 from datasets.imdb import imdb
@@ -24,29 +23,19 @@ import uuid
 from datasets.voc_eval import voc_eval
 from main.config import cfg
 import random
-from datasets.voc_eval import parse_rec
 import math
 
 
-class musicma(imdb):
+class deep_scores(imdb):
   def __init__(self, image_set, year, devkit_path=None):
-    imdb.__init__(self, 'MUSICMA++' + year + '_' + image_set)
+    imdb.__init__(self, 'DeepScores' + year + '_' + image_set)
     self._year = year
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
       else devkit_path
-    self._data_path = os.path.join(self._devkit_path, 'MUSICMA++_2017')
+    self._data_path = os.path.join(self._devkit_path, 'segmentation_detection')
     self._split_path = os.path.join(self._devkit_path, 'train_val_test')
-
-    classes = pa.read_csv(self._devkit_path + "/MUSICMA_classification/class_names.csv", header=None)
-    classes[classes[2] != "x"][1]
-    self._classes = list(classes[classes[2] != "x"][1])
-    for i in range(len(self._classes)):
-        if self.classes[i][:3] == 'let':
-            self._classes[i] = self._classes[i].strip()
-        else:
-            self._classes[i] = self._classes[i].lower().strip()
-	print(self._classes[i])
+    self._classes = list(pa.read_csv(self._devkit_path + "/DeepScores_classification/class_names.csv", header=None)[1])
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._image_ext = '.png'
@@ -116,11 +105,12 @@ class musicma(imdb):
     """
     Return the default path where PASCAL VOC is expected to be installed.
     """
-    return os.path.join(cfg.DATA_DIR, 'MUSICMA++_' + self._year)
+    return os.path.join(cfg.DATA_DIR, 'DeepScores_' + self._year)
 
   def gt_roidb(self):
     """
     Return the database of ground-truth regions of interest.
+
     This function loads/saves from/to a cache file to speed up future calls.
     """
     cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
@@ -142,7 +132,7 @@ class musicma(imdb):
     return gt_roidb
 
   def rpn_roidb(self):
-    if int(self._year) == 2017 or self._image_set != 'test':
+    if int(self._year) == 2017 or self._image_set != 'debug':
       gt_roidb = self.gt_roidb()
       rpn_roidb = self._load_rpn_roidb(gt_roidb)
       roidb = imdb.merge_roidbs(gt_roidb, rpn_roidb)
@@ -162,12 +152,12 @@ class musicma(imdb):
 
   def _load_musical_annotation(self, index):
     """
-    Load image and bounding boxes info from XML in musicma format to PASCAL VOC format
+    Load image and bounding boxes info from XML file in the PASCAL VOC
+    format.
     """
-    muscima = True
-    rescale_factor = 1
     filename = os.path.join(self._data_path, 'xml_annotations', index + '.xml')
-    objs = parse_rec(filename, muscima=muscima, rescale_factor=rescale_factor)
+    tree = ET.parse(filename)
+    objs = tree.findall('object')
     num_objs = len(objs)
 
     boxes = np.zeros((num_objs, 4), dtype=np.uint16)
@@ -176,21 +166,22 @@ class musicma(imdb):
     # "Seg" area for pascal is just the box area
     seg_areas = np.zeros((num_objs), dtype=np.float32)
 
+    size = tree.find("size")
+    height = float(size.find("height").text)
+    width = float(size.find("width").text)
+    # Load object bounding boxes into a data frame.
     for ix, obj in enumerate(objs):
-      x1 = objs[ix]['bbox'][0]
-      y1 = objs[ix]['bbox'][1]
-      x2 = objs[ix]['bbox'][2]
-      y2 = objs[ix]['bbox'][3]
-      pdb.set_trace()
-      if objs[ix]['name'] not in ['ledger_line', 'multi-measure_rest', 'multi-staff_brace', 'multi-staff_bracket', 'staff_grouping']:
-        if objs[ix]['name'][:3] == 'let':
-            cls = self._class_to_ind[objs[ix]['name'].strip()]
-        else:
-            cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
-        boxes[ix, :] = [x1, y1, x2, y2]
-        gt_classes[ix] = cls
-        overlaps[ix, cls] = 1.0
-        seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
+      bbox = obj.find('bndbox')
+      # Pixel indexes should already be 0 bases
+      x1 = np.floor(float(bbox.find('xmin').text)*width)
+      y1 = np.floor(float(bbox.find('ymin').text)*height)
+      x2 = np.floor(float(bbox.find('xmax').text)*width)
+      y2 = np.floor(float(bbox.find('ymax').text)*height)
+      cls = self._class_to_ind[obj.find('name').text]#.lower().strip()]
+      boxes[ix, :] = [x1, y1, x2, y2]
+      gt_classes[ix] = cls
+      overlaps[ix, cls] = 1.0
+      seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
 
@@ -199,7 +190,6 @@ class musicma(imdb):
             'gt_overlaps': overlaps,
             'flipped': False,
             'seg_areas': seg_areas}
-
 
   def _get_comp_id(self):
     comp_id = (self._comp_id + '_' + self._salt if self.config['use_salt']
@@ -210,8 +200,8 @@ class musicma(imdb):
     filename = self._get_comp_id() + '_det_' + self._image_set + '_{:s}.txt'
     path = os.path.join(
       self._devkit_path,
-      'MUSICMA++_' + self._year,
-      'ImageSets',
+      'results',
+      'musical' + self._year,
       'Main',
       filename)
     return path
@@ -225,18 +215,19 @@ class musicma(imdb):
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
           dets = all_boxes[cls_ind][im_ind]
-          if list(dets) == []: continue
-
-          for k in range(len(dets)):
+          if dets == []:
+            continue
+          # the VOCdevkit expects 1-based indices
+          for k in range(dets.shape[0]):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                    format(index, dets[k][-1],
-                           dets[k][0] + 1, dets[k][1] + 1,
-                           dets[k][2] + 1, dets[k][3] + 1))
+                    format(index, dets[k, -1],
+                           dets[k, 0] + 1, dets[k, 1] + 1,
+                           dets[k, 2] + 1, dets[k, 3] + 1))
 
   def _do_python_eval(self, output_dir='output', path=None):
     annopath = os.path.join(
       self._devkit_path,
-      'MUSICMA++_' + self._year,
+      'segmentation_detection',
       'xml_annotations',
       '{:s}.xml')
     imagesetfile = os.path.join(
@@ -244,23 +235,18 @@ class musicma(imdb):
       'train_val_test',
       self._image_set + '.txt')
     cachedir = os.path.join(self._devkit_path, 'annotations_cache')
-    aps = []
     # The PASCAL VOC metric changed in 2010
     use_07_metric = True if int(self._year) < 2010 else False
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
     if not os.path.isdir(output_dir):
       os.mkdir(output_dir)
-    #pdb.set_trace()
+
     ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     for ovthresh in ovthresh_list:
-      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
       aps = []
-      sum_aps, present = 0, 0
-      #pdb.set_trace()
       for i, cls in enumerate(self._classes):
-        if cls in ['tuple_bracket_line', 'other-clef', 'dotted_horizontal_spanner', 'letter_other', 'trill_wobble', 'numeral_0', 'letter_E', 'letter_S', 'curved-line_(tie-or-slur)', 'letter_g', 'arpeggio_wobble', 'transposition_text']:# or cls[:3] == 'let':
+        if cls == '__background__':
           continue
-        #pdb.set_trace()
         filename = self._get_voc_results_file_template().format(cls)
         rec, prec, ap = voc_eval(
           filename, annopath, imagesetfile, cls, cachedir, ovthresh=ovthresh,
@@ -269,21 +255,29 @@ class musicma(imdb):
         print(('AP for {} = {:.4f}'.format(cls, ap)))
         with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
           pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
-        if math.isnan(ap):
-          res_file.write(cls + " " + ap + "\n")
-        else:
-          res_file.write(cls + " " + '{:.3f}'.format(ap) + "\n")
-          sum_aps += ap
-        present += 1
-      res_file.write('\n\n\n')
-      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
-      res_file.close()
-
       print(('Mean AP = {:.4f}'.format(np.mean(aps))))
       print('~~~~~~~~')
       print('Results:')
-      print(('{:.3f}'.format(np.mean(aps))))
+      # open the file where we want to save the results
+      if path is not None:
+        res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
+        len_ap = len(aps)
+        sum_aps = 0
+        present = 0
+        for i in range(len_ap):
+          print(('{:.3f}'.format(aps[i])))
+          if i not in [68, 34, 35, 36, 90, 102, 39, 42, 75, 45, 48, 99, 20, 117, 118, 89, 25, 26, 74]:
+            if math.isnan(aps[i]):
+              res_file.write(str(0) + "\n")
+            else:
+              res_file.write(('{:.3f}'.format(aps[i])) + "\n")
+              sum_aps += aps[i]
+            present += 1
+        res_file.write('\n\n\n')
+        res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+        res_file.close()
 
+      print(('{:.3f}'.format(np.mean(aps))))
     print('~~~~~~~~')
     print('')
     print('--------------------------------------------------------------')
@@ -318,10 +312,7 @@ class musicma(imdb):
         if cls == '__background__':
           continue
         filename = self._get_voc_results_file_template().format(cls)
-        try:
-          os.remove(filename)
-        except:
-          continue
+        os.remove(filename)
 
   def competition_mode(self, on):
     if on:
@@ -334,5 +325,6 @@ class musicma(imdb):
 
 if __name__ == '__main__':
 
-  d = musicma('test', '2017')
+  d = deep_scores('trainval', '2017')
   res = d.roidb
+

@@ -192,13 +192,11 @@ def voc_eval(detpath,
   imagenames = [x.strip() for x in lines]
 
   # remove files not present on disk
-  print("remove files not present")
   present_files = os.listdir(annopath[:-9])
   present_files = set([x[:-4] for x in present_files])
   imagenames = set(imagenames)
   imagenames = list(imagenames.intersection(present_files))
 
-  print("start reading annotations")
   if not os.path.isfile(cachefile):
     # load annotations
     recs = {}
