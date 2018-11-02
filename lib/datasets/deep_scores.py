@@ -247,7 +247,7 @@ class deep_scores(imdb):
       aps = []
       sum_aps, present = 0, 0
       for i, cls in enumerate(self._classes):
-        if cls == '__background__' or cls in ['noteheadDoubleWholeSmall', 'flag8thDownSmall', 'restMaxima', 'dynamicRinforzando2', 'flag64thDown', 'articStaccatissimoBelow', 'noteheadDoubleWhole', 'timeSig16', 'timeSig12', 'dynamicPPPPP', 'flag8thUpSmall']:
+        if cls in ['noteheadDoubleWholeSmall', 'flag8thDownSmall', 'restMaxima', 'dynamicRinforzando2', 'flag64thDown', 'articStaccatissimoBelow', 'noteheadDoubleWhole', 'timeSig16', 'timeSig12', 'dynamicPPPPP', 'flag8thUpSmall']:
           continue
         filename = self._get_voc_results_file_template().format(cls)
         rec, prec, ap = voc_eval(
