@@ -1,10 +1,9 @@
 import os
 import sys
 
-sys.path.insert(0, '/DeepWatershedDetection/lib')
-sys.path.insert(0, os.path.dirname(__file__)[:-4])
+
 # from main.train_dwd import main
-import main.train_dwd as dwd
+import train_dwd as dwd
 import argparse
 import numpy.random as ran
 import random
@@ -96,13 +95,13 @@ def main():
                              'stamp_args': {'marker_dim': (17, 17), 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"}},
                             # # class markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
+                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9, 9), 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"}},
 
                             # bbox markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9, 9), 'size_percentage': 1, "shape": "oval", "loss": "reg"}}
 
@@ -113,7 +112,7 @@ def main():
         5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 1000000},
+                            {"assign": 0, "help": 0, "Itrs": 10000},
                             {"assign": 1, "help": 0, "Itrs": 10000},
                             {"assign": 2, "help": 0, "Itrs": 10000},
                             {"assign": 0, "help": 0, "Itrs": 10000}
@@ -122,7 +121,7 @@ def main():
 
     parser.add_argument('--combined_assignements', type=list,
                         default=[
-                            {"assigns": [0, 1, 2], "loss_factors": [2, 1, 1], "Running_Mean_Length": 5, "Itrs": 100000}],
+                            {"assigns": [0, 1, 2], "loss_factors": [2, 1, 1], "Running_Mean_Length": 5, "Itrs": 10000000}],
                         help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0,
