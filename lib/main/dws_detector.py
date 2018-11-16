@@ -13,9 +13,9 @@ tf.set_random_seed(314)
 
 
 class DWSDetector:
-    def __init__(self, imdb, path):
+    def __init__(self, imdb, path, individual_upsamp = False):
         self.model_path = path
-        self.model_name = "RefineNet-Res101"
+        self.model_name = "RefineNet-Res152"
         self.saved_net = 'backbone'
         # self.saved_net = "RefineNet-Res101"
 
@@ -34,7 +34,7 @@ class DWSDetector:
         else:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
         self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
-                                               pretrained_dir="", substract_mean=False)
+                                               pretrained_dir="", substract_mean=False,  individual_upsamp = individual_upsamp)
 
         self.saver = tf.train.Saver(max_to_keep=1000)
         self.sess.run(tf.global_variables_initializer())
@@ -44,19 +44,26 @@ class DWSDetector:
         self.counter = 0
 
     def classify_img(self, img, cutoff=0, min_ccoponent_size=0):
-        if len(img.shape) < 4:
-            img = np.expand_dims(np.expand_dims(img, -1), 0)
+
+        if img.shape[0] > 1:
+            img = np.expand_dims(img, 0)
+
+        if img.shape[-1] > 3:
+            img = np.expand_dims(img, -1)
 
         y_mulity = int(np.ceil(img.shape[1] / 160.0))
         x_mulity = int(np.ceil(img.shape[2] / 160.0))
         if "realistic" not in self.model_path:
             canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
+            canv = np.expand_dims(np.expand_dims(canv, -1), 0)
         else:
             canv = np.ones([y_mulity * 160, x_mulity * 160, 3], dtype=np.uint8) * 255
-        canv = np.expand_dims(np.expand_dims(canv, -1), 0)
+            canv = np.expand_dims(canv, 0)
+
         canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
-        if "realistic" in self.model_path:
-            canv = canv[:,:,:,:,0]
+
+        #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+
         pred_energy, pred_class, pred_bbox = self.tf_session.run(
             [self.network_heads["stamp_energy"][self.energy_loss][-1],
              self.network_heads["stamp_class"][self.class_loss][-1],
@@ -115,7 +122,7 @@ def show_images(data, gt_boxes=None, gt=False, text=False):
 
 def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
     im_input, im_gt = get_images(data, gt_boxes, gt, text)
-    # im_input.save(cfg.ROOT_DIR + "/output_images/images_output/" + str(counter) + '.png')
-    im_gt.save(cfg.ROOT_DIR + "/output_images/images_output/" + str(counter) + '.png')
+    im_input.save(cfg.ROOT_DIR + "/output_images/" + str(counter)+ 'input' + '.png')
+    im_gt.save(cfg.ROOT_DIR + "/output_images/" + str(counter) + 'gt' +'.png')
 
     return

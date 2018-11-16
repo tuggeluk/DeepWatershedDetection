@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import cv2
-import cPickle
+import pickle
 from PIL import Image
 import sys
 sys.path.insert(0, '/DeepWatershedDetection/lib')
@@ -56,9 +56,11 @@ def test_net(net, imdb, parsed, path, debug=False):
         for i in range(num_images):
             start_time = time.time()
             if i%500 == 0:
-                print i
+                print(i)
             if "realistic" not in path:
                 im = Image.open(imdb.image_path_at(i)).convert('L')
+                # subtract mean
+                im -= cfg.PIXEL_MEANS
             else:
                 im = Image.open(imdb.image_path_at(i))
             im = np.asanyarray(im)
@@ -97,7 +99,7 @@ def test_net(net, imdb, parsed, path, debug=False):
 
     else:
         with open(det_file, "rb") as f:
-            all_boxes = cPickle.load(f)
+            all_boxes = pickle.load(f)
 
     print('Evaluating detections')
     imdb.evaluate_detections(all_boxes, output_dir, path)

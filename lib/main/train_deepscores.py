@@ -61,7 +61,7 @@ def main():
                         help="Value for regularization parameter")
     dataset = "voc_2012_train"
     if dataset == "DeepScores_2017_train":
-        parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                             help="DeepScores, voc, coco or no - validation set")
     elif dataset == "DeepScores_300dpi_2017_train":
@@ -92,18 +92,18 @@ def main():
     parser.add_argument('--training_assignements', type=list,
                         default=[
                             # energy markers
-                            {'ds_factors': [1, 8, 16, 32], 'downsample_marker': True, 'overlap_solution': 'max',
+                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': (17, 17), 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"}},
                             # # class markers
-                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'no',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9, 9), 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"}},
 
                             # bbox markers
-                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': (9, 9), 'size_percentage': 1, "shape": "oval", "loss": "reg"}}
 
@@ -114,19 +114,15 @@ def main():
         5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 100000},
-                            {"assign": 1, "help": 0, "Itrs": 100000},
-                            {"assign": 2, "help": 0, "Itrs": 100000},
-                            {"assign": 0, "help": 0, "Itrs": 100000},
-                            {"assign": 1, "help": 0, "Itrs": 100000},
-                            {"assign": 2, "help": 0, "Itrs": 100000},
-                            {"assign": 0, "help": 0, "Itrs": 100000}
+                            {"assign": 0, "help": 0, "Itrs": 500000},
+                            {"assign": 1, "help": 0, "Itrs": 500000},
+                            {"assign": 2, "help": 0, "Itrs": 500000}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
                         default=[
-                            {"assigns": [0, 1, 2], "loss_factors": [2, 1, 1], "Running_Mean_Length": 5, "Itrs": 10000000}],
+                            {"assigns": [0, 1, 2], "loss_factors": [1, 1, 1], "Running_Mean_Length": 5, "Itrs": 10000000}],
                         help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0,
