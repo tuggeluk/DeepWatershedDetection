@@ -19,14 +19,14 @@ def main(parsed):
     imdb = get_imdb(parsed.test_set)
     if parsed.dataset == 'DeepScores':
         path = os.path.join("/experiments/music/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
-    elif parsed.dataset == "DeepScored_300dpi":
+    elif parsed.dataset == "DeepScores_300dpi":
         path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/RefineNet-Res101", parsed.net_id)
     elif parsed.dataset == "MUSCIMA":
         path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
     elif parsed.dataset == "Dota":
         path = os.path.join("/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
-    pdb.set_trace()
-    debug = True
+    #pdb.set_trace()
+    debug = False
     if not debug:
         net = DWSDetector(imdb, path)
         all_boxes = test_net(net, imdb, parsed, path)
@@ -102,7 +102,7 @@ def test_net(net, imdb, parsed, path, debug=False):
 
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir, path)
     return all_boxes
 
 
@@ -111,16 +111,16 @@ if __name__ == '__main__':
     parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
     dataset = 'Dota'
     if dataset == 'MUSCIMA':
-        parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores300dpi, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
     elif dataset == 'DeepScores':
-        parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores300dpi, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
     elif dataset == 'DeepScores_300dpi':
-        parser.add_argument("--dataset", type=str, default='DeepScores_300dpi', help="name of the dataset: DeepScores, DeepScores300dpi, DeepScores_300dpi, MUSCIMA, Dota")
-        parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_test", help="dataset to perform inference on")
+        parser.add_argument("--dataset", type=str, default='DeepScores_300dpi', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_val", help="dataset to perform inference on, we use val for evaluation, test can be used only visually")
     elif dataset == 'Dota':
-        parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores300dpi, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
 
