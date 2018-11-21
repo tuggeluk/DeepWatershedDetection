@@ -17,7 +17,7 @@ def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
 
-    path = "experiments/realistic/pretrain_lvl_class/RefineNet-Res152/run_2"
+    path = "experiments/realistic/pretrain_lvl_class/backup_combined_16Nov"
     # path = "/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_3"
     # path = "/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101/run_5"
     debug = False
@@ -57,12 +57,10 @@ def test_net(net, imdb, parsed, path, debug=False):
                 im = cv2.imread(imdb.image_path_at(i)).convert('L')
                 im = im.astype(np.float32, copy=False)
             else:
-                for i in range(3):
-                    for ii in range(3):
-                        for iii in range(3):
-                            im = cv2.imread(imdb.image_path_at(9))
-                            im = im[:, :, (i, ii, iii)]
-                            Image.fromarray(im).save(cfg.ROOT_DIR + "/output_images/" + str(i)+"."+str(ii)+"."+str(iii) + 'input' + '.png')
+
+                im = cv2.imread(imdb.image_path_at(i))
+                # im = im[:, :, (2, 1, 0)]
+                #Image.fromarray(im).save(cfg.ROOT_DIR + "/output_images/" + 'input' + '.png')
                 #im.save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
 
                 im = im.astype(np.float32, copy=False)
@@ -115,7 +113,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="voc_2012_val", help="dataset to perform inference on")
+    parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
