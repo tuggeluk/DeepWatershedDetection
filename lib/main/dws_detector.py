@@ -15,7 +15,7 @@ tf.set_random_seed(314)
 class DWSDetector:
     def __init__(self, imdb, path, individual_upsamp = False):
         self.model_path = path
-        self.model_name = "RefineNet-Res152"
+        self.model_name = "RefineNet-Res101"
         self.saved_net = 'backbone'
         # self.saved_net = "RefineNet-Res101"
 
