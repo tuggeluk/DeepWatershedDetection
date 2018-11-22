@@ -69,6 +69,7 @@ class DWSDetector:
              self.network_heads["stamp_class"][self.class_loss][-1],
              self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
 
+        Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
 

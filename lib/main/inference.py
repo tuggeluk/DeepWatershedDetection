@@ -4,14 +4,13 @@ import cv2
 import pickle as cPickle
 from PIL import Image
 import sys
-sys.path.insert(0, '/DeepWatershedDetection/lib')
-sys.path.insert(0,os.path.dirname(__file__)[:-4])
+sys.path.insert(0, os.path.dirname(__file__)[:-4])
+
 from datasets.factory import get_imdb
 from main.dws_detector import DWSDetector
 from main.config import cfg
 import argparse
 import time
-import pdb
 
 
 def main(parsed):
@@ -55,26 +54,35 @@ def test_net(net, imdb, parsed, path, debug=False):
     if not debug:
         for i in range(num_images):
             start_time = time.time()
-            if i%500 == 0:
-                print i
+            if i % 500 == 0:
+                print(i)
             if "realistic" not in path:
-                im = Image.open(imdb.image_path_at(i)).convert('L')
+                im = cv2.imread(imdb.image_path_at(i)).convert('L')
+                im = im.astype(np.float32, copy=False)
             else:
-                im = Image.open(imdb.image_path_at(i))
-            im = np.asanyarray(im)
-            im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-	    print(im.shape)
-            if im.shape[0]*im.shape[1]>3837*2713:
-	        continue
 
-            boxes = net.classify_img(im,1,4)
-	    if len(boxes) > 800:
-	        boxes = []
+                im = cv2.imread(imdb.image_path_at(i))
+                # im = im[:, :, (2, 1, 0)]
+                #Image.fromarray(im).save(cfg.ROOT_DIR + "/output_images/" + 'input' + '.png')
+                #im.save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+
+                im = im.astype(np.float32, copy=False)
+                #im -= cfg.PIXEL_MEANS
+                #Image.fromarray(im).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+
+            im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
+            print(im.shape)
+            if im.shape[0] * im.shape[1] > 3837 * 2713:
+                continue
+
+            boxes = net.classify_img(im, 1, 4)
+            if len(boxes) > 800:
+                boxes = []
             no_objects = len(boxes)
             for j in range(len(boxes)):
                 # invert scaling for Boxes
                 boxes[j] = np.array(boxes[j])
-                boxes[j][:-1] = (boxes[j][:-1]*(1/parsed.scaling)).astype(np.int)
+                boxes[j][:-1] = (boxes[j][:-1] * (1 / parsed.scaling)).astype(np.int)
 
                 class_of_symbol = boxes[j][4]
                 all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
@@ -97,7 +105,6 @@ def test_net(net, imdb, parsed, path, debug=False):
     else:
         with open(det_file, "rb") as f:
             all_boxes = cPickle.load(f)
-
 
     print('Evaluating detections')
     imdb.evaluate_detections(all_boxes, output_dir, path)
