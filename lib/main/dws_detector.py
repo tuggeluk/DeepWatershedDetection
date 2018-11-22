@@ -14,14 +14,14 @@ tf.set_random_seed(314)
 
 
 class DWSDetector:
-    def __init__(self, imdb, path, parsed, individual_upsamp = False):
+    def __init__(self, imdb, path, pa, individual_upsamp = False):
         self.model_path = path
-        self.model_name = parsed.net_type 
-        self.saved_net = parsed.saved_net
+        self.model_name = pa.net_type
+        self.saved_net = pa.saved_net
         # has to be adjusted according to the training scheme used
-        self.energy_loss = parsed.energy_loss
-        self.class_loss = parsed.class_loss
-        self.bbox_loss = parsed.bbox_loss
+        self.energy_loss = pa.energy_loss
+        self.class_loss = pa.class_loss
+        self.bbox_loss = pa.bbox_loss
 
         self.tf_session = None
         self.root_dir = cfg.ROOT_DIR

@@ -17,18 +17,21 @@ def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
     if parsed.dataset == 'DeepScores':
-        path = os.path.join("/experiments/music/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
+        path = os.path.join("/experiments/music/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "DeepScores_300dpi":
-        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/RefineNet-Res101", parsed.net_id)
+        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "MUSCIMA":
-        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
+        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "Dota":
         path = os.path.join("/experiments/realistic/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+    elif parsed.dataset == "VOC":
+        path = os.path.join("/experiments/realistic/pretrain_lvl_class", parsed.net_type, parsed.net_id)
     if not parsed.debug:
-        net = DWSDetector(imdb, path, parsed)
+        net = DWSDetector(imdb=imdb, path=path, pa=parsed, individual_upsamp=parsed.individual_upsamp)
+
         all_boxes = test_net(net, imdb, parsed, path)
     else:
-        all_boxes = test_net(False, imdb, parsed, path, debug)
+        all_boxes = test_net(False, imdb, parsed, path, parsed.debug)
 
 
 def test_net(net, imdb, parsed, path, debug=False):
@@ -114,7 +117,8 @@ def test_net(net, imdb, parsed, path, debug=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
-    dataset = 'Dota'
+    parser.add_argument("--debug", type=bool, default=False, help="scale factor applied to images after loading")
+    dataset = 'VOC'
     if dataset == 'MUSCIMA':
         parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
@@ -127,8 +131,19 @@ if __name__ == '__main__':
     elif dataset == 'Dota':
         parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
+    elif dataset == 'VOC':
+        parser.add_argument("--dataset", type=str, default='VOC', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
+        parser.add_argument("--test_set", type=str, default="voc_2012_val", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
+    parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of resnet used (RefineNet-Res152/101)")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
+    parser.add_argument("--individual_upsamp", type=str, default="True", help="Are three individual RefineNets used for upsampling")
 
-    # configure output heads used ---> have to match trained model
+    parser.add_argument("--saved_net", type=str, default="backbone", help="name of the checkpoint")
+
+    parser.add_argument("--energy_loss", type=str, default="softmax", help="loss on energy ")
+    parser.add_argument("--class_loss", type=str, default="softmax", help="loss on class ")
+    parser.add_argument("--bbox_loss", type=str, default="reg", help="loss on bbox")
+
     parsed = parser.parse_known_args()
     main(parsed)
+
