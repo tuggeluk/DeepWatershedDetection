@@ -69,7 +69,7 @@ class DWSDetector:
              self.network_heads["stamp_class"][self.class_loss][-1],
              self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
 
-        Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+        #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
 
@@ -81,7 +81,8 @@ class DWSDetector:
 
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
-        save_images(img, dws_list, True, False, self.counter)
+        save_images(canv, dws_list, True, False, self.counter)
+        save_debug_panes()
         self.counter += 1
 
 
@@ -125,5 +126,10 @@ def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
     im_input, im_gt = get_images(data, gt_boxes, gt, text)
     im_input.save(cfg.ROOT_DIR + "/output_images/" + str(counter)+ 'input' + '.png')
     im_gt.save(cfg.ROOT_DIR + "/output_images/" + str(counter) + 'gt' +'.png')
+
+    return
+
+def save_debug_panes(data, gt_boxes=None, gt=False, text=False, counter=0):
+    # save panes to disk
 
     return
