@@ -16,8 +16,7 @@ tf.set_random_seed(314)
 class DWSDetector:
     def __init__(self, imdb, path, parsed, individual_upsamp = False):
         self.model_path = path
-        self.split_path = path.split('/') 
-        self.model_name = self.split_path[-2] 
+        self.model_name = parsed.net_type 
         self.saved_net = parsed.saved_net
         # has to be adjusted according to the training scheme used
         self.energy_loss = parsed.energy_loss
@@ -33,6 +32,7 @@ class DWSDetector:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         else:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
+
         self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
                                                pretrained_dir="", substract_mean=False,  individual_upsamp = individual_upsamp)
 
