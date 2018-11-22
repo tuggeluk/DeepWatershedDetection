@@ -53,8 +53,8 @@ On the main method, give the path of the model we are using to evaluate
 - implements data augmentation (see WORMS paper from Elezi, Tugginer, Pelillo and Stadelmann).
 - implements l2-regularization.
 - implements random search for hyperparameter optimization.
-- in addition to rmsprop, the nets now can be trained using adam and sgd with momentum.
-- implements focal loss.
+- in addition to rmsprop, the nets now can be trained using adam and sgd with momentum (we have done hyperparameter optimization only using rmsprop)
+- implements focal loss (it has been tested that it works, but no hyperparameter optimization has been done).
 - you do not need to track the information on hyperparameters and results, all the needed information is stored on the same folder where is the net.
 - run.sh allows sequential running.
 - a lot of visualization code, for both debugging and testing purposes
