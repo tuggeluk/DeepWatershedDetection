@@ -17,20 +17,18 @@ def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
     if parsed.dataset == 'DeepScores':
-        path = os.path.join("/experiments/music/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
+        path = os.path.join("/experiments/music/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "DeepScores_300dpi":
-        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/RefineNet-Res101", parsed.net_id)
+        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "MUSCIMA":
-        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
+        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "Dota":
-        path = os.path.join("/experiments/realistic/pretrain_lvl_semseg/RefineNet-Res101", parsed.net_id)
-    #pdb.set_trace()
-    debug = False
-    if not debug:
-        net = DWSDetector(imdb, path, individual_upsamp = True)
+        path = os.path.join("/experiments/realistic/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+    if not parsed.debug:
+        net = DWSDetector(imdb, path, parsed)
         all_boxes = test_net(net, imdb, parsed, path)
     else:
-        all_boxes = test_net(False, imdb, parsed, path, debug)
+        all_boxes = test_net(False, imdb, parsed, path, parsed.debug)
 
 
 def test_net(net, imdb, parsed, path, debug=False):
@@ -129,7 +127,13 @@ if __name__ == '__main__':
     elif dataset == 'Dota':
         parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
+    parser.add_argument("--net_type", type=str, default="RefineNet-Res101", help="type of the net")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
+    parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
+    parser.add_argument("--energy_loss", type=str, default="softmax", help="type of the energy loss")
+    parser.add_argument("--class_loss", type=str, default="softmax", help="type of the class loss")
+    parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
+    parser.add_argument("--debug", type=bool, default=True, help="if set to True, it is in debug mode, and instead of running the images on the net, it only evaluates from a previous run")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
