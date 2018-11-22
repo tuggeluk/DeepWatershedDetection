@@ -7,22 +7,22 @@ from PIL import Image
 from main.config import cfg
 import sys
 import cv2
+import pdb
 
 np.random.seed(314)
 tf.set_random_seed(314)
 
 
 class DWSDetector:
-    def __init__(self, imdb, path, individual_upsamp = False):
+    def __init__(self, imdb, path, parsed, individual_upsamp = False):
         self.model_path = path
-        self.model_name = "RefineNet-Res101"
-        self.saved_net = 'backbone'
-        # self.saved_net = "RefineNet-Res101"
-
+        self.split_path = path.split('/') 
+        self.model_name = self.split_path[-2] 
+        self.saved_net = parsed.saved_net
         # has to be adjusted according to the training scheme used
-        self.energy_loss = "softmax"
-        self.class_loss = "softmax"
-        self.bbox_loss = "reg"
+        self.energy_loss = parsed.energy_loss
+        self.class_loss = parsed.class_loss
+        self.bbox_loss = parsed.bbox_loss
 
         self.tf_session = None
         self.root_dir = cfg.ROOT_DIR

@@ -28,7 +28,7 @@ def main(parsed):
     #pdb.set_trace()
     debug = False
     if not debug:
-        net = DWSDetector(imdb, path)
+        net = DWSDetector(imdb, path, parsed)
         all_boxes = test_net(net, imdb, parsed, path)
     else:
         all_boxes = test_net(False, imdb, parsed, path, debug)
@@ -123,6 +123,10 @@ if __name__ == '__main__':
         parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
+    parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
+    parser.add_argument("--energy_loss", type=str, default="softmax", help="type of the energy loss")
+    parser.add_argument("--class_loss", type=str, default="softmax", help="type of the class loss")
+    parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
 
     # configure output heads used ---> have to match trained model
     parsed = parser.parse_known_args()
