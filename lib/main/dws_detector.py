@@ -82,7 +82,7 @@ class DWSDetector:
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
         save_images(canv, dws_list, True, False, self.counter)
-        save_debug_panes()
+        #save_debug_panes(canv)
         self.counter += 1
 
 
