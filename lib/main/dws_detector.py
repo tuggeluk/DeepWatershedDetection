@@ -5,6 +5,7 @@ from models.dwd_net import build_dwd_net
 from main.dws_transform import perform_dws
 from PIL import Image
 from main.config import cfg
+from datasets import fcn_groundtruth
 import sys
 import cv2
 import pdb
@@ -82,7 +83,7 @@ class DWSDetector:
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
         save_images(canv, dws_list, True, False, self.counter)
-        #save_debug_panes(canv)
+        save_debug_panes(canv, pred_energy, pred_class, pred_bbox,self.counter)
         self.counter += 1
 
 
@@ -129,7 +130,17 @@ def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
 
     return
 
-def save_debug_panes(data, gt_boxes=None, gt=False, text=False, counter=0):
+def save_debug_panes(data, pred_energy, pred_class, pred_bbox, counter=0):
     # save panes to disk
+    print("dave panes to disk")
+    panes_list = [[pred_energy, "stamp_energy", "softmax"],
+    [pred_class, "stamp_class", "softmax"],
+    [pred_bbox, "stamp_bbox", "softmax"]]
+
+    for pane in panes_list:
+        pan_vis = fcn_groundtruth.color_map(pane[0], {"stamp_func" : [pane[1]], "stamp_args": {"loss": pane[2]}})
+        im = Image.fromarray(pan_vis)
+        im.save(cfg.ROOT_DIR + "/output_images/" + str(counter)+ pane[1] + '.png')
+
 
     return
