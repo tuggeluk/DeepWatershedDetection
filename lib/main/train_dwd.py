@@ -574,7 +574,8 @@ def get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placehold
         feed_dict[images_placeholders[len(images_placeholders) - 2]] = (
                 blob["helper"] / np.max(blob["helper"]) * 255).astype(np.uint8)
     else:
-        feed_dict[images_placeholders[len(images_placeholders) - 2]] = np.zeros(blob["data"].shape, dtype=np.uint8)
+        data_shape = blob["data"].shape[: -1]+ (3,)
+        feed_dict[images_placeholders[len(images_placeholders) - 2]] = np.zeros(data_shape, dtype=np.uint8)
 
     if blob["data"].shape[3] == 1:
         img_data = np.concatenate([blob["data"], blob["data"], blob["data"]], -1).astype(np.uint8)

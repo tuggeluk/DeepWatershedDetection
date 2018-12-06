@@ -33,6 +33,7 @@ class DWSDetector:
         else:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
 
+        # create and load the net
         self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
                                                pretrained_dir="", substract_mean=False,  individual_upsamp = individual_upsamp)
 
@@ -43,7 +44,7 @@ class DWSDetector:
         self.tf_session = self.sess
         self.counter = 0
 
-    def classify_img(self, img, cutoff=0, min_ccoponent_size=0):
+    def classify_img(self, img, cutoff=0, min_component_size=0):
         """
         This function classifies an image based on the results of the net, has been tested with different values of cutoff and min_component_size and 
         we have observed that it is very robust to perturbations of those values.
@@ -53,7 +54,7 @@ class DWSDetector:
             min_component_size - the minimum size of the connected component
         returns:
             dws_list - the list of bounding boxes the dwdnet infers
-        """
+        """  
         if img.shape[0] > 1:
             img = np.expand_dims(img, 0)
 
@@ -71,14 +72,12 @@ class DWSDetector:
 
         canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
 
-        #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
-
         pred_energy, pred_class, pred_bbox = self.tf_session.run(
             [self.network_heads["stamp_energy"][self.energy_loss][-1],
              self.network_heads["stamp_class"][self.class_loss][-1],
              self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
 
-        #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+        Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
 
@@ -88,16 +87,14 @@ class DWSDetector:
         if self.bbox_loss == "softmax":
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
-
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
-        #save_images(img, dws_list, True, False, self.counter)
+        save_images(img, dws_list, True, False, self.counter)
         self.counter += 1
-
 
         return dws_list
 
 
-def get_images(data, gt_boxes=None, gt=False, text=False):
+def get_images(data, boxes=None, gt=False, text=False):
     """
     Utility function which draws the bounding boxes from both the inference and ground truth, useful to do manual inspection of results
     arguments:
@@ -121,7 +118,6 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
         draw = ImageDraw.Draw(im_gt)
         # overlay GT boxes
         for row in gt_boxes:
-            # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
 
     if text:
@@ -133,7 +129,7 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
     return im_input, im_gt
 
 
-def show_images(data, gt_boxes=None, gt=False, text=False):
+def show_images(data, boxes=None, gt=False, text=False):
     """
     Utility functions which shows the results of get_images in the display window.
     arguments:
@@ -149,7 +145,7 @@ def show_images(data, gt_boxes=None, gt=False, text=False):
     im_gt.show()
 
 
-def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
+def save_images(data, boxes=None, gt=False, text=False, counter=0):
     """
     Utility function which saves the results of get_images.
     arguments:
