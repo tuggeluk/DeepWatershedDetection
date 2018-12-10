@@ -4,8 +4,9 @@ import cv2
 import pickle as cPickle
 from PIL import Image
 import sys
+sys.path.insert(0, '/DeepWatershedDetection/lib')
 sys.path.insert(0, os.path.dirname(__file__)[:-4])
-
+import pdb
 from datasets.factory import get_imdb
 from main.dws_detector import DWSDetector
 from main.config import cfg
@@ -57,25 +58,15 @@ def test_net(net, imdb, parsed, path, debug=False):
     if not debug:
         for i in range(num_images):
             start_time = time.time()
-            if i % 500 == 0:
+            if i%500 == 0:
                 print(i)
             if "realistic" not in path:
-                im = cv2.imread(imdb.image_path_at(i)).convert('L')
-                im = im.astype(np.float32, copy=False)
+                im = Image.open(imdb.image_path_at(i)).convert('L')
             else:
-
-                im = cv2.imread(imdb.image_path_at(i))
-                # im = im[:, :, (2, 1, 0)]
-                #Image.fromarray(im).save(cfg.ROOT_DIR + "/output_images/" + 'input' + '.png')
-                #im.save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
-
-                im = im.astype(np.float32, copy=False)
-                #im -= cfg.PIXEL_MEANS
-                #Image.fromarray(im).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
-
+                im = Image.open(imdb.image_path_at(i))
+            im = np.asanyarray(im)
             im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-            print(im.shape)
-            if im.shape[0] * im.shape[1] > 3837 * 2713:
+            if im.shape[0]*im.shape[1]>3837*2713:
                 continue
 
             boxes = net.classify_img(im, 1, 4)
@@ -106,6 +97,7 @@ def test_net(net, imdb, parsed, path, debug=False):
             cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     else:
+        pdb.set_trace()
         with open(det_file, "rb") as f:
             all_boxes = cPickle.load(f)
 
@@ -117,8 +109,7 @@ def test_net(net, imdb, parsed, path, debug=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
-    parser.add_argument("--debug", type=bool, default=False, help="scale factor applied to images after loading")
-    dataset = 'VOC'
+    dataset = 'DeepScores'
     if dataset == 'MUSCIMA':
         parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
@@ -136,13 +127,13 @@ if __name__ == '__main__':
         parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
     parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of resnet used (RefineNet-Res152/101)")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
-    parser.add_argument("--individual_upsamp", type=str, default="True", help="Are three individual RefineNets used for upsampling")
 
-    parser.add_argument("--saved_net", type=str, default="backbone", help="name of the checkpoint")
+    parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
+    parser.add_argument("--energy_loss", type=str, default="softmax", help="type of the energy loss")
+    parser.add_argument("--class_loss", type=str, default="softmax", help="type of the class loss")
+    parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
+    parser.add_argument("--debug", type=bool, default=False, help="if set to True, it is in debug mode, and instead of running the images on the net, it only evaluates from a previous run")
 
-    parser.add_argument("--energy_loss", type=str, default="softmax", help="loss on energy ")
-    parser.add_argument("--class_loss", type=str, default="softmax", help="loss on class ")
-    parser.add_argument("--bbox_loss", type=str, default="reg", help="loss on bbox")
 
     parsed = parser.parse_known_args()
     main(parsed)
