@@ -107,10 +107,6 @@ def parse_rec_dota(filename, rescale_factor=0.5):
             w = int(float(splitline[4]) * rescale_factor) - int(float(splitline[0]) * rescale_factor)
             h = int(float(splitline[5]) * rescale_factor) - int(float(splitline[1]) * rescale_factor)
             object_struct['area'] = w * h
-            #print('area:', object_struct['area'])
-            # if object_struct['area'] < (15 * 15):
-            #     #print('area:', object_struct['area'])
-            #     object_struct['difficult'] = 1
             objects.append(object_struct)
     return objects
 

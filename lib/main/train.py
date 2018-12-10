@@ -1,12 +1,10 @@
 import os
 import sys
-
-
-# from main.train_dwd import main
-import train_dwd as dwd
+import main.train_dwd as dwd
 import argparse
 import numpy.random as ran
 import random
+import pdb
 
 
 def rnd(lower, higher):
@@ -19,7 +17,6 @@ def main():
     parser = argparse.ArgumentParser()
 
     # default arguments for deep-scores
-
     parser.add_argument("--scale_list", type=list, default=[0.5],
                         help="global scaling factor randomly chosen from this list")
     parser.add_argument("--crop", type=str, default="True", help="should images be cropped")
@@ -49,8 +46,10 @@ def main():
 
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  # code only works with batchsize 1!
+
     parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
+
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
@@ -59,35 +58,44 @@ def main():
     regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "voc_2012_train"
+    dataset = "DeepScores_2017_train"
     if dataset == "DeepScores_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                             help="DeepScores, voc, coco or no - validation set")
     elif dataset == "DeepScores_300dpi_2017_train":
-        parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train",
-                            help="DeepScores, voc or coco")
-        parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
-                            help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+    elif dataset == "DeepScores_ipad_2017_train":
+        parser.add_argument("--dataset", type=str, default="DeepScores_ipad_2017_train", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+    elif dataset == "MUSICMA++_2017_train":
+        parser.add_argument("--dataset", type=str, default="MUSICMA++_2017_train", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+    elif dataset == "Dota_2018_train":
+        parser.add_argument("--dataset", type=str, default="Dota_2018_debug", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="Dota_2018_debug", help="DeepScores, voc, coco or no - validation set")
     elif dataset == "voc_2012_train":
-        parser.add_argument("--dataset", type=str, default="voc_2012_train",
-                            help="DeepScores, voc or coco")
-        parser.add_argument("--dataset_validation", type=str, default="voc_2012_train",
-                            help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="voc_2012_val", help="DeepScores, voc, coco or no - validation set")
+    else:
+        raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
+                         "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")
+
     parser.add_argument("--print_interval", type=int, default=10,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--tensorboard_interval", type=int, default=1,
                         help="after how many iterations is tensorboard updated")
-    parser.add_argument("--save_interval", type=int, default=500,
+    parser.add_argument("--save_interval", type=int, default=50,
                         help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[], help="ignore, will be overwritten by program")
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res152",
+    parser.add_argument('--model', type=str, default="RefineNet-Res101",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
 
     parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput")
 
-    parser.add_argument('--individual_upsamp', type=str, default="True", help="sample gt into imput")
+    parser.add_argument('--individual_upsamp', type=str, default="False", help="sample gt into imput")
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
@@ -109,28 +117,23 @@ def main():
 
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = ran.randint(5000, 20000), ran.randint(5000, 20000), ran.randint(5000,
-                                                                                                                  20000), ran.randint(
-        5000, 10000), ran.randint(5000, 30000)
+
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 50, 50, 50, 50, 50
     parser.add_argument('--do_assign', type=list,
                         default=[
-
-
-                        ], help="configure how assignements get repeated")
+                            {"assign": 0, "help": 0, "Itrs": Itrs0},
+                            {"assign": 1, "help": 0, "Itrs": Itrs1},
+                            {"assign": 2, "help": 0, "Itrs": Itrs2},
+			                {"assign": 0, "help": 0, "Itrs": Itrs0_1}
+                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[
-                            {"assigns": [0, 1, 2], "loss_factors": [1, 1, 1], "Running_Mean_Length": 5, "Itrs": 10000000}],
-                        help="configure how groundtruth is built, see datasets.fcn_groundtruth")
-
-    dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0,
-                 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
-                 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}
-    parser.add_argument("--dict_info", type=dict, default=dict_info,
-                        help="a dictionary containing information about some of the hyperparameters")
-
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+    
+    dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
+		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}
+    parser.add_argument("--dict_info", type=dict, default=dict_info, help="a dictionary containing information about some of the hyperparameters")
     parsed = parser.parse_known_args()
-
     dwd.main(parsed)
 
 
