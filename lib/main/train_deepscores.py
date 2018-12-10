@@ -49,7 +49,7 @@ def main():
 
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  # code only works with batchsize 1!
-    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
@@ -59,7 +59,7 @@ def main():
     regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "DeepScores_2017_train"
+    dataset = "voc_2012_train"
     if dataset == "DeepScores_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
@@ -70,13 +70,13 @@ def main():
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                             help="DeepScores, voc, coco or no - validation set")
     elif dataset == "voc_2012_train":
-        parser.add_argument("--dataset", type=str, default="voc_2012_val",
+        parser.add_argument("--dataset", type=str, default="voc_2012_train",
                             help="DeepScores, voc or coco")
-        parser.add_argument("--dataset_validation", type=str, default="voc_2012_val",
+        parser.add_argument("--dataset_validation", type=str, default="voc_2012_train",
                             help="DeepScores, voc, coco or no - validation set")
     parser.add_argument("--print_interval", type=int, default=10,
                         help="after how many iterations is tensorboard updated")
-    parser.add_argument("--tensorboard_interval", type=int, default=10,
+    parser.add_argument("--tensorboard_interval", type=int, default=1,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=500,
                         help="after how many iterations are the weights saved")
@@ -114,9 +114,7 @@ def main():
         5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 500000},
-                            {"assign": 1, "help": 0, "Itrs": 500000},
-                            {"assign": 2, "help": 0, "Itrs": 500000}
+
 
                         ], help="configure how assignements get repeated")
 

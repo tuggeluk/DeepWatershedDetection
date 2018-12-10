@@ -133,7 +133,7 @@ if __name__ == '__main__':
         parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
     elif dataset == 'VOC':
         parser.add_argument("--dataset", type=str, default='VOC', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
-        parser.add_argument("--test_set", type=str, default="voc_2012_val", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
+        parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
     parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of resnet used (RefineNet-Res152/101)")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
     parser.add_argument("--individual_upsamp", type=str, default="True", help="Are three individual RefineNets used for upsampling")

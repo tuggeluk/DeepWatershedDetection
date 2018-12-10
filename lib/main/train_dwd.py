@@ -235,6 +235,9 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1),
                                                                          [1.0E-6, 1.0E-6, 1.0E-6])
 
+        with open('feed_dict_train.pickle', 'wb') as handle:
+            pickle.dump(feed_dict[input_ph], handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         # train step
         fetch_list = list()
         fetch_list.append(optim)

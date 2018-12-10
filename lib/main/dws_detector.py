@@ -70,6 +70,8 @@ class DWSDetector:
              self.network_heads["stamp_class"][self.class_loss][-1],
              self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
 
+        save_debug_panes(canv, pred_energy, pred_class, pred_bbox,self.counter)
+
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
@@ -83,7 +85,7 @@ class DWSDetector:
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
         save_images(canv, dws_list, True, False, self.counter)
-        save_debug_panes(canv, pred_energy, pred_class, pred_bbox,self.counter)
+
         self.counter += 1
 
 
@@ -125,22 +127,22 @@ def show_images(data, gt_boxes=None, gt=False, text=False):
 
 def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
     im_input, im_gt = get_images(data, gt_boxes, gt, text)
-    im_input.save(cfg.ROOT_DIR + "/output_images/" + str(counter)+ 'input' + '.png')
-    im_gt.save(cfg.ROOT_DIR + "/output_images/" + str(counter) + 'gt' +'.png')
+    im_input.save(cfg.ROOT_DIR + "/output_images/inference/" +  'input' + str(counter)+ '.png')
+    im_gt.save(cfg.ROOT_DIR + "/output_images/inference/"  + 'gt' + str(counter) +'.png')
 
     return
 
 def save_debug_panes(data, pred_energy, pred_class, pred_bbox, counter=0):
     # save panes to disk
-    print("dave panes to disk")
+    print("save panes to disk")
     panes_list = [[pred_energy, "stamp_energy", "softmax"],
     [pred_class, "stamp_class", "softmax"],
     [pred_bbox, "stamp_bbox", "softmax"]]
 
     for pane in panes_list:
         pan_vis = fcn_groundtruth.color_map(pane[0], {"stamp_func" : [pane[1]], "stamp_args": {"loss": pane[2]}})
-        im = Image.fromarray(pan_vis)
-        im.save(cfg.ROOT_DIR + "/output_images/" + str(counter)+ pane[1] + '.png')
+        im = Image.fromarray(pan_vis[0])
+        im.save(cfg.ROOT_DIR + "/output_images/inference/" + pane[1] + str(counter) + '.png')
 
 
     return
