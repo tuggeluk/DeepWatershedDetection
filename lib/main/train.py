@@ -56,7 +56,7 @@ def main():
     regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "Dota_2018_train"
+    dataset = "DeepScores_2017_train"
     if dataset == "DeepScores_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
@@ -86,7 +86,7 @@ def main():
                         help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[], help="ignore, will be overwritten by program")
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res50",
+    parser.add_argument('--model', type=str, default="RefineNet-Res101",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
 
     parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput")
