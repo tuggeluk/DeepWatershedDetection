@@ -42,10 +42,11 @@ The names of an image, its corresponding ground truth, and its corresponding pix
 
 NB: For hyperparameter optimization, we have merged val.txt and test.txt in order to have a validation set which has a higher representation of different classes. For an unbiased evaluation, it is highly recommended to get a new fresh test set and do a single evaluation there (with the best model we have). priority - high.
 
-```
-cd repo_home/lib/demo
-python setup_deepscores.py
-```
+
+MUSICMA++ has a similar structure, with the following difference:
+
+         ```MUSICMA++_2017``` - replaces ```segmentation_detection``` and has the exact structure.
+         
 The full dataset can be downloaded [here](https://tuggeluk.github.io/downloads/). For Pascal VOC data
 please refer to the [official website](http://host.robots.ox.ac.uk/pascal/VOC/).
 
@@ -53,10 +54,12 @@ please refer to the [official website](http://host.robots.ox.ac.uk/pascal/VOC/).
 To train a DWD model DeepScores_dense run:
 ```
 cd repo_home/lib
-python main/train_dwd.py
+python main/train.py
 ```
-`train_dwd.py` contains a variety of configuration possibilities, most of them are easily understood
+`train.py` contains a variety of configuration possibilities, most of them are easily understood
 from the help. Some of the most important ones are explained here:
+
+```dataset = "DeepScores_2017_train"``` tells the classifier which dataset to use for training. Options are ```DeepScores_2017_train``` for DeepScores, ```DeepScores_300dpi_2017_train``` for the scanned version of DeepScores, ```DeepScores_ipad_2017_train``` for the ipad version of DeepScores, ```MUSICMA++_2017_train``` for the handwritten dataset.
 
 + Input Scaling
 
