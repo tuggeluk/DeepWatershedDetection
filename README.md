@@ -20,6 +20,26 @@ As it is, the path for the data should be:
 
 ```/DeepWatershedDetection/data/your_data_set``` for some other dataset you might want to use.
 
+All three DeepScores dataset have the same structure. We will explain the structure of DeepScores_2017, but you can generalize for the other datasets. The directory has the following structure:
+
+```annotations_cache``` - create it using mkdir ```/DeepWatershedDetection/data/DeepScores_2017/annotations_cache```.
+
+```DeepScores_classification``` - contains a single file named ```class_names.csv``` which maps names of musical symbol classes to numbers.
+
+```results``` - contains a folder called ```musical2017``` which contains a folder called ```Main``` needed for internal procedures during training. Please create the folders using mkdir. The path should be ```/DeepWatershedDetection/data/DeepScores_2017/results/musical2017/Main```.
+
+```segmentation_detection``` - contains the dataset with the following structure:
+         
+         ```images_png``` - all images of the data set, in png format.
+         
+         ```pix_annotations_png``` - pixelwise annotations in png format, at the moment is not used, however we plan to use it in the future as an improvement for out model.
+         
+         ```xml_annotations``` - the ground truth for the detection, xml format.
+         
+The names of an image, its corresponding ground truth, and its corresponding pixelwise annotation must be the same. For example, image ```lg-527907832922209940-aug-beethoven--page-5.png``` located in ```images_png``` must have a corresponding   ```lg-527907832922209940-aug-beethoven--page-5.xml``` located in ```xml_annotations``` and might have (optionally) a ```lg-527907832922209940-aug-beethoven--page-5.png``` located in ```pix_annotations_png```.
+
+```train_val_test```
+
 ```
 cd repo_home/lib/demo
 python setup_deepscores.py
