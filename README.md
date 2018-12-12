@@ -38,7 +38,9 @@ All three DeepScores dataset have the same structure. We will explain the struct
          
 The names of an image, its corresponding ground truth, and its corresponding pixelwise annotation must be the same. For example, image ```lg-527907832922209940-aug-beethoven--page-5.png``` located in ```images_png``` must have a corresponding   ```lg-527907832922209940-aug-beethoven--page-5.xml``` located in ```xml_annotations``` and might have (optionally) a ```lg-527907832922209940-aug-beethoven--page-5.png``` located in ```pix_annotations_png```.
 
-```train_val_test```
+```train_val_test``` contains 3 files called train.txt, val.txt and test.txt which have the names of images for training, validation and testing set.
+
+NB: For hyperparameter optimization, we have merged val.txt and test.txt in order to have a validation set which has a higher representation of different classes. For an unbiased evaluation, it is highly recommended to get a new fresh test set and do a single evaluation there (with the best model we have). priority - high.
 
 ```
 cd repo_home/lib/demo
