@@ -130,3 +130,97 @@ On the main method, give the path of the model we are using to evaluate
 - you do not need to track the information on hyperparameters and results, all the needed information is stored on the same folder where is the net.
 - run.sh allows sequential running.
 - a lot of visualization code, for both debugging and testing purposes
+
+#### Citation
+
+If you use this code in any way, please consider using one or more of the following papers:
+
+
+
+```
+For DeepScores dataset, please cite:
+
+@inproceedings{DBLP:conf/icpr/TuggenerESPS18,
+  author    = {Lukas Tuggener and
+               Ismail Elezi and
+               J{\"{u}}rgen Schmidhuber and
+               Marcello Pelillo and
+               Thilo Stadelmann},
+  title     = {DeepScores-A Dataset for Segmentation, Detection and Classification
+               of Tiny Objects},
+  booktitle = {24th International Conference on Pattern Recognition, {ICPR} 2018,
+               Beijing, China, August 20-24, 2018},
+  pages     = {3704--3709},
+  year      = {2018},
+  crossref  = {DBLP:conf/icpr/2018},
+  url       = {https://doi.org/10.1109/ICPR.2018.8545307},
+  doi       = {10.1109/ICPR.2018.8545307},
+  timestamp = {Wed, 05 Dec 2018 13:31:37 +0100},
+  biburl    = {https://dblp.org/rec/bib/conf/icpr/TuggenerESPS18},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+} 
+
+For Deep Watershed Detector model, please cite:
+
+@inproceedings{DBLP:conf/ismir/TuggenerESS18,
+  author    = {Lukas Tuggener and
+               Ismail Elezi and
+               J{\"{u}}rgen Schmidhuber and
+               Thilo Stadelmann},
+  title     = {Deep Watershed Detector for Music Object Recognition},
+  booktitle = {Proceedings of the 19th International Society for Music Information
+               Retrieval Conference, {ISMIR} 2018, Paris, France, September 23-27,
+               2018},
+  pages     = {271--278},
+  year      = {2018},
+  crossref  = {DBLP:conf/ismir/2018},
+  url       = {http://ismir2018.ircam.fr/doc/pdfs/225\_Paper.pdf},
+  timestamp = {Tue, 20 Nov 2018 15:33:12 +0100},
+  biburl    = {https://dblp.org/rec/bib/conf/ismir/TuggenerESS18},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+
+If you use DeepScores_300dpi, DeepScores_ipad or tricks like synthetic augmentation please cite the following papers:
+
+@inproceedings{DBLP:conf/annpr/StadelmannAAADE18,
+  author    = {Thilo Stadelmann and
+               Mohammadreza Amirian and
+               Ismail Arabaci and
+               Marek Arnold and
+               Gilbert Fran{\c{c}}ois Duivesteijn and
+               Ismail Elezi and
+               Melanie Geiger and
+               Stefan L{\"{o}}rwald and
+               Benjamin Bruno Meier and
+               Katharina Rombach and
+               Lukas Tuggener},
+  title     = {Deep Learning in the Wild},
+  booktitle = {Artificial Neural Networks in Pattern Recognition - 8th {IAPR} {TC3}
+               Workshop, {ANNPR} 2018, Siena, Italy, September 19-21, 2018, Proceedings},
+  pages     = {17--38},
+  year      = {2018},
+  crossref  = {DBLP:conf/annpr/2018},
+  url       = {https://doi.org/10.1007/978-3-319-99978-4\_2},
+  doi       = {10.1007/978-3-319-99978-4\_2},
+  timestamp = {Thu, 30 Aug 2018 13:24:28 +0200},
+  biburl    = {https://dblp.org/rec/bib/conf/annpr/StadelmannAAADE18},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+
+@article{DBLP:journals/corr/abs-1810-05423,
+  author    = {Ismail Elezi and
+               Lukas Tuggener and
+               Marcello Pelillo and
+               Thilo Stadelmann},
+  title     = {DeepScores and Deep Watershed Detection: current state and open issues},
+  journal   = {CoRR},
+  volume    = {abs/1810.05423},
+  year      = {2018},
+  url       = {http://arxiv.org/abs/1810.05423},
+  archivePrefix = {arXiv},
+  eprint    = {1810.05423},
+  timestamp = {Tue, 30 Oct 2018 20:39:56 +0100},
+  biburl    = {https://dblp.org/rec/bib/journals/corr/abs-1810-05423},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+```
