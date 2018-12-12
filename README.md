@@ -67,15 +67,48 @@ from the help. Some of the most important ones are explained here:
 
 ```scale_list``` - we have set it to 0.5 in all experiments.
 
-   ...
 + Pretraining
 
-  ...
+```pretrain_lvl``` - the net performs better if it is pretrained in some other task. For DeepScores, we first pretrained the net in semantic segmentation task (option: ```semseg```), for scanned version of DeepScores, we do finetuning of a net already trained on DeepScores (option: ```DeepScores_300dpi_2017_train```).
 
 + Definition of training assignments
 
-  ...
+We do the training in stages, as explained in ISMIR paper. You can set the number of iterations for each task in ```Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined```. For the best results we have so far, we use ```Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 20000, 20000, 20000, 10000, 30000```
 
++ Augmentation with synthetic symbols
+
+Field ```augmentation_type``` sets the synthetic augmentation as described on ANNPR and WORMS papers. By default is set to ```no``` which means no synthetic augmentation. You can set this field to ```up``` which augments 12 synthetic images above the sheet, or ```full``` which creates a page totally synthetized. Augmentation might be considered in cases where the dataset is very unbalanced.
+
++ Base model
+
+Field ```model``` is set by default to ```RefineNet-Res101```, however you can change the model of ResNet to other ResNets.We used for experiments always ResNet101, however ResNet152 should work slightly better (and make both training and inference slower).
+
++ Other important training parameters
+
+We did a random hyperparameter search for learning rate and l2 regularization coefficient. The exact values for these hyperparameters can be seen in the folders for each net, however we found that training works well if learning rate is set close to 5e-5, while l2 is set close to 5e-7. For optimizer we have used rmsprop, however, the code accepts also Adam and SGD with momentum.
+
+
+#### Saving Nets
+
+Nets are saved by default in a path looking like: ```/DeepWatershedDetection/experiments/music/<pretrain level>/<net model>/<net id>```. For example a net trained on DeepScores will be saved on the path: ```/DeepWatershedDetection/experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_0``` where ```run_0, run_1, run_2, ..., run_n``` etc are created automatically for each new run of training. For ```DeepScores_300dpi``` (scans) replace ```pretrain_lvl_semseg``` with ```pretrain_lvl_DeepScores_to_300dpi```, and for the version ```DeepScores_ipad``` (photos) with ```pretrain_lvl_DeepScores_to_ipad```. For MUSCIMA, the path would be ```/DeepWatershedDetection/experiments/music_handwritten/pretrain_lvl_semseg/RefineNet-Res101/run_0```.
+
+On each folder where a net is saved, you will find the following files:
+
+         Files which have the serialized net, can be used for predictions and/or further training of that net:
+         
+                  backbone.data-00000-of-00001
+                  backbone.meta
+                  backbone.index
+                  checkpoint
+                  
+         dict.pickle - a dictionary saved on pickle format which saves information about how the net was trained (number of iterations, optimizer used, augmentation type, learning rate, l2 parameter etc).
+         
+         events.out.tfevents - tensorboard file
+         
+         res-0.5.txt - Average precision in validation set at IoU = 0.5
+         res-0.55.txt - Average precision in validation set at IoU = 0.55
+         ...
+         res-0.95.txt - Average precision in validation set at IoU = 0.95
 
 
 #### Model Evaluation
