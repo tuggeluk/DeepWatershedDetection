@@ -52,6 +52,17 @@ MUSICMA++ has a similar structure, with the following difference:
 The full dataset can be downloaded [here](https://tuggeluk.github.io/downloads/). For Pascal VOC data
 please refer to the [official website](http://host.robots.ox.ac.uk/pascal/VOC/).
 
+#### Preparing a New Dataset
+
+The easiest way to work with a new dataset, is to emulate the structure of one of the mentioned datasets. Assmuing that you build the same structure (save the data in files with the same names in a new folder) then additionally you need to to:
+
+- on ```/DeepWatershedDetection/lib/datasets/``` create a file similar to files for deepscores ```deep_scores.py``` or muscima ```musicma.py```. The file contains a class with all the information, please read ```deep_scores.py``` to understand how to write this file.
+
+- link it on ```factory.py```
+
+- if the dataset ground truth is on some other format, then you need to write a function for it on ```voc_eval.py```. Please look at functions ```parse_rec()``` and ```parse_rec_deepscores``` for an idea on how to write this function.
+
+
 #### Model Training
 To train a DWD model DeepScores_dense run:
 ```
@@ -80,6 +91,9 @@ We do the training in stages, as explained in ISMIR paper. You can set the numbe
 + Augmentation with synthetic symbols
 
 Field ```augmentation_type``` sets the synthetic augmentation as described on ANNPR and WORMS papers. By default is set to ```no``` which means no synthetic augmentation. You can set this field to ```up``` which augments 12 synthetic images above the sheet, or ```full``` which creates a page totally synthetized. Augmentation might be considered in cases where the dataset is very unbalanced.
+
+NB: In case you use ```up``` or ```full``` you need to have the dataset of augmentation in the root of the projects (see: ```/DeepWatershedDetection/new_augmentation_combined``` where ```new_augmentation_combined``` is the folder containing the augmentation. It has the same format as a dataset, in addition to having pickle files for efficiency. This has been done only once, so best thing is to just keep it as it is.
+
 
 + Base model
 
