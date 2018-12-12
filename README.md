@@ -4,9 +4,8 @@ The documentation is intended enable easy use of the code, for an explanation of
 methods please refer to the original publication.
 
 #### Installation
-The code only runs on python version 2.7, to install dependencies run inside the repo base directory (`repo_home`):
-`pip install -r requirements.txt`. The image database module taken from the original [fast r-cnn repository](https://github.com/rbgirshick/fast-rcnn)
-has some cython code that needs to be compiled by running `make all` inside lib.
+The code is tested on python version 3.6 and Tensorflow 1.4.1, to install dependencies run inside the repo base directory (`repo_home`):
+`pip install -r requirements.txt`. The image database module taken from the original [fast r-cnn repository](https://github.com/rbgirshick/fast-rcnn) and it has some cython code that needs to be compiled by running `make all` inside lib.
 
 #### Data
 The training data is expected to be inside `repo_home/data`, you can set up DeepScores_dense (which should suffice for most applications) by running:
