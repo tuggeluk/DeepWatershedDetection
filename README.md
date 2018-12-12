@@ -59,9 +59,13 @@ python main/train.py
 `train.py` contains a variety of configuration possibilities, most of them are easily understood
 from the help. Some of the most important ones are explained here:
 
++ Dataset
+
 ```dataset = "DeepScores_2017_train"``` tells the classifier which dataset to use for training. Options are ```DeepScores_2017_train``` for DeepScores, ```DeepScores_300dpi_2017_train``` for the scanned version of DeepScores, ```DeepScores_ipad_2017_train``` for the ipad version of DeepScores, ```MUSICMA++_2017_train``` for the handwritten dataset.
 
 + Input Scaling
+
+```scale_list``` - we have set it to 0.5 in all experiments.
 
    ...
 + Pretraining
