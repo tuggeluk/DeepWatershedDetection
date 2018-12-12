@@ -118,6 +118,7 @@ In order to evaluate a model run:
 
 
 ```cd DeepWatershedDetection/lib/main```
+
 ```python3 inference.py ```
 
 Important parameters for inference file are:
@@ -132,20 +133,15 @@ Important parameters for inference file are:
     debug - in case you have already done predictions and now you want to just compute mAP
     ```
     
-inference.py heavily uses dws_detector.py file. Please give a look at it how it works     
+inference.py heavily uses dws_detector.py file. Please give a look at it how it works, each method there is commented.     
 
 
 
-#### Recent changes
-- a large part of the code is cleaned, made more human readable and partially optimized.
-- implements data augmentation (see WORMS paper from Elezi, Tugginer, Pelillo and Stadelmann).
-- implements l2-regularization.
-- implements random search for hyperparameter optimization.
-- in addition to rmsprop, the nets now can be trained using adam and sgd with momentum (we have done hyperparameter optimization only using rmsprop)
-- implements focal loss (it has been tested that it works, but no hyperparameter optimization has been done).
-- you do not need to track the information on hyperparameters and results, all the needed information is stored on the same folder where is the net.
-- run.sh allows sequential running.
-- a lot of visualization code, for both debugging and testing purposes
+#### Future Work
+- in addition to rmsprop, the nets now can be trained using adam and sgd with momentum but we need to do hyperparameter optimization for this to work well.
+- focal loss has been implemented and tested that it works, but not how well it works.
+- make the code work for good quality images.
+- Domain adaptation - train in a dataset, test in an another. 
 
 #### Citation
 
