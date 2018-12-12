@@ -8,7 +8,13 @@ The code is tested on python version 3.6 and Tensorflow 1.4.1, to install depend
 `pip install -r requirements.txt`. The image database module taken from the original [fast r-cnn repository](https://github.com/rbgirshick/fast-rcnn) and it has some cython code that needs to be compiled by running `make all` inside lib.
 
 #### Data
-The training data is expected to be inside `repo_home/data`, you can set up DeepScores_dense (which should suffice for most applications) by running:
+As it is, the path for the data should be:
+```/DeepWatershedDetection/data/DeepScores_2017``` for DeepScores.
+```/DeepWatershedDetection/data/DeepScores_300dpi_2017``` for the scanned version of DeepScores.
+```/DeepWatershedDetection/data/DeepScores_ipad_2017``` for the ipad version of DeepScores.
+```/DeepWatershedDetection/data/MUSICMA++_2017``` for MUSCIMA++ dataset.
+```/DeepWatershedDetection/data/your_data_set``` for some other dataset you might want to use.
+
 ```
 cd repo_home/lib/demo
 python setup_deepscores.py
