@@ -20,6 +20,8 @@ As it is, the path for the data should be:
 
 ```/DeepWatershedDetection/data/your_data_set``` for some other dataset you might want to use.
 
+NB: ipad version still doesn't work well (as in, getting decent results on it).
+
 All three DeepScores dataset have the same structure. We will explain the structure of DeepScores_2017, but you can generalize for the other datasets. The directory has the following structure:
 
 ```annotations_cache``` - create it using mkdir ```/DeepWatershedDetection/data/DeepScores_2017/annotations_cache```.
@@ -117,7 +119,20 @@ In order to evaluate a model run:
 cd DeepWatershedDetection/lib/main
 python inference.py
 
-On the main method, give the path of the model we are using to evaluate
+Important parameters for inference file are:
+
+    ```
+    dataset - the dataset you want to do inference in. Use DeepScores, DeepScores_300dpi or MUSCIMA
+    
+    net_type - the type of net you want to use for reference, must be the same as the net you trained. By default it uses RefineNet-Res101
+    
+    net_id - the id of the net you want to perform inference with
+    
+    debug - in case you have already done predictions and now you want to just compute mAP
+    ```
+    
+inference.py heavily uses dws_detector.py file. Please give a look at it how it works     
+
 
 
 #### Recent changes
