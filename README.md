@@ -56,7 +56,7 @@ please refer to the [official website](http://host.robots.ox.ac.uk/pascal/VOC/).
 To train a DWD model DeepScores_dense run:
 ```
 cd repo_home/lib
-python main/train.py
+python3 main/train.py
 ```
 `train.py` contains a variety of configuration possibilities, most of them are easily understood
 from the help. Some of the most important ones are explained here:
@@ -116,8 +116,9 @@ On each folder where a net is saved, you will find the following files:
 #### Model Evaluation
 In order to evaluate a model run:
 
-cd DeepWatershedDetection/lib/main
-python inference.py
+
+```cd DeepWatershedDetection/lib/main```
+```python3 inference.py ```
 
 Important parameters for inference file are:
 
