@@ -2,3 +2,8 @@ easydict
 numpy
 Cython
 tensorflow==1.4.1
+scipy
+pycocotools
+matplotlib
+pandas
+opencv-python
