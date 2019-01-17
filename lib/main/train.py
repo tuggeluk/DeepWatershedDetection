@@ -1,6 +1,7 @@
 import os
 import sys
-import main.train_dwd as dwd
+sys.path.append(os.path.abspath('../'))
+import train_dwd as dwd
 import argparse
 import numpy.random as ran
 import random
@@ -37,7 +38,7 @@ def main():
                         help="wether or not to append Horizontally flipped images")
     parser.add_argument("--substract_mean", type=str, default="False",
                         help="wether or not to substract the mean of the VOC images")
-    parser.add_argument("--pad_to", type=int, default=160,
+    parser.add_argument("--pad_to", type=int, default=0,
                         help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0, help="use this number to pad images")
 
@@ -49,7 +50,6 @@ def main():
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
-
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
@@ -82,43 +82,43 @@ def main():
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
                          "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")
 
-    parser.add_argument("--print_interval", type=int, default=10,
+    parser.add_argument("--print_interval", type=int, default=200,
+                        help="after how many iterations the loss is printed to console")
+    parser.add_argument("--tensorboard_interval", type=int, default=200,
                         help="after how many iterations is tensorboard updated")
-    parser.add_argument("--tensorboard_interval", type=int, default=1,
-                        help="after how many iterations is tensorboard updated")
-    parser.add_argument("--save_interval", type=int, default=50,
+    parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
     parser.add_argument("--nr_classes", type=list, default=[], help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
 
-    parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput")
+    parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput / currently unused")
 
-    parser.add_argument('--individual_upsamp', type=str, default="False", help="sample gt into imput")
+    parser.add_argument('--individual_upsamp', type=str, default="True", help="sample gt into imput")
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
                             # energy markers
                             {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
-                             'stamp_args': {'marker_dim': (17, 17), 'size_percentage': 0.8, "shape": "oval",
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"}},
                             # # class markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
-                             'stamp_args': {'marker_dim': (9, 9), 'size_percentage': 1, "shape": "oval",
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"}},
 
                             # bbox markers
                             {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
-                             'stamp_args': {'marker_dim': (9, 9), 'size_percentage': 1, "shape": "oval", "loss": "reg"}}
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval", "loss": "reg"}}
 
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 50, 50, 50, 50, 50
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000000, 10000, 10000, 10000, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},

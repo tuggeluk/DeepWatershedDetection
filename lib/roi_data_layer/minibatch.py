@@ -21,6 +21,7 @@ from utils.blob import prep_im_for_blob, im_list_to_blob
 from datasets.fcn_groundtruth import get_markers, stamp_class
 import sys
 from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
+from PIL import Image
 
 counter = 0
 
@@ -199,11 +200,23 @@ def _get_image_blob(roidb, scale_inds, args):
     crop_box = []
 
     for i in range(num_images):
-        im = cv2.imread(roidb[i]['image'])
+
+        im = Image.open(roidb[i]['image'])
+        im = np.array(im, dtype=np.float32)
+
+        if "VOC2012" in roidb[i]['image']:
+            # 1 2 0
+            im = im[:, :, (0,1,2)]
+            # substract mean
+            if args.substract_mean == "True":
+                mean = (122.67891434, 116.66876762, 104.00698793)
+                im -= mean
+            #im = im.transpose((2, 0, 1))
+
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
         global_scale = args.scale_list[scale_inds[i]]
-        im, im_scale, im_crop_box = prep_im_for_blob(im, cfg.PIXEL_MEANS, global_scale, args)
+        im, im_scale, im_crop_box = prep_im_for_blob(im, global_scale, args)
 
         crop_box.append(im_crop_box)
         im_scales.append(im_scale)

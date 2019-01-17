@@ -33,6 +33,7 @@ def main(parsed):
     print(args)
     iteration = 1
     np.random.seed(cfg.RNG_SEED)
+
     # load database
     imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val = load_database(args)
 
@@ -519,6 +520,7 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
 
         # train step
         _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
+        blob["data"].shape
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))

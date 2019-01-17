@@ -273,9 +273,11 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     if objectness_settings["downsample_marker"]:
         if objectness_settings["stamp_args"]["loss"] == "softmax":
             sm_dim = canvas.shape[-1]
-            canvas_un_oh = np.argmax(canvas, -1)
+            canvas_un_oh = np.argmax(canvas, -1).astype("uint8")
+
             for x in objectness_settings["ds_factors"][1:]:
-                resized = np.round(cv2.resize(canvas_un_oh, None, None, 1.0/x, 1.0/x, cv2.INTER_NEAREST))
+                shape = (int(np.ceil(float(canvas_un_oh.shape[1]) / x)), int(np.ceil(float(canvas_un_oh.shape[0]) / x)))
+                resized = np.round(cv2.resize(canvas_un_oh, shape, cv2.INTER_NEAREST))
                 resized_oh = np.eye(sm_dim)[resized[:,:]]
                 maps_list.append(np.expand_dims(resized_oh,0))
         else:
@@ -286,7 +288,8 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 #         rez_l = []
                 #         rez_l.append()
                 # else:
-                resized = cv2.resize(canvas, None, None, 1.0 / x, 1.0 / x, cv2.INTER_NEAREST)
+                shape = (int(np.ceil(float(canvas.shape[1]) / x)), int(np.ceil(float(canvas.shape[0]) / x)))
+                resized = cv2.resize(canvas, shape, cv2.INTER_NEAREST)
                 if len(resized.shape) < len(canvas.shape):
                     maps_list.append(np.expand_dims(np.expand_dims(resized, -1),0))
                 else:

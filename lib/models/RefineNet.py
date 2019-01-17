@@ -4,8 +4,20 @@ import models.resnet_v1 as resnet_v1
 
 import os, sys
 
-def Upsampling(inputs,scale):
-    return tf.image.resize_bilinear(inputs, size=[tf.shape(inputs)[1]*scale,  tf.shape(inputs)[2]*scale])
+def Upsampling_scale(inputs,scale):
+    inputs = tf.Print(inputs, [tf.shape(inputs)], "Before scaling")
+    outputs = tf.image.resize_bilinear(inputs, size=[tf.shape(inputs)[1]*scale,  tf.shape(inputs)[2]*scale])
+    outputs = tf.Print(outputs, [tf.shape(outputs)], "After scaling")
+    return outputs
+
+
+def Upsampling(inputs,shape_1, shape_2):
+    #inputs = tf.Print(inputs, [tf.shape(inputs)], "Before scaling")
+    #inputs = tf.Print(inputs, [shape_1, shape_2], "scale goal")
+    outputs = tf.image.resize_bilinear(inputs, size=[shape_1,  shape_2])
+    #outputs = tf.Print(outputs, [tf.shape(outputs)], "After scaling")
+    return outputs
+
 
 def ConvBlock(inputs, n_filters, kernel_size=[3, 3]):
     """
@@ -114,8 +126,8 @@ def MultiResolutionFusion(high_inputs=None,low_inputs=None,n_filters=256):
         rcu_high_1 = high_inputs[0]
         rcu_high_2 = high_inputs[1]
 
-        rcu_high_1 = Upsampling(slim.conv2d(rcu_high_1, n_filters, 3, activation_fn=None),2)
-        rcu_high_2 = Upsampling(slim.conv2d(rcu_high_2, n_filters, 3, activation_fn=None),2)
+        rcu_high_1 = Upsampling(slim.conv2d(rcu_high_1, n_filters, 3, activation_fn=None),tf.shape(rcu_low_1)[1],tf.shape(rcu_low_1)[2])
+        rcu_high_2 = Upsampling(slim.conv2d(rcu_high_2, n_filters, 3, activation_fn=None),tf.shape(rcu_low_1)[1],tf.shape(rcu_low_1)[2])
 
         rcu_high = tf.add(rcu_high_1,rcu_high_2)
 
@@ -175,8 +187,9 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
     Returns:
       RefineNet model
     """
-    if substract_mean:
-        inputs = mean_image_subtraction(inputs)
+    # if substract_mean:
+    #     inputs = mean_image_subtraction(inputs)
+
 
     if preset_model == 'RefineNet-Res50':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
@@ -217,7 +230,8 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
             g[2] = RefineBlock(g[1], h[2])
             g[3] = RefineBlock(g[2], h[3])
 
-            g[3] = Upsampling(g[3], scale=4)
+            g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
+
             g_list.append(g)
 
         return g_list, init_fn
@@ -236,7 +250,7 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
         g[2] = RefineBlock(g[1], h[2])
         g[3] = RefineBlock(g[2], h[3])
 
-        g[3] = Upsampling(g[3], scale=4)
+        g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
 
         # if upscaling_method.lower() == "conv":
         #     net = ConvUpscaleBlock(net, 256, kernel_size=[3, 3], scale=2)

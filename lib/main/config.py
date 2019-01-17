@@ -45,7 +45,7 @@ __C.RNG_SEED = 3
 # Pixel mean values (BGR order) as a (1, 1, 3) array
 # We use the same pixel mean for all networks even though it's not exactly what
 # they were trained with
-__C.PIXEL_MEANS = np.array([[[102.9801, 115.9465, 122.7717]]])
+__C.PIXEL_MEANS = np.array([[[104.00698793, 116.66876762, 122.67891434]]])
 
 
 # Root directory of project
