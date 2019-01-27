@@ -17,10 +17,13 @@ from utils.prefetch_wrapper import PrefetchWrapper
 from tensorflow.python.ops import array_ops
 import pickle
 import pdb
+from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw
 
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, \
-    try_all_assign, get_gt_visuals, get_map_visuals
+    try_all_assign, get_gt_visuals, get_map_visuals, overlayed_image
 
 nr_classes = None
 store_dict = True
@@ -256,10 +259,8 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
             print(past_losses)
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
-            for i in range(len(preped_assigns)):
-                _, _, _, scalar_summary_op, images_summary_op, images_placeholders, _ = preped_assigns[i]
-                post_assign_to_tensorboard(orig_assign[i], i, scalar_summary_op, network_heads, feed_dict, itr, sess,
-                                           writer, blob, images_placeholders, images_summary_op)
+
+            post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess,writer, blob)
 
         if itr % args.save_interval == 0:
             print("saving weights")
@@ -274,26 +275,44 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
     return iteration
 
 
-def post_assign_to_tensorboard(assign, assign_nr, scalar_summary_op, network_heads, feed_dict, itr, sess, writer, blob,
-                               images_placeholders, images_summary_op):
-    fetch_list = [scalar_summary_op]
-    # fetch sub_predicitons
-    nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob):
 
-    [fetch_list.append(
-        network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-        in
-        range(len(assign["ds_factors"]))]
+    gt_visuals = []
+    map_visuals = []
+    # post scalar summary per assign, store fetched maps
+    for i in range(len(preped_assigns)):
+        assign = orig_assign[i]
+        _, _, _, scalar_summary_op, images_summary_op, images_placeholders, _ = preped_assigns[i]
+        fetch_list = [scalar_summary_op]
+        # fetch sub_predicitons
+        nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
-    summary = sess.run(fetch_list, feed_dict=feed_dict)
-    writer.add_summary(summary[0], float(itr))
+        [fetch_list.append(
+            network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+            in
+            range(len(assign["ds_factors"]))]
 
-    gt_visuals = get_gt_visuals(blob, assign, assign_nr, pred_boxes=None, show=False)
-    map_visuals = get_map_visuals(summary[1:], assign, show=False)
-    images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
+        summary = sess.run(fetch_list, feed_dict=feed_dict)
+        writer.add_summary(summary[0], float(itr))
+
+        gt_visual = get_gt_visuals(blob, assign, i, pred_boxes=None, show=False)
+        map_visual = get_map_visuals(summary[1:], assign, show=False)
+        gt_visuals.append(gt_visual)
+        map_visuals.append(map_visual)
+
+    # stitch one large image out of all assigns
+    stitched_img = get_stitched_tensorboard_image(orig_assign, gt_visuals, map_visuals, blob, itr)
+    stitched_img = np.expand_dims(stitched_img, 0)
+    #obsolete
+    #images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
+    images_feed_dict = dict()
+    images_feed_dict[images_placeholders[0]] = stitched_img
+
     # save images to tensorboard
     summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
     writer.add_summary(summary[0], float(itr))
+    
+
     return None
 
 
@@ -463,20 +482,21 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
     images_sums = []
     images_placeholders = []
 
-    # feature maps
-    for i in range(len(assign["ds_factors"])):
-        sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-        images_placeholders.append(sub_prediction_placeholder)
-        images_sums.append(
-            tf.summary.image('sub_prediction_' + str(i) + "_" + get_config_id(assign), sub_prediction_placeholder))
-
-    helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    images_placeholders.append(helper_img)
-    images_sums.append(tf.summary.image('helper' + str(i) + get_config_id(assign), helper_img))
+    # MOVE TO ONE BIT IMAGE THAT IS STITCHED MANUALLY FOR EACH UPDATE
+    # # feature maps
+    # for i in range(len(assign["ds_factors"])):
+    #     sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    #     images_placeholders.append(sub_prediction_placeholder)
+    #     images_sums.append(
+    #         tf.summary.image('sub_prediction_' + str(i) + "_" + get_config_id(assign), sub_prediction_placeholder))
+    #
+    # helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    # images_placeholders.append(helper_img)
+    # images_sums.append(tf.summary.image('helper' + str(i) + get_config_id(assign), helper_img))
 
     final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_placeholders.append(final_pred_placeholder)
-    images_sums.append(tf.summary.image('final_predictions_' + str(i) + get_config_id(assign), final_pred_placeholder))
+    images_sums.append(tf.summary.image('DWD_debug_img', final_pred_placeholder))
     images_summary_op = tf.summary.merge(images_sums)
 
     return loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, loss_mask_placeholders
@@ -502,6 +522,9 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
             else:
                 batch_not_loaded = False
 
+        #disable all helpers
+        blob["helper"] = None
+
         if blob["helper"] is not None:
             input_data = np.concatenate([blob["data"], blob["helper"]], -1)
             feed_dict = {input: input_data}
@@ -520,7 +543,6 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
 
         # train step
         _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
-        blob["data"].shape
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
@@ -539,9 +561,17 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
             summary = sess.run(fetch_list, feed_dict=feed_dict)
             writer.add_summary(summary[0], float(itr))
 
+            # feed one stitched image to summary op
             gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
             map_visuals = get_map_visuals(summary[1:], assign, show=False)
-            images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
+
+            stitched_img = get_stitched_tensorboard_image([assign], [gt_visuals], [map_visuals], blob, itr)
+            stitched_img = np.expand_dims(stitched_img, 0)
+            # obsolete
+            #images_feed_dict = get_images_feed_dict(assign, blob, None, None, images_placeholders)
+            images_feed_dict = dict()
+            images_feed_dict[images_placeholders[0]] = stitched_img
+
             # save images to tensorboard
             summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
             writer.add_summary(summary[0], float(itr))
@@ -567,6 +597,9 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
 
 
 def get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders):
+
+    # obsolete, should not be used!
+
     feed_dict = dict()
     # reverse map vis order
     for i in range(len(assign["ds_factors"])):
@@ -589,6 +622,45 @@ def get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placehold
     feed_dict[images_placeholders[len(images_placeholders) - 1]] = img_data
     return feed_dict
 
+
+def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
+    pix_spacer = 3
+
+
+    print("doit!")
+    # input image + gt
+    input_gt = overlayed_image(blob["data"][0], gt_boxes=blob["gt_boxes"][0], pred_boxes=None)
+
+    # input image + prediction
+    #TODO get actual predictions
+    input_pred = overlayed_image(blob["data"][0], gt_boxes=None, pred_boxes=blob["gt_boxes"][0])
+
+    # concat inputs
+    conc = np.concatenate((input_gt, np.zeros((input_gt.shape[0],pix_spacer,3)).astype("uint8"), input_pred), axis = 1)
+    # im = Image.fromarray(conc)
+    # im.save(sys.argv[0][:-17] + "asdfsadfa.png")
+
+    # iterate over tasks
+    for i in range(len(assign)):
+        # concat task outputs
+        for ii in range(len(assign[i]["ds_factors"])):
+            sub_map = np.concatenate([gt_visuals[i][ii], np.zeros((gt_visuals[i][ii].shape[0], pix_spacer,3)).astype("uint8"), map_visuals[i][ii]], axis = 1)
+            if sub_map.shape[1] != conc.shape[1]:
+                expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
+                expand[:, 0:sub_map.shape[1]] = sub_map
+                sub_map = expand.astype("uint8")
+            conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1],3)).astype("uint8"),sub_map), axis = 0)
+
+    # prepend additional info
+    add_info = Image.fromarray(np.ones((50, conc.shape[1],3), dtype="uint8")*255)
+
+    draw = ImageDraw.Draw(add_info)
+    font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf", 18)
+    draw.text((2, 2), "Iteration Nr: " + str(itr), (0, 0, 0), font=font)
+    add_info = np.asarray(add_info).astype("uint8")
+    #add_info.save(sys.argv[0][:-17] + "add_info.png")
+    conc = np.concatenate((add_info, conc), axis=0)
+    return conc
 
 def get_gt_placeholders(assign, imdb):
     gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes)

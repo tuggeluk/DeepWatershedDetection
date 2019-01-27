@@ -245,7 +245,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
             else:
                 canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.expand_dims(np.max(np.concatenate([canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp],-1),-1),-1)
         elif objectness_settings["overlap_solution"] == "no":
-            canvas[coords[1]:coords[3],coords[0]:coords[2]] = stamp
+            canvas[coords[1]:coords[3], coords[0]:coords[2]] = stamp
         elif objectness_settings["overlap_solution"] == "nearest":
             closest_mask = get_closest_mask(coords, used_coords)
             if objectness_settings["stamp_args"]["loss"] == "softmax":
@@ -554,6 +554,9 @@ def stamp_class(bbox, args, nr_classes):
               topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
 
 
+    # transpose bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1, 0]]
+
     # piggy back on energy marker
     marker = get_energy_marker(marker_size, args["shape"])
 
@@ -604,6 +607,8 @@ def stamp_bbox(bbox, args, nr_classes):
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
 
+    # transpose bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1, 0]]
 
     # piggy back on energy marker
     marker = get_energy_marker(marker_size, args["shape"])
@@ -691,7 +696,7 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     # add mean
     #image += cfg.PIXEL_MEANS[0][0][[0,1,2]]
     if len(image.shape)==3 and  image.shape[2]>=3:
-        image = image[:,:,[2,1,0]] # Switch to rgb
+        # image = image[:,:,[2,1,0]] # Switch to rgb
         im = Image.fromarray(image.astype("uint8"))
     else:
         im = Image.fromarray(np.squeeze(image.astype("uint8"),-1))
@@ -712,7 +717,7 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
         for row in pred_boxes:
             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[1], outline=outline[1])
     if show:
-        im.save(sys.argv[0][:-24] + "inp.png")
+        im.save(sys.argv[0][:-17] + "inp.png")
         im.show()
     return np.asarray(im).astype("uint8")
 

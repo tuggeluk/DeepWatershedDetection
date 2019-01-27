@@ -84,7 +84,7 @@ def main():
 
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
-    parser.add_argument("--tensorboard_interval", type=int, default=200,
+    parser.add_argument("--tensorboard_interval", type=int, default=1,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
@@ -100,12 +100,12 @@ def main():
     parser.add_argument('--training_assignements', type=list,
                         default=[
                             # energy markers
-                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'max',
+                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"}},
                             # # class markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'no',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
                              'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"}},
@@ -118,7 +118,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000000, 10000, 10000, 10000, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10000, 10000, 10000, 10000, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
