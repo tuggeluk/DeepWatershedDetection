@@ -84,10 +84,19 @@ def main(parsed):
     network_heads, init_fn = build_dwd_net(
         input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp)
 
+    # use just one image summary OP for all tasks
+    final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    images_sums = []
+    images_placeholders = []
+
+    images_placeholders.append(final_pred_placeholder)
+    images_sums.append(tf.summary.image('DWD_debug_img', final_pred_placeholder))
+    images_summary_op = tf.summary.merge(images_sums)
+
     # initialize tasks
     preped_assign = []
     for assign in args.training_assignements:
-        [loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders,
+        [loss, optim, gt_placeholders, scalar_summary_op,
          mask_placholders] = initialize_assignement(assign, imdb, network_heads, sess, data_layer, input, args)
         preped_assign.append(
             [loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, mask_placholders])
@@ -479,27 +488,28 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
 
     scalar_summary_op = tf.summary.merge(scalar_sums)
 
-    images_sums = []
-    images_placeholders = []
-
-    # MOVE TO ONE BIT IMAGE THAT IS STITCHED MANUALLY FOR EACH UPDATE
-    # # feature maps
-    # for i in range(len(assign["ds_factors"])):
-    #     sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    #     images_placeholders.append(sub_prediction_placeholder)
-    #     images_sums.append(
-    #         tf.summary.image('sub_prediction_' + str(i) + "_" + get_config_id(assign), sub_prediction_placeholder))
+    # images_sums = []
+    # images_placeholders = []
     #
-    # helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    # images_placeholders.append(helper_img)
-    # images_sums.append(tf.summary.image('helper' + str(i) + get_config_id(assign), helper_img))
+    # # MOVE TO ONE BIG IMAGE THAT IS STITCHED MANUALLY FOR EACH UPDATE
+    # # # feature maps
+    # # for i in range(len(assign["ds_factors"])):
+    # #     sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    # #     images_placeholders.append(sub_prediction_placeholder)
+    # #     images_sums.append(
+    # #         tf.summary.image('sub_prediction_' + str(i) + "_" + get_config_id(assign), sub_prediction_placeholder))
+    # #
+    # # helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    # # images_placeholders.append(helper_img)
+    # # images_sums.append(tf.summary.image('helper' + str(i) + get_config_id(assign), helper_img))
+    #
+    # #final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    #
+    # images_placeholders.append(final_pred_placeholder)
+    # images_sums.append(tf.summary.image('DWD_debug_img', final_pred_placeholder))
+    # images_summary_op = tf.summary.merge(images_sums)
 
-    final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    images_placeholders.append(final_pred_placeholder)
-    images_sums.append(tf.summary.image('DWD_debug_img', final_pred_placeholder))
-    images_summary_op = tf.summary.merge(images_sums)
-
-    return loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, loss_mask_placeholders
+    return loss, optim, gt_placeholders, scalar_summary_op, loss_mask_placeholders
 
 
 def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,

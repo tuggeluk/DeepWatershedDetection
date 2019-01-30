@@ -236,7 +236,19 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
         stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
         if stamp is None:
+            print("skipping element")
             continue #skip this element
+
+         #TODO overwrite empty/zero parts of stamp with canv content
+        if objectness_settings["stamp_args"]["loss"] == "softmax":
+            stamp_zeros = stamp[:, :, 0] == 1
+            stamp_zeros = np.expand_dims(stamp_zeros,-1).astype("int")
+            stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
+
+        else:
+            stamp_zeros = stamp == 0
+            stamp_zeros = stamp_zeros.astype("int")
+            stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
 
         if objectness_settings["overlap_solution"] == "max":
             if objectness_settings["stamp_args"]["loss"]=="softmax":

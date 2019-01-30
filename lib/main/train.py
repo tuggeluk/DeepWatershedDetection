@@ -84,7 +84,7 @@ def main():
 
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
-    parser.add_argument("--tensorboard_interval", type=int, default=1,
+    parser.add_argument("--tensorboard_interval", type=int, default=2,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
@@ -118,7 +118,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10000, 10000, 10000, 10000, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10, 10, 10, 10, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
