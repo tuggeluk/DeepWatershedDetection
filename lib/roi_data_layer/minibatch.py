@@ -216,7 +216,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                 # weigh each position by the inverse of its size
                 unique_counts = np.unique(fg_map, return_counts=1)
 
-                for ele in range(len(1, unique_counts[0])):
+                for ele in range(1, len(unique_counts[0])):
                     fg_copy[fg_map == unique_counts[0][ele]] = sum(unique_counts[1])/unique_counts[1][ele]
 
                 blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_copy[0], -1)

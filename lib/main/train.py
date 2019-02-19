@@ -100,16 +100,16 @@ def main():
     parser.add_argument('--training_assignements', type=list,
                         default=[
                             # energy markers
-                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'no',
+                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'no',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
+                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"},
                              'balance_mask': 'fg_bg_balanced' # by_class, by_object, fg_bg, mask_bg, None
                              },
                             # # class markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
+                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"},
                              'balance_mask': 'by_class_no_bg'
                              },
@@ -117,7 +117,7 @@ def main():
                             # bbox markers
                             {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval", "loss": "reg"},
+                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval", "loss": "reg"},
                              'balance_mask': 'mask_bg'
                              }
 
@@ -134,7 +134,7 @@ def main():
                          ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [1,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
 		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}
