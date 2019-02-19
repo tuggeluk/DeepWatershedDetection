@@ -239,7 +239,6 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
             print("skipping element")
             continue #skip this element
 
-         #TODO overwrite empty/zero parts of stamp with canv content
         if objectness_settings["stamp_args"]["loss"] == "softmax":
             stamp_zeros = stamp[:, :, 0] == 1
             stamp_zeros = np.expand_dims(stamp_zeros,-1).astype("int")

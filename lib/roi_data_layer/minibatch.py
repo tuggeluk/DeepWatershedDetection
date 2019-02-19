@@ -143,20 +143,94 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
         for i2 in range(len(assign[i1]["ds_factors"])):
             blobs["assign" + str(i1)]["gt_map" + str(i2)] = markers_list[i2]
 
-    # get loss masks
+    # Build loss masks
+    # mask out background for class and bounding box predictions
+    # also used for class/object weight balancing
     for i1 in range(len(assign)):
         for i2 in range(len(assign[i1]["ds_factors"])):
-            if assign[i1]["mask_zeros"]:
+            if assign[i1]["balance_mask"] == "mask_bg":
+                # background has weight zero
                 if assign[i1]["stamp_args"]["loss"] == "softmax":
                     fg_map = np.argmax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
                 else:
                     fg_map = np.amax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
                 fg_map[fg_map != 0] = 1
-                fg_map = fg_map / (np.sum(fg_map) + 1) * (fg_map.shape[1] + 1)
+                fg_map = fg_map / (np.sum(fg_map) + 1)
 
                 blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_map[0], -1)
-            else:
+
+            elif assign[i1]["balance_mask"] == "fg_bg_balanced":
+                # foreground and background have the same weight
+                if assign[i1]["stamp_args"]["loss"] == "softmax":
+                    fg_map = np.argmax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
+                else:
+                    fg_map = np.amax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
+                fg_map[fg_map != 0] = 1
+
+                fg_copy = np.copy(fg_map).astype("float64")
+                # weigh each position by the inverse of its size
+                unique_counts = np.unique(fg_map, return_counts=1)
+
+                for ele in range(len(unique_counts[0])):
+                    fg_copy[fg_map == unique_counts[0][ele]] = sum(unique_counts[1])/unique_counts[1][ele]
+
+                blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_copy[0], -1)
+
+            elif assign[i1]["balance_mask"] == "by_object":
+                # each object has the same weight (background is one object)
+                print("Unknown loss mask command")
+                sys.exit(1)
+
+
+            elif assign[i1]["balance_mask"] == "by_class":
+                # each class has the same weight ( background is one class)
+                if assign[i1]["stamp_args"]["loss"] == "softmax":
+                    fg_map = np.argmax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
+                else:
+                    fg_map = np.amax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
+
+                fg_copy = np.copy(fg_map).astype("float64")
+                # weigh each position by the inverse of its size
+                unique_counts = np.unique(fg_map, return_counts=1)
+
+                for ele in range(len(unique_counts[0])):
+                    fg_copy[fg_map == unique_counts[0][ele]] = sum(unique_counts[1])/unique_counts[1][ele]
+
+                blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_copy[0], -1)
+
+
+            elif assign[i1]["balance_mask"] == "by_object_no_bg":
+                # each object has the same weight (background has no weight)
+                print("Unknown loss mask command")
+                sys.exit(1)
+
+
+            elif assign[i1]["balance_mask"] == "by_class_no_bg":
+                # each class has the same weight ( background discarded)
+                if assign[i1]["stamp_args"]["loss"] == "softmax":
+                    fg_map = np.argmax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
+                else:
+                    fg_map = np.amax(blobs["assign" + str(i1)]["gt_map" + str(i2)], -1)
+
+                fg_copy = np.copy(fg_map).astype("float64")
+                # weigh each position by the inverse of its size
+                unique_counts = np.unique(fg_map, return_counts=1)
+
+                for ele in range(len(1, unique_counts[0])):
+                    fg_copy[fg_map == unique_counts[0][ele]] = sum(unique_counts[1])/unique_counts[1][ele]
+
+                blobs["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_copy[0], -1)
+
+
+            elif assign[i1]["balance_mask"] is None:
+                # do nothing / multiply everything by 1
                 blobs["assign" + str(i1)]["mask" + str(i2)] = np.ones(blobs["assign" + str(i1)]["gt_map" + str(i2)].shape[:-1] + (1,))[0]
+
+            else:
+                print("Unknown loss mask command")
+                sys.exit(1)
+
+
     # set helper to None
     blobs["helper"] = None
     gt_boxes.extend(new_boxes)

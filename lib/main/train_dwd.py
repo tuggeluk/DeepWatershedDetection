@@ -29,8 +29,6 @@ nr_classes = None
 store_dict = True
 
 
-# - make different FCN architecture available --> RefineNet, DeepLabv3, standard fcn
-
 def main(parsed):
     args = parsed[0]
     print(args)

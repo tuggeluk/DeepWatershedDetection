@@ -101,19 +101,25 @@ def main():
                         default=[
                             # energy markers
                             {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'no',
-                             'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
+                             'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
-                                            "loss": "softmax", "energy_shape": "linear"}},
+                                            "loss": "softmax", "energy_shape": "linear"},
+                             'balance_mask': 'fg_bg_balanced' # by_class, by_object, fg_bg, mask_bg, None
+                             },
                             # # class markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
+                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
-                                            "class_resolution": "class", "loss": "softmax"}},
+                                            "class_resolution": "class", "loss": "softmax"},
+                             'balance_mask': 'by_class_no_bg'
+                             },
 
                             # bbox markers
                             {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg', 'mask_zeros': True,
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval", "loss": "reg"}}
+                             'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval", "loss": "reg"},
+                             'balance_mask': 'mask_bg'
+                             }
 
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
