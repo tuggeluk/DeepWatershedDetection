@@ -48,7 +48,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  # code only works with batchsize 1!
 
-    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
@@ -84,7 +84,7 @@ def main():
 
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
-    parser.add_argument("--tensorboard_interval", type=int, default=2,
+    parser.add_argument("--tensorboard_interval", type=int, default=200,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
@@ -134,7 +134,7 @@ def main():
                          ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [1,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
 		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}

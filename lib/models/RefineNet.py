@@ -216,7 +216,7 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
         f = [end_points['pool5'], end_points['pool4'],
              end_points['pool3'], end_points['pool2']]
 
-        us_stages = ["energy", "classes", "bbox"]
+        us_stages = ["energy", "classes", "bbox", "semseg"]
         g_list = list()
         for stage in us_stages:
             g = [None, None, None, None]
