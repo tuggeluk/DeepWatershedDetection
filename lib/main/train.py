@@ -84,7 +84,7 @@ def main():
 
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
-    parser.add_argument("--tensorboard_interval", type=int, default=200,
+    parser.add_argument("--tensorboard_interval", type=int, default=1,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
@@ -99,11 +99,19 @@ def main():
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
+
+                            # semseg
+                            # {'ds_factors': [1, 8],
+                            #  'stamp_func': 'stamp_semseg', 'layer_loss_aggregate': 'avg',
+                            #  'stamp_args': {"loss": "softmax"},
+                            #  'balance_mask': None  # by_class, by_object, fg_bg, mask_bg, None
+                            #  },
+
                             # energy markers
-                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'no',
+                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
-                                            "loss": "softmax", "energy_shape": "linear"},
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
+                                            "loss": "softmax", "energy_shape": "quadratic"},
                              'balance_mask': 'fg_bg_balanced' # by_class, by_object, fg_bg, mask_bg, None
                              },
                             # # class markers
@@ -124,7 +132,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10, 10, 10, 10, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000000, 10, 10, 10, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},

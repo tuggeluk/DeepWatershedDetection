@@ -108,7 +108,7 @@ def get_partial_marker(canvas_shape, coords, mark):
     crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], canvas_shape[1]-1)
 
     # if a dimension collapses kill element
-    if crop_coords[0] == crop_coords[1] or crop_coords[2]==crop_coords[3]:
+    if crop_coords[0] == crop_coords[2] or crop_coords[1]==crop_coords[3]:
         return None, None
 
     # if marker has bigger size than coords
@@ -235,8 +235,12 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     for bbox in sampled_gt:
         stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
         stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
+
         if stamp is None:
             print("skipping element")
+            stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+            stamp, coords = get_partial_marker(canvas.shape, coords, stamp)
+            print(bbox)
             continue #skip this element
 
         if objectness_settings["stamp_args"]["loss"] == "softmax":
@@ -429,6 +433,11 @@ def get_direction_marker(size, shape, hole):
 
     return marker
 
+def stamp_semseg(bbox,args,nr_classes):
+    if bbox is None:
+        return nr_classes
+
+    print("not implemented")
 
 def stamp_energy(bbox,args,nr_classes):
 

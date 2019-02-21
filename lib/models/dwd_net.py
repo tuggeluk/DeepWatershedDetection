@@ -40,7 +40,7 @@ def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False,
 
             # semseg
             network_heads["stamp_semseg"] = dict()
-            network_heads["stamp_class"]["softmax"] = [slim.conv2d(g[3][x], num_classes, [1, 1], activation_fn=None, scope='semseg_' + str(x)) for x in range(0, len(g[3]))]
+            network_heads["stamp_semseg"]["softmax"] = [slim.conv2d(g[3][x], num_classes, [1, 1], activation_fn=None, scope='semseg_' + str(x)) for x in range(0, len(g[3]))]
 
 
 
@@ -74,7 +74,7 @@ def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False,
 
                         # semseg
             network_heads["stamp_semseg"] = dict()
-            network_heads["stamp_class"]["softmax"] = [slim.conv2d(g[x], num_classes, [1, 1], activation_fn=None, scope='semseg_' + str(x)) for x in range(0, len(g))]
+            network_heads["stamp_semseg"]["softmax"] = [slim.conv2d(g[x], num_classes, [1, 1], activation_fn=None, scope='semseg_' + str(x)) for x in range(0, len(g))]
 
             return network_heads, init_fn
 

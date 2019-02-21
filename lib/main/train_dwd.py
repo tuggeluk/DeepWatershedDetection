@@ -22,7 +22,7 @@ from PIL import ImageFont
 from PIL import ImageDraw
 
 
-from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, \
+from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, stamp_semseg, \
     try_all_assign, get_gt_visuals, get_map_visuals, overlayed_image
 
 nr_classes = None
@@ -635,7 +635,7 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     pix_spacer = 3
 
 
-    print("doit!")
+    #print("doit!")
     # input image + gt
     input_gt = overlayed_image(blob["data"][0], gt_boxes=blob["gt_boxes"][0], pred_boxes=None)
 
@@ -658,6 +658,28 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
                 expand[:, 0:sub_map.shape[1]] = sub_map
                 sub_map = expand.astype("uint8")
             conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1],3)).astype("uint8"),sub_map), axis = 0)
+
+
+    # show loss masks if necessary
+    show_masks = True
+    if show_masks:
+        for i in range(len(assign)):
+            # concat task outputs
+            for ii in range(len(assign[i]["ds_factors"])):
+                mask = blob["assign"+str(i)]["mask"+str(ii)]
+                mask = mask/np.max(mask)*255
+                mask = np.concatenate([mask,mask,mask], -1)
+
+                sub_map = np.concatenate(
+                    [gt_visuals[i][ii], np.zeros((gt_visuals[i][ii].shape[0], pix_spacer, 3)).astype("uint8"),
+                     mask.astype("uint8")], axis=1)
+                if sub_map.shape[1] != conc.shape[1]:
+                    expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
+                    expand[:, 0:sub_map.shape[1]] = sub_map
+                    sub_map = expand.astype("uint8")
+                conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1], 3)).astype("uint8"), sub_map), axis=0)
+
+
 
     # prepend additional info
     add_info = Image.fromarray(np.ones((50, conc.shape[1],3), dtype="uint8")*255)
@@ -719,7 +741,8 @@ def save_objectness_function_handles(args, imdb):
     FUNCTION_MAP = {'stamp_directions': stamp_directions,
                     'stamp_energy': stamp_energy,
                     'stamp_class': stamp_class,
-                    'stamp_bbox': stamp_bbox
+                    'stamp_bbox': stamp_bbox,
+                    'stamp_semseg': stamp_semseg
                     }
 
     for obj_setting in args.training_assignements:
