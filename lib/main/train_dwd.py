@@ -36,14 +36,18 @@ def main(parsed):
     np.random.seed(cfg.RNG_SEED)
 
     # load database
-    imdb, roidb, imdb_val, roidb_val, data_layer, data_layer_val = load_database(args)
+    imdb_train, roidb_train, imdb_val, roidb_val, data_layer_train, data_layer_val = load_database(args)
+
+    imdb = [imdb_train, imdb_val]
+    data_layer = [data_layer_train, data_layer_val]
+
 
     global nr_classes
-    nr_classes = len(imdb._classes)
+    nr_classes = len(imdb_train._classes)
     args.nr_classes.append(nr_classes)
 
     # replaces keywords with function handles in training assignements
-    save_objectness_function_handles(args, imdb)
+    save_objectness_function_handles(args)
 
     # tensorflow session
     config = tf.ConfigProto()
@@ -83,13 +87,25 @@ def main(parsed):
         input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp)
 
     # use just one image summary OP for all tasks
-    final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    # train
+    train_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
     images_sums = []
     images_placeholders = []
 
-    images_placeholders.append(final_pred_placeholder)
-    images_sums.append(tf.summary.image('DWD_debug_img', final_pred_placeholder))
-    images_summary_op = tf.summary.merge(images_sums)
+    images_placeholders.append(train_pred_placeholder)
+    images_sums.append(tf.summary.image('DWD_debug_train_img', train_pred_placeholder))
+    train_images_summary_op = tf.summary.merge(images_sums)
+
+    # valid
+    valid_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
+    images_sums = []
+
+    images_placeholders.append(valid_pred_placeholder)
+    images_sums.append(tf.summary.image('DWD_debug_valid_img', valid_pred_placeholder))
+    valid_images_summary_op = tf.summary.merge(images_sums)
+
+    images_summary_op = [train_images_summary_op, valid_images_summary_op]
+
 
     # initialize tasks
     preped_assign = []
@@ -171,6 +187,9 @@ def main(parsed):
                                 network_heads, sess, checkpoint_dir, checkpoint_name, saver, writer)
 
     print("done :)")
+
+def run_batch_combined_assign():
+    return "fetched_loss"
 
 
 def execute_combined_assign(args, data_layer, training_help, orig_assign, preped_assigns, loss_factors, do_comb_itr,
@@ -282,7 +301,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
     return iteration
 
 
-def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob):
+def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob, valid = 0):
 
     gt_visuals = []
     map_visuals = []
@@ -290,7 +309,7 @@ def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_
     for i in range(len(preped_assigns)):
         assign = orig_assign[i]
         _, _, _, scalar_summary_op, images_summary_op, images_placeholders, _ = preped_assigns[i]
-        fetch_list = [scalar_summary_op]
+        fetch_list = [scalar_summary_op[valid]]
         # fetch sub_predicitons
         nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
@@ -313,10 +332,10 @@ def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_
     #obsolete
     #images_feed_dict = get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders)
     images_feed_dict = dict()
-    images_feed_dict[images_placeholders[0]] = stitched_img
+    images_feed_dict[images_placeholders[valid]] = stitched_img
 
     # save images to tensorboard
-    summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
+    summary = sess.run([images_summary_op[valid]], feed_dict=images_feed_dict)
     writer.add_summary(summary[0], float(itr))
     
 
@@ -477,14 +496,24 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
     # init summary operations
     # define summary ops
     scalar_sums = []
-
-    scalar_sums.append(tf.summary.scalar("loss " + get_config_id(assign) + ":", loss))
+    scalar_sums.append(tf.summary.scalar("train_loss " + get_config_id(assign) + ":", loss))
 
     for comp_nr in range(len(loss_components)):
-        scalar_sums.append(tf.summary.scalar("loss_component " + get_config_id(assign) + "Nr" + str(comp_nr) + ":",
+        scalar_sums.append(tf.summary.scalar("train_loss_component " + get_config_id(assign) + "Nr" + str(comp_nr) + ":",
                                              final_loss_components[comp_nr]))
 
-    scalar_summary_op = tf.summary.merge(scalar_sums)
+    train_scalar_summary_op = tf.summary.merge(scalar_sums)
+
+    scalar_sums = []
+    scalar_sums.append(tf.summary.scalar("valid_loss " + get_config_id(assign) + ":", loss))
+
+    for comp_nr in range(len(loss_components)):
+        scalar_sums.append(tf.summary.scalar("valid_loss_component " + get_config_id(assign) + "Nr" + str(comp_nr) + ":",
+                                             final_loss_components[comp_nr]))
+
+    valid_scalar_summary_op = tf.summary.merge(scalar_sums)
+
+    scalar_summary_op = [train_scalar_summary_op, valid_scalar_summary_op]
 
     # images_sums = []
     # images_placeholders = []
@@ -510,54 +539,66 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
     return loss, optim, gt_placeholders, scalar_summary_op, loss_mask_placeholders
 
 
-def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
+def run_batch_assign(data_layer, args, assign, training_help,input_placeholder, gt_placeholders, mask_placeholders, sess, optim, loss, valid=0):
+    # load batch - only use batches with content
+    batch_not_loaded = True
+    while batch_not_loaded:
+        blob = data_layer[valid].forward(args, [assign], training_help)
+        if int(gt_placeholders[0].shape[-1]) != blob["assign0"]["gt_map0"].shape[-1] or len(
+                blob["gt_boxes"].shape) != 3:
+            print("skipping queue element")
+        else:
+            batch_not_loaded = False
+
+    # disable all helpers
+    blob["helper"] = None
+
+    if blob["helper"] is not None:
+        input_data = np.concatenate([blob["data"], blob["helper"]], -1)
+        feed_dict = {input_placeholder: input_data}
+    else:
+        if len(args.training_help) == 1:
+            feed_dict = {input_placeholder: blob["data"]}
+        else:
+            # pad input with zeros
+            input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
+            feed_dict = {input_placeholder: input_data}
+
+    for i in range(len(gt_placeholders)):
+        # only one assign
+        feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
+        feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
+
+    if valid == 0:
+        # train step
+        _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
+    else:
+        # compute validation loss
+       loss_fetch = sess.run([loss], feed_dict=feed_dict)
+
+    return loss_fetch, feed_dict, blob
+
+
+def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
                    do_itr, assign, prepped_assign, iteration, training_help):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, mask_placeholders = prepped_assign
 
     if args.prefetch == "True":
-        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, [assign], training_help)
+        data_layer[0] = PrefetchWrapper(data_layer[0].forward, args.prefetch_len, args, [assign], training_help)
 
     print("training on:" + str(assign))
     print("for " + str(do_itr) + " iterations")
     for itr in range(iteration, (iteration + do_itr)):
-        # load batch - only use batches with content
-        batch_not_loaded = True
-        while batch_not_loaded:
-            blob = data_layer.forward(args, [assign], training_help)
-            if int(gt_placeholders[0].shape[-1]) != blob["assign0"]["gt_map0"].shape[-1] or len(
-                    blob["gt_boxes"].shape) != 3:
-                print("skipping queue element")
-            else:
-                batch_not_loaded = False
 
-        #disable all helpers
-        blob["helper"] = None
-
-        if blob["helper"] is not None:
-            input_data = np.concatenate([blob["data"], blob["helper"]], -1)
-            feed_dict = {input: input_data}
-        else:
-            if len(args.training_help) == 1:
-                feed_dict = {input: blob["data"]}
-            else:
-                # pad input with zeros
-                input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
-                feed_dict = {input: input_data}
-
-        for i in range(len(gt_placeholders)):
-            # only one assign
-            feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
-            feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
-
-        # train step
-        _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
+        # run a training batch
+        loss_fetch, feed_dict, blob = run_batch_assign(data_layer, args, assign, training_help,input_placeholder, gt_placeholders, mask_placeholders, sess, optim, loss)
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
             print(loss_fetch)
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
-            fetch_list = [scalar_summary_op]
+            fetch_list = [scalar_summary_op[0]]
             # fetch sub_predicitons
             nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
@@ -581,8 +622,51 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
             images_feed_dict[images_placeholders[0]] = stitched_img
 
             # save images to tensorboard
-            summary = sess.run([images_summary_op], feed_dict=images_feed_dict)
+            summary = sess.run([images_summary_op[0]], feed_dict=images_feed_dict)
             writer.add_summary(summary[0], float(itr))
+
+        if itr % args.validation_loss_task == 0:
+            # approximate validation loss
+            val_loss = 0
+            for i in range(args.validation_loss_task_nr_batch):
+                loss_fetch, feed_dict, blob = run_batch_assign(data_layer, args, assign, training_help, input_placeholder, gt_placeholders, mask_placeholders, sess, optim, loss, valid=1)
+                val_loss += loss_fetch[0]
+
+            val_loss = val_loss/args.validation_loss_task_nr_batch
+            print("Validation loss estimate at itr " + str(itr) + ": " + str(val_loss))
+
+
+            # post to tensorboard
+            fetch_list = [scalar_summary_op[1]]
+            # fetch sub_predicitons
+            nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+
+            [fetch_list.append(
+                network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+                in
+                range(len(assign["ds_factors"]))]
+
+            summary = sess.run(fetch_list, feed_dict=feed_dict)
+            writer.add_summary(summary[0], float(itr))
+
+            # feed one stitched image to summary op
+            gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
+            map_visuals = get_map_visuals(summary[1:], assign, show=False)
+
+            stitched_img = get_stitched_tensorboard_image([assign], [gt_visuals], [map_visuals], blob, itr)
+            stitched_img = np.expand_dims(stitched_img, 0)
+            # obsolete
+            # images_feed_dict = get_images_feed_dict(assign, blob, None, None, images_placeholders)
+            images_feed_dict = dict()
+            images_feed_dict[images_placeholders[1]] = stitched_img
+
+            # save images to tensorboard
+            summary = sess.run([images_summary_op[1]], feed_dict=images_feed_dict)
+            writer.add_summary(summary[0], float(itr))
+
+
+        if itr % args.validation_loss_final == 0:
+            print("do full validation")
 
         if itr % args.save_interval == 0:
             print("saving weights")
@@ -604,31 +688,31 @@ def execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, da
     return iteration
 
 
-def get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders):
-
-    # obsolete, should not be used!
-
-    feed_dict = dict()
-    # reverse map vis order
-    for i in range(len(assign["ds_factors"])):
-        feed_dict[images_placeholders[i]] = np.concatenate([gt_visuals[i], map_visuals[i]])
-
-    for key in feed_dict.keys():
-        feed_dict[key] = np.expand_dims(feed_dict[key], 0)
-
-    if blob["helper"] is not None:
-        feed_dict[images_placeholders[len(images_placeholders) - 2]] = (
-                blob["helper"] / np.max(blob["helper"]) * 255).astype(np.uint8)
-    else:
-        data_shape = blob["data"].shape[: -1]+ (3,)
-        feed_dict[images_placeholders[len(images_placeholders) - 2]] = np.zeros(data_shape, dtype=np.uint8)
-
-    if blob["data"].shape[3] == 1:
-        img_data = np.concatenate([blob["data"], blob["data"], blob["data"]], -1).astype(np.uint8)
-    else:
-        img_data = blob["data"].astype(np.uint8)
-    feed_dict[images_placeholders[len(images_placeholders) - 1]] = img_data
-    return feed_dict
+# def get_images_feed_dict(assign, blob, gt_visuals, map_visuals, images_placeholders):
+#
+#     # obsolete, should not be used!
+#
+#     feed_dict = dict()
+#     # reverse map vis order
+#     for i in range(len(assign["ds_factors"])):
+#         feed_dict[images_placeholders[i]] = np.concatenate([gt_visuals[i], map_visuals[i]])
+#
+#     for key in feed_dict.keys():
+#         feed_dict[key] = np.expand_dims(feed_dict[key], 0)
+#
+#     if blob["helper"] is not None:
+#         feed_dict[images_placeholders[len(images_placeholders) - 2]] = (
+#                 blob["helper"] / np.max(blob["helper"]) * 255).astype(np.uint8)
+#     else:
+#         data_shape = blob["data"].shape[: -1]+ (3,)
+#         feed_dict[images_placeholders[len(images_placeholders) - 2]] = np.zeros(data_shape, dtype=np.uint8)
+#
+#     if blob["data"].shape[3] == 1:
+#         img_data = np.concatenate([blob["data"], blob["data"], blob["data"]], -1).astype(np.uint8)
+#     else:
+#         img_data = blob["data"].astype(np.uint8)
+#     feed_dict[images_placeholders[len(images_placeholders) - 1]] = img_data
+#     return feed_dict
 
 
 def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
@@ -737,7 +821,7 @@ def get_training_roidb(imdb, use_flipped):
     return imdb.roidb
 
 
-def save_objectness_function_handles(args, imdb):
+def save_objectness_function_handles(args):
     FUNCTION_MAP = {'stamp_directions': stamp_directions,
                     'stamp_energy': stamp_energy,
                     'stamp_class': stamp_class,

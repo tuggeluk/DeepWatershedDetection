@@ -48,14 +48,14 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  # code only works with batchsize 1!
 
-    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 0.001  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
     dataset = "voc_2012_train"
@@ -84,10 +84,23 @@ def main():
 
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
-    parser.add_argument("--tensorboard_interval", type=int, default=1,
+
+    parser.add_argument("--tensorboard_interval", type=int, default=200,
                         help="after how many iterations is tensorboard updated")
+
+    parser.add_argument("--validation_loss_task", type=int, default=200,
+                        help="Compute validation loss on current task")
+
+    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=5,
+                        help="batch size for validation loss estimation")
+
+    parser.add_argument("--validation_loss_final", type=int, default=1000000,
+                        help="Compute validation loss on bounding box level")
+
     parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
+
+
     parser.add_argument("--nr_classes", type=list, default=[], help="ignore, will be overwritten by program")
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101",
@@ -110,7 +123,7 @@ def main():
                             # energy markers
                             {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
+                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "quadratic"},
                              'balance_mask': 'fg_bg_balanced' # by_class, by_object, fg_bg, mask_bg, None
                              },
@@ -132,7 +145,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000000, 10, 10, 10, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 500000, 10, 10, 10, 10
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
