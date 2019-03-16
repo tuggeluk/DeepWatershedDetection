@@ -58,7 +58,7 @@ def main():
     regularization_coefficient = 0.001  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "voc_2012_train"
+    dataset = "macrophages_2019_train"
     if dataset == "DeepScores_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
@@ -78,6 +78,9 @@ def main():
     elif dataset == "voc_2012_train":
         parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="voc_2012_val", help="DeepScores, voc, coco or no - validation set")
+    elif dataset == "macrophages_2019_train":
+        parser.add_argument("--dataset", type=str, default="macrophages_2019_train", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="macrophages_2019_val", help="DeepScores, voc, coco or no - validation set")
     else:
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
                          "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")

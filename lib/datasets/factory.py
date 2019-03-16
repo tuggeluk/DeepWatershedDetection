@@ -21,6 +21,7 @@ from datasets.deep_scores_300dpi import deep_scores_300dpi
 from datasets.deep_scores_ipad import deep_scores_ipad
 from datasets.musicma import musicma
 from datasets.dota import dota
+from datasets.macrophages import macrophages
 
 # Set up voc_<year>_<split> 
 for year in ['2007', '2012']:
@@ -76,6 +77,12 @@ for year in ['2018']:
     name = 'Dota_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: dota(split, year))
 
+
+# Set up for macrophages_2019_<split>
+for year in ['2019']:
+  for split in ['train', 'val', 'test', 'debug']:
+    name = 'macrophages_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: macrophages(split, year))
 
 def get_imdb(name):
   """Get an imdb (image database) by name."""

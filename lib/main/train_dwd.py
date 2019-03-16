@@ -70,6 +70,11 @@ def main(parsed):
         resnet_dir = cfg.PRETRAINED_DIR + "/DeepScores/"
         refinenet_dir = cfg.PRETRAINED_DIR + "/DeepScores_semseg/"
 
+    elif "macrophages" in args.dataset:
+        input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
+        resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
+        refinenet_dir = cfg.PRETRAINED_DIR + "/VOC2012/"
+
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
