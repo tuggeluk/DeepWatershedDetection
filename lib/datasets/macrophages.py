@@ -38,7 +38,8 @@ class macrophages(imdb):
     #self._split_path = os.path.join(self._devkit_path, 'train_val_test')
     # no fixed split randomly according to size
     self._val_proportion = 0.1
-    self._classes = list(["background", "DAPI", "mCherry"])
+    self._classes = list(["background", "FG"])
+    self._semseg_classes = [0, 255]
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._image_ext = '.tif'
@@ -61,6 +62,10 @@ class macrophages(imdb):
       'Path does not exist: {}'.format(self._data_path)
     assert os.path.exists(self._data_path), \
       'Path does not exist: {}'.format(self._split_path)
+
+  def semseg_index(self):
+    return self._semseg_classes
+
 
   def image_path_at(self, i):
     """
@@ -191,7 +196,7 @@ class macrophages(imdb):
         y1 = int(obj[1])
         x2 = int(obj[2])+x1
         y2 = int(obj[3])+y1
-        cls = self._class_to_ind[img_class]
+        cls = self._class_to_ind["FG"] #hack
         boxes[ix, :] = [x1, y1, x2, y2]
         gt_classes[ix] = cls
         overlaps[ix, cls] = 1.0

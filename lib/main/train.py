@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=960,
+        parser.add_argument("--max_edge", type=int, default=320,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
 
-    parser.add_argument("--batch_size", type=int, default=1,
+    parser.add_argument("--batch_size", type=int, default=3,
                         help="batch size for training")  # code only works with batchsize 1!
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
@@ -63,24 +63,31 @@ def main():
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                             help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "DeepScores_300dpi_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "DeepScores_ipad_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_ipad_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "MUSICMA++_2017_train":
         parser.add_argument("--dataset", type=str, default="MUSICMA++_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "Dota_2018_train":
         parser.add_argument("--dataset", type=str, default="Dota_2018_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="Dota_2018_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "voc_2012_train":
         parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="voc_2012_val", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "macrophages_2019_train":
         parser.add_argument("--dataset", type=str, default="macrophages_2019_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="macrophages_2019_val", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--paired_data", type=int, default=2, help="is data paired? use 1 for unpaired")
     else:
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
                          "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")
@@ -105,6 +112,8 @@ def main():
 
 
     parser.add_argument("--nr_classes", type=list, default=[], help="ignore, will be overwritten by program")
+    parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
+
 
     parser.add_argument('--model', type=str, default="RefineNet-Res101",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
@@ -116,26 +125,23 @@ def main():
     parser.add_argument('--training_assignements', type=list,
                         default=[
 
-                            # semseg
-                            # {'ds_factors': [1, 8],
-                            #  'stamp_func': 'stamp_semseg', 'layer_loss_aggregate': 'avg',
-                            #  'stamp_args': {"loss": "softmax"},
-                            #  'balance_mask': None  # by_class, by_object, fg_bg, mask_bg, None
-                            #  },
-
                             # energy markers
-                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'max',
+                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "quadratic"},
-                             'balance_mask': 'fg_bg_balanced' # by_class, by_object, fg_bg, mask_bg, None
+                             'balance_mask': 'fg_bg_balanced', # by_class, by_object, fg_bg, mask_bg, None
+                             'use_obj_seg': True, # use object segmentation if available
+                             'use_obj_seg_cached': True
                              },
+
                             # # class markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"},
-                             'balance_mask': 'by_class_no_bg'
+                             'balance_mask': 'by_class_no_bg',
+                             'use_sem_seg': True # use semantic segmentation if avialable
                              },
 
                             # bbox markers

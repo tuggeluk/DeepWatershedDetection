@@ -42,9 +42,10 @@ def main(parsed):
     data_layer = [data_layer_train, data_layer_val]
 
 
-    global nr_classes
+    #global nr_classes
     nr_classes = len(imdb_train._classes)
     args.nr_classes.append(nr_classes)
+    args.semseg_ind = imdb_train.semseg_index()
 
     # replaces keywords with function handles in training assignements
     save_objectness_function_handles(args)
@@ -89,7 +90,7 @@ def main(parsed):
     print("Initializing Model:" + args.model)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp)
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data)
 
     # use just one image summary OP for all tasks
     # train
@@ -380,109 +381,147 @@ def focal_loss(prediction_tensor, target_tensor, weights=None, alpha=0.25, gamma
 
 
 def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input, args):
-    gt_placeholders = get_gt_placeholders(assign, imdb)
+    gt_placeholders = get_gt_placeholders(assign, imdb, args.paired_data,args.nr_classes[0])
 
-    loss_mask_placeholders = [tf.placeholder(tf.float32, shape=[None, None, 1]) for x in assign["ds_factors"]]
-
-    debug_fetch = dict()
-
-    if assign["stamp_func"][0] == "stamp_directions":
-        loss_components = []
-        for x in range(len(assign["ds_factors"])):
-            debug_fetch[str(x)] = dict()
-            # # mask, where gt is zero
-            split1, split2 = tf.split(gt_placeholders[x], 2, -1)
-            debug_fetch[str(x)]["split1"] = split1
-
-            mask = tf.squeeze(split1 > 0, -1)
-            debug_fetch[str(x)]["mask"] = mask
-
-            masked_pred = tf.boolean_mask(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x], mask)
-            debug_fetch[str(x)]["masked_pred"] = masked_pred
-
-            masked_gt = tf.boolean_mask(gt_placeholders[x], mask)
-            debug_fetch[str(x)]["masked_gt"] = masked_gt
-
-            # norm prediction
-            norms = tf.norm(masked_pred, ord="euclidean", axis=-1, keep_dims=True)
-            masked_pred = masked_pred / norms
-            debug_fetch[str(x)]["masked_pred_normed"] = masked_pred
-
-            gt_1, gt_2 = tf.split(masked_gt, 2, -1)
-            pred_1, pred_2 = tf.split(masked_pred, 2, -1)
-            inner_2 = gt_1 * pred_1 + gt_2 * pred_2
-            debug_fetch[str(x)]["inner_2"] = inner_2
-            inner_2 = tf.maximum(tf.constant(-1, dtype=tf.float32),
-                                 tf.minimum(tf.constant(1, dtype=tf.float32), inner_2))
-
-            acos_inner = tf.acos(inner_2)
-            debug_fetch[str(x)]["acos_inner"] = acos_inner
-
-            loss_components.append(acos_inner)
-    else:
-        nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
-        nr_ds_factors = len(assign["ds_factors"])
-        if assign["stamp_args"]["loss"] == "softmax":
-            loss_components = [tf.nn.softmax_cross_entropy_with_logits(
-                logits=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
-                    nr_feature_maps - nr_ds_factors + x],
-                labels=gt_placeholders[x], dim=-1) for x in range(nr_ds_factors)]
-            # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
-            #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
+    loss_mask_placeholders = []
+    for pair_nr in range(args.paired_data):
+        loss_mask_placeholders.append([tf.placeholder(tf.float32, shape=[None, None, None, 1]) for x in assign["ds_factors"]])
 
 
-            for x in range(nr_ds_factors):
-                debug_fetch["logits_" + str(x)] = network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
-                    nr_feature_maps - nr_ds_factors + x]
-                debug_fetch["labels" + str(x)] = gt_placeholders[x]
-            debug_fetch["loss_components_softmax"] = loss_components
+
+    for pair_nr in range(args.paired_data):
+        debug_fetch = dict()
+        pair_contrib_loss = []
+        if assign["stamp_func"][0] == "stamp_directions":
+            loss_components = []
+            for x in range(len(assign["ds_factors"])):
+                # TODO ignored for the moment
+                raise NotImplementedError
+
+                debug_fetch[str(x)] = dict()
+                # # mask, where gt is zero
+                split1, split2 = tf.split(gt_placeholders[x], 2, -1)
+                debug_fetch[str(x)]["split1"] = split1
+
+                mask = tf.squeeze(split1 > 0, -1)
+                debug_fetch[str(x)]["mask"] = mask
+
+                masked_pred = tf.boolean_mask(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x], mask)
+                debug_fetch[str(x)]["masked_pred"] = masked_pred
+
+                masked_gt = tf.boolean_mask(gt_placeholders[x], mask)
+                debug_fetch[str(x)]["masked_gt"] = masked_gt
+
+                # norm prediction
+                norms = tf.norm(masked_pred, ord="euclidean", axis=-1, keep_dims=True)
+                masked_pred = masked_pred / norms
+                debug_fetch[str(x)]["masked_pred_normed"] = masked_pred
+
+                gt_1, gt_2 = tf.split(masked_gt, 2, -1)
+                pred_1, pred_2 = tf.split(masked_pred, 2, -1)
+                inner_2 = gt_1 * pred_1 + gt_2 * pred_2
+                debug_fetch[str(x)]["inner_2"] = inner_2
+                inner_2 = tf.maximum(tf.constant(-1, dtype=tf.float32),
+                                     tf.minimum(tf.constant(1, dtype=tf.float32), inner_2))
+
+                acos_inner = tf.acos(inner_2)
+                debug_fetch[str(x)]["acos_inner"] = acos_inner
+
+                loss_components.append(acos_inner)
         else:
-            loss_components = [tf.losses.mean_squared_error(
-                predictions=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
-                    nr_feature_maps - nr_ds_factors + x],
-                labels=gt_placeholders[x], reduction="none") for x in range(nr_ds_factors)]
-            debug_fetch["loss_components_mse"] = loss_components
+            nr_feature_maps = len(network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+            nr_ds_factors = len(assign["ds_factors"])
+            if assign["stamp_args"]["loss"] == "softmax":
+                loss_components = [tf.nn.softmax_cross_entropy_with_logits(
+                    logits=network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                        nr_feature_maps - nr_ds_factors + x],
+                    labels=gt_placeholders[pair_nr][x], dim=-1) for x in range(nr_ds_factors)]
+                # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
+                #                                                target_tensor=gt_placeholders[x]) for x in range(nr_ds_factors)]
 
-    comp_multy = []
-    for i in range(len(loss_components)):
-        # maybe expand dims
-        if len(loss_components[i][0].shape) == 2:
-            cond_result = tf.expand_dims(loss_components[i][0], -1)
+
+                for x in range(nr_ds_factors):
+                    debug_fetch["logits_" + str(x)] = network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                        nr_feature_maps - nr_ds_factors + x]
+                    debug_fetch["labels" + str(x)] = gt_placeholders[pair_nr][x]
+                debug_fetch["loss_components_softmax"] = loss_components
+            else:
+                loss_components = [tf.losses.mean_squared_error(
+                    predictions=network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                        nr_feature_maps - nr_ds_factors + x],
+                    labels=gt_placeholders[pair_nr][x], reduction="none") for x in range(nr_ds_factors)]
+                debug_fetch["loss_components_mse"] = loss_components
+
+        # apply loss mask
+        comp_multy = []
+        for i in range(len(loss_components)):
+            # maybe expand dims
+            if len(loss_components[i].shape) == 3:
+                cond_result = tf.expand_dims(loss_components[i], -1)
+            else:
+                cond_result = loss_components[i]
+            comp_multy.append(tf.multiply(cond_result, loss_mask_placeholders[pair_nr][i]))
+        # call tf.reduce mean on each loss component
+        final_loss_components = [tf.reduce_mean(x) for x in comp_multy]
+
+        stacked_components = tf.stack(final_loss_components)
+
+        if assign["layer_loss_aggregate"] == "min":
+            loss = tf.reduce_min(stacked_components)
+        elif assign["layer_loss_aggregate"] == "avg":
+            loss = tf.reduce_mean(stacked_components)
         else:
-            cond_result = loss_components[i][0]
-        comp_multy.append(tf.multiply(cond_result, loss_mask_placeholders[i]))
-    # call tf.reduce mean on each loss component
-    final_loss_components = [tf.reduce_mean(x) for x in comp_multy]
+            raise NotImplementedError("unknown layer aggregate")
 
-    stacked_components = tf.stack(final_loss_components)
+        pair_contrib_loss.append(loss)
 
-    if assign["layer_loss_aggregate"] == "min":
-        loss = tf.reduce_min(stacked_components)
-    elif assign["layer_loss_aggregate"] == "avg":
-        loss = tf.reduce_mean(stacked_components)
-    else:
-        raise NotImplementedError("unknown layer aggregate")
+        # ---------------------------------------------------------------------
+        # Debug code -- THIS HAS TO BE COMMENTED OUT UNLESS FOR DEBUGGING
+        #
+        # sess.run(tf.global_variables_initializer())
+        # blob = data_layer[0].forward(args, [assign], None)
+        #
+        # feed_dict = {}
+        #
+        # data_list = []
+        # for ind_batch, batch_ele in enumerate(blob):
+        #     sub_data_list = []
+        #     for ind_sub_batch, sub_batch_ele in enumerate(batch_ele):
+        #         sub_data_list.append(sub_batch_ele["data"])
+        #
+        #     # stack input data
+        #     if len(sub_data_list) > 1:
+        #         data_list.append(np.concatenate(sub_data_list, -1))
+        #     else:
+        #         data_list.append(sub_data_list[0])
+        #
+        # # stack minibatch
+        # if len(data_list) > 1:
+        #     feed_dict[input] = np.concatenate(data_list, 0)
+        # else:
+        #     feed_dict[input] = data_list[0]
+        #
+        #
+        # # pad with zeros if last dim is exactly 2
+        # if feed_dict[input].shape[-1] == 2:
+        #     feed_dict[input] = np.concatenate([feed_dict[input], np.zeros(feed_dict[input].shape[:-1] + (1,))], -1)
+        #
+        # # iterate over sub-batch
+        # for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, loss_mask_placeholders)):
+        #     # iterate ds-factor
+        #     for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
+        #         # concat over batch axis
+        #         feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign0"]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+        #         feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign0"]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+        #
+        # # train step
+        # loss_fetch = sess.run(debug_fetch, feed_dict=feed_dict)
+        # loss_fetch_1 = sess.run(loss, feed_dict=feed_dict)
+        # end debug code
+        # ---------------------------------------------------------------------
 
-    # ---------------------------------------------------------------------
-    # Debug code -- THIS HAS TO BE COMMENTED OUT UNLESS FOR DEBUGGING
-    #
-    # sess.run(tf.global_variables_initializer())
-    # blob = data_layer.forward(args, [assign], None)
-    #
-    # feed_dict = {input: blob["data"]}
-    #
-    # del debug_fetch["loss_components_softmax"]
-    # for i in range(len(gt_placeholders)):
-    #     # only one assign
-    #     feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
-    #     feed_dict[loss_mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
-    #
-    # # train step
-    # loss_fetch = sess.run(debug_fetch, feed_dict=feed_dict)
-
-    # end debug code
-    # ---------------------------------------------------------------------
-
+    stacked_components = tf.stack(pair_contrib_loss)
+    loss = tf.reduce_mean(stacked_components)
     # init optimizer
     var_list = [var for var in tf.trainable_variables()]
     optimizer_type = args.optim
@@ -549,30 +588,70 @@ def run_batch_assign(data_layer, args, assign, training_help,input_placeholder, 
     batch_not_loaded = True
     while batch_not_loaded:
         blob = data_layer[valid].forward(args, [assign], training_help)
-        if int(gt_placeholders[0].shape[-1]) != blob["assign0"]["gt_map0"].shape[-1] or len(
-                blob["gt_boxes"].shape) != 3:
+        if int(gt_placeholders[0][0].shape[-1]) != blob[0][0]["assign0"]["gt_map0"].shape[-1] or len(
+                blob[0][0]["gt_boxes"].shape) != 3:
             print("skipping queue element")
         else:
             batch_not_loaded = False
 
-    # disable all helpers
-    blob["helper"] = None
+    feed_dict = {}
 
-    if blob["helper"] is not None:
-        input_data = np.concatenate([blob["data"], blob["helper"]], -1)
-        feed_dict = {input_placeholder: input_data}
-    else:
-        if len(args.training_help) == 1:
-            feed_dict = {input_placeholder: blob["data"]}
+    data_list = []
+    for ind_batch, batch_ele in enumerate(blob):
+        sub_data_list = []
+        for ind_sub_batch, sub_batch_ele in enumerate(batch_ele):
+            sub_data_list.append(sub_batch_ele["data"])
+
+            # all_keys = sub_batch_ele["assign0"].keys()
+            # sub_batch_lists["gt"].append([sub_batch_ele["assign0"][x] for x in all_keys if "gt_map" in x])
+            # sub_batch_lists["masks"].append([sub_batch_ele["assign0"][x] for x in all_keys if "mask" in x])
+            # batch_lists["gt"].append(sub_batch_lists["gt"])
+            # batch_lists["masks"].append(sub_batch_lists["masks"])
+
+
+            # # disable all helpers
+            # sub_batch_ele["helper"] = None
+            # if blob["helper"] is not None:
+            #     input_data = np.concatenate([blob["data"], blob["helper"]], -1)
+            #     feed_dict = {input_placeholder: input_data}
+            # else:
+            #     if len(args.training_help) == 1:
+            #         feed_dict = {input_placeholder: blob["data"]}
+            #     else:
+            #         # pad input with zeros
+            #         input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
+            #         feed_dict = {input_placeholder: input_data}
+            #
+            # for i in range(len(gt_placeholders)):
+            #     # only one assign
+            #     feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
+            #     feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
+
+        # stack input data
+        if len(sub_data_list) > 1:
+            data_list.append(np.concatenate(sub_data_list, -1))
         else:
-            # pad input with zeros
-            input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
-            feed_dict = {input_placeholder: input_data}
+            data_list.append(sub_data_list[0])
 
-    for i in range(len(gt_placeholders)):
-        # only one assign
-        feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
-        feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
+    # stack minibatch
+    if len(data_list) > 1:
+        feed_dict[input_placeholder] = np.concatenate(data_list, 0)
+    else:
+        feed_dict[input_placeholder] = data_list[0]
+
+    #pad with zeros if last dim is exactly 2
+    if feed_dict[input_placeholder].shape[-1] == 2:
+        feed_dict[input_placeholder] = np.concatenate([feed_dict[input_placeholder], np.zeros(feed_dict[input_placeholder].shape[:-1] + (1,))], -1)
+
+    # iterate over sub-batch
+    for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
+        # iterate ds-factor
+        for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
+            # concat over batch axis
+            feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign0"]["gt_map"+str(len(gt_sb)-1-index_ds)] for batch_ele in blob], 0)
+            feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign0"]["mask" + str(len(gt_sb)-1-index_ds)] for batch_ele in blob], 0)
+
+
 
     if valid == 0:
         # train step
@@ -781,9 +860,12 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     conc = np.concatenate((add_info, conc), axis=0)
     return conc
 
-def get_gt_placeholders(assign, imdb):
-    gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes)
-    return [tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]]
+def get_gt_placeholders(assign, imdb, paired_data, nr_classes):
+    gt_placehoders = []
+    for pair_nr in range(paired_data):
+        gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes)
+        gt_placehoders.append([tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]])
+    return gt_placehoders
 
 
 def get_config_id(assign):

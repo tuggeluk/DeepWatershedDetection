@@ -22,8 +22,10 @@ from datasets.fcn_groundtruth import get_markers, stamp_class
 import sys
 from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
 from PIL import Image
+import pickle
 
 counter = 0
+
 
 
 def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, augmentation_type='none'):
@@ -38,7 +40,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
         'num_images ({}) must divide BATCH_SIZE ({})'. \
             format(num_images, args.batch_size)
 
-    assert len(roidb) == 1, "Single batch only"
+    #assert len(roidb) == 1, "Single batch only"
 
 
     # iterate over batch elements
@@ -62,7 +64,6 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             im_blob = _get_image_blob(roidb_subele, scalings, args)
             blob = {'data': im_blob}
 
-            # TODO continue paired dataset update here
             # gt boxes: (x1, y1, x2, y2, cls)
             if cfg.TRAIN.USE_ALL_GT:
                 # Include all ground truth boxes
@@ -158,14 +159,155 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             blob['data'] = new_blob
 
             for i1 in range(len(assign)):
-                markers_list = get_markers(blob['data'].shape, gt_boxes, args.nr_classes[0], assign[i1], 0, [])
-                blob["assign" + str(i1)] = dict()
-                for i2 in range(len(assign[i1]["ds_factors"])):
-                    blob["assign" + str(i1)]["gt_map" + str(i2)] = markers_list[i2]
+                if assign[i1]["stamp_func"][0] == "stamp_energy" and assign[i1]["use_obj_seg"] and roidb_subele["objseg_path"] is not None:
+                    canvas = None
 
-            #TODO add semseg GT if available
+                    cache_path = roidb_subele["objseg_path"][0].replace("object_masks", "semseg_cache").split("/")
+                    cache_path = "/"+os.path.join(*cache_path[:-1])+cache_path[-1][-8:-4]
 
-            #TODO add obj-seg GT if available
+                    if assign[i1]["use_obj_seg_cached"] and os.path.exists(cache_path+".npy"):
+                        #im = Image.open(cache_path)
+                        #canvas = np.array(im, dtype=np.float32)
+                        canvas = np.load(cache_path+".npy")
+
+                    else:
+                        for objseg_img_path in roidb_subele["objseg_path"]:
+
+                            im = Image.open(objseg_img_path)
+                            im = np.array(im, dtype=np.float32)
+
+                            if canvas is None:
+                                # init canvas
+                                canvas = np.zeros(im.shape, dtype=np.float32)
+
+                            #print("build marker")
+                            # build marker
+                            im[im != 0] = 10000 # assume longest path is shorter than 10'000
+                            dims = im.shape
+                            not_done = True
+                            save_val = 1
+                            while not_done:
+                                unlabeled_ind = np.where(im == 10000)
+                                #print(len(unlabeled_ind[0]))
+                                if len(unlabeled_ind[0]) == 0:
+                                    not_done = False
+                                    continue
+                                for x1, x2 in zip(unlabeled_ind[0], unlabeled_ind[1]):
+                                    #check neighborhood
+                                    proposed_val = np.min(im[np.max((0,(x1-1))):np.min(((x1+2), dims[0])),np.max(((x2-1),0)):np.min(((x2+2),dims[1]))])+1
+                                    if proposed_val != 10001 and proposed_val <= save_val:
+                                        im[x1,x2] = proposed_val
+                                save_val += 1
+
+                            # add to canvas
+                            im = im/np.max(im)*(cfg.TRAIN.MAX_ENERGY-1)
+                            canvas += im
+
+                        # cache
+                        canvas = np.round(canvas)
+                        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                        np.save(cache_path,canvas)
+                        #Image.fromarray(canvas.astype(np.uint8)).save(cache_path)
+
+                    # crop and scale
+                    # do scaling
+                    canvas = cv2.resize(canvas, None, None, fx=scalings[0], fy=scalings[0],
+                                    interpolation=cv2.INTER_NEAREST)
+                    # do cropping
+                    canvas = canvas[scalings[1][0]:scalings[1][2], scalings[1][1]:scalings[1][3]]
+
+
+                    # cavn_print = im/np.max(im)*255
+                    # Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test.jpg")
+
+                    blob["assign" + str(i1)] = dict()
+                    for i2 in range(len(assign[i1]["ds_factors"])):
+                        # downsample
+                        canv_downsamp = cv2.resize(canvas, None, None, fx=1/assign[i1]["ds_factors"][i2], fy=1/assign[i1]["ds_factors"][i2],
+                                    interpolation=cv2.INTER_NEAREST)
+
+                        # one-hot encode
+                        if assign[i1]["stamp_args"]["loss"] == "softmax":
+                            canv_downsamp = np.round(canv_downsamp).astype(np.int32)
+                            canv_downsamp = np.eye(cfg.TRAIN.MAX_ENERGY)[canv_downsamp[:, :]]
+                        else:
+                            canv_downsamp = np.expand_dims(canv_downsamp, -1)
+
+                        canv_downsamp = np.expand_dims(canv_downsamp, 0)
+                        blob["assign" + str(i1)]["gt_map" + str(i2)] = canv_downsamp
+
+
+                elif assign[i1]["stamp_func"][0] == "stamp_class" and assign[i1]["use_sem_seg"] and roidb_subele["semseg_path"] is not None:
+                    print("use semseg")
+                    im = Image.open(roidb_subele["semseg_path"])
+                    canvas = np.array(im, dtype=np.float32)
+
+
+                    # apply semseg color -> class transform
+                    for ind, val in enumerate(args.semseg_ind):
+                        canvas[canvas ==  val] = ind
+
+                    # crop and scale
+                    # do scaling
+                    canvas = cv2.resize(canvas, None, None, fx=scalings[0], fy=scalings[0],
+                                    interpolation=cv2.INTER_NEAREST)
+                    # do cropping
+                    canvas = canvas[scalings[1][0]:scalings[1][2], scalings[1][1]:scalings[1][3]]
+
+                    blob["assign" + str(i1)] = dict()
+                    for i2 in range(len(assign[i1]["ds_factors"])):
+                        # downsample
+                        canv_downsamp = cv2.resize(canvas, None, None, fx=assign[i1]["ds_factors"][i2], fy=assign[i1]["ds_factors"][i2],
+                                    interpolation=cv2.INTER_NEAREST)
+
+                        # one-hot encode
+                        if assign[i1]["stamp_args"]["loss"] == "softmax":
+                            canv_downsamp = np.round(canv_downsamp).astype(np.int32)
+                            canv_downsamp = np.eye(args.nr_classes[0])[canv_downsamp[:, :]]
+                        else:
+                            canv_downsamp = np.expand_dims(canv_downsamp, -1)
+
+                        canv_downsamp = np.expand_dims(canv_downsamp, 0)
+                        blob["assign" + str(i1)]["gt_map" + str(i2)] = canv_downsamp
+
+                else:
+                    # bbox based assign
+                    markers_list = get_markers(blob['data'].shape, gt_boxes, args.nr_classes[0], assign[i1], 0, [])
+                    blob["assign" + str(i1)] = dict()
+                    for i2 in range(len(assign[i1]["ds_factors"])):
+                        blob["assign" + str(i1)]["gt_map" + str(i2)] = markers_list[i2]
+
+            # ds_factors = set()
+            # for i1 in range(len(assign)):
+            #     ds_factors = ds_factors.union(set(assign[i1]["ds_factors"]))
+
+            # #TODO add semseg GT if available
+            # print("load, semseg gt")
+            # if roidb_subele["semseg_path"] is not None:
+            #     # load image
+            #     im = Image.open(roidb_subele['semseg_path'])
+            #     im = np.array(im, dtype=np.float32)
+            #
+            #     # do scaling
+            #     im = cv2.resize(im, None, None, fx=scalings[0], fy=scalings[0],
+            #                     interpolation=cv2.INTER_LINEAR)
+            #     # do cropping
+            #     im = im[scalings[1][0]:scalings[1][2], scalings[1][1]:scalings[1][3]]
+            #     if len(im.shape) == 2:
+            #         im = np.expand_dims(np.expand_dims(im, -1),0)
+            #     # save downsampled versions
+            #     for ds_factor in enumerate(ds_factors):
+            #         blob["assign" + str(i1)]["gt_map" + str(i2)] = markers_list[i2]
+            #
+            # #TODO add obj-seg GT if available
+            # print("load obj GT")
+            #     # init canvas
+            #     # load images
+            #     # add marker according to energy assign
+            #
+            #     # apply scaling and cropping
+            #
+            #     # save downsampled versions according to energy task
 
             # Build loss masks
             # mask out background for class and bounding box predictions
@@ -275,8 +417,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             sub_batch.append(blob)
         # sub batch done stack inputs and outputs
         #TODO concatenate sub batches
-        inp = None
-        minibatch.append(inp)
+        minibatch.append(sub_batch)
     return minibatch
 
 
