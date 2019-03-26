@@ -46,7 +46,7 @@ def main():
     parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
 
     parser.add_argument("--batch_size", type=int, default=3,
-                        help="batch size for training")  # code only works with batchsize 1!
+                        help="batch size for training")  #  code only works with batchsize 1!
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
