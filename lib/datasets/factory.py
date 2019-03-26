@@ -80,7 +80,7 @@ for year in ['2018']:
 
 # Set up for macrophages_2019_<split>
 for year in ['2019']:
-  for split in ['train', 'val', 'test', 'debug']:
+  for split in ['train', 'test', 'debug']:
     name = 'macrophages_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: macrophages(split, year))
 

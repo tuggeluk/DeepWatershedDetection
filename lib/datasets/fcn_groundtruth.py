@@ -719,7 +719,7 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
         # image = image[:,:,[2,1,0]] # Switch to rgb
         im = Image.fromarray(image.astype("uint8"))
     else:
-        im = Image.fromarray(np.squeeze(image.astype("uint8"),-1))
+        im = Image.fromarray(np.concatenate([image,image,image],-1).astype(np.uint8))
 
     if fill:
         outline = [None,None]
@@ -742,24 +742,31 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     return np.asarray(im).astype("uint8")
 
 
-def get_gt_visuals(data,assign,assign_nr,pred_boxes=None,show=False):
-    vis = []
-    for i in range(len(assign["ds_factors"])):
-        img_map = data["assign"+str(assign_nr)]["gt_map" + str(i)]
-        colored_map = color_map(img_map[0],assign,show)
-        vis.append(colored_map)
+def get_gt_visuals(data, assign, assign_nr, pred_boxes=None, show=False):
+    # just use first img of batch
+    data = data[0]
 
-    colored_gt = overlayed_image(image=data["data"][0],gt_boxes=data["gt_boxes"][0],pred_boxes=pred_boxes,fill=False,show=show)
-    vis.append(colored_gt)
+    vis = []
+    # iterate over sub batch
+    for data_sub in data:
+        sub_vis = []
+        for i in range(len(assign["ds_factors"])):
+            # use first img of batch
+            img_map = data_sub["assign"+str(assign_nr)]["gt_map" + str(i)]
+            colored_map = color_map(img_map[0], assign, show)
+            sub_vis.append(colored_map)
+
+        colored_gt = overlayed_image(image=data_sub["data"][0], gt_boxes=data_sub["gt_boxes"][0], pred_boxes=pred_boxes, fill=False,show=show)
+        sub_vis.append(colored_gt)
+        vis.append(sub_vis)
     return vis
 
 
 def get_map_visuals(fetched_maps,assign,show=False):
     vis = []
     for fetched_map in fetched_maps:
-        colored_map = color_map(fetched_map[0],assign,show)
+        colored_map = color_map(fetched_map[0], assign, show)
         vis.append(colored_map)
-
     return vis
 
 

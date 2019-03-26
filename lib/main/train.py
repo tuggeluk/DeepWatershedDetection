@@ -86,7 +86,7 @@ def main():
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "macrophages_2019_train":
         parser.add_argument("--dataset", type=str, default="macrophages_2019_train", help="DeepScores, voc or coco")
-        parser.add_argument("--dataset_validation", type=str, default="macrophages_2019_val", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--dataset_validation", type=str, default="macrophages_2019_test", help="DeepScores, voc, coco or no - validation set")
         parser.add_argument("--paired_data", type=int, default=2, help="is data paired? use 1 for unpaired")
     else:
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
@@ -101,7 +101,7 @@ def main():
     parser.add_argument("--validation_loss_task", type=int, default=200,
                         help="Compute validation loss on current task")
 
-    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=5,
+    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=3,
                         help="batch size for validation loss estimation")
 
     parser.add_argument("--validation_loss_final", type=int, default=1000000,
@@ -154,7 +154,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 500000, 10, 10, 10, 10
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000, 1000, 1000, 1000, 10000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},

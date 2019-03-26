@@ -34,7 +34,7 @@ class macrophages(imdb):
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
       else devkit_path
-    self._data_path = os.path.join(self._devkit_path, 'train')
+    self._data_path = os.path.join(self._devkit_path, image_set)
     #self._split_path = os.path.join(self._devkit_path, 'train_val_test')
     # no fixed split randomly according to size
     self._val_proportion = 0.1

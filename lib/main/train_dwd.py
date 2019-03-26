@@ -238,41 +238,56 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
 
     # waste elements off queue because queue clear does not work
     for i in range(14):
-        data_layer.forward(args, orig_assign, training_help)
+        data_layer[0].forward(args, orig_assign, training_help)
 
     for itr in range(iteration, (iteration + do_comb_itr)):
         # load batch - only use batches with content
         batch_not_loaded = True
         while batch_not_loaded:
-            blob = data_layer.forward(args, orig_assign, training_help)
-            batch_not_loaded = len(blob["gt_boxes"].shape) != 3 or sum(["assign" in key for key in blob.keys()]) != len(
-                preped_assigns)
+            blob = data_layer[0].forward(args, orig_assign, training_help)
+            batch_not_loaded = len(blob[0][0]["gt_boxes"].shape) != 3 or sum(["assign" in key for key in blob[0][0].keys()]) != len(preped_assigns)
 
-        if blob["helper"] is not None:
-            input_data = np.concatenate([blob["data"], blob["helper"]], -1)
-            feed_dict = {input_ph: input_data}
-        else:
-            if len(args.training_help) == 1:
-                feed_dict = {input_ph: blob["data"]}
+        feed_dict = {}
+        data_list = []
+        for ind_batch, batch_ele in enumerate(blob):
+            sub_data_list = []
+            for ind_sub_batch, sub_batch_ele in enumerate(batch_ele):
+                print("asdf")
+                sub_data_list.append(sub_batch_ele["data"])
+            # stack input data
+            if len(sub_data_list) > 1:
+                data_list.append(np.concatenate(sub_data_list, -1))
             else:
-                # pad input with zeros
-                input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
-                feed_dict = {input_ph: input_data}
+                data_list.append(sub_data_list[0])
 
+        # stack minibatch
+        if len(data_list) > 1:
+            feed_dict[input_ph] = np.concatenate(data_list, 0)
+        else:
+            feed_dict[input_ph] = data_list[0]
+
+        # pad with zeros if last dim is exactly 2
+        if feed_dict[input_ph].shape[-1] == 2:
+            feed_dict[input_ph] = np.concatenate([feed_dict[input_ph], np.zeros(feed_dict[input_ph].shape[:-1] + (1,))], -1)
+
+        # iterate over assignements
         for i1 in range(len(preped_assigns)):
             gt_placeholders = preped_assigns[i1][2]
             mask_placeholders = preped_assigns[i1][6]
-            for i2 in range(len(gt_placeholders)):
-                # only one assign
-                feed_dict[gt_placeholders[i2]] = blob["assign" + str(i1)]["gt_map" + str(len(gt_placeholders) - i2 - 1)]
-                feed_dict[mask_placeholders[i2]] = blob["assign" + str(i1)]["mask" + str(len(gt_placeholders) - i2 - 1)]
+            # iterate over sub-batch
+            for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
+                # iterate over downsampling
+                for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
+                    # concat over batch axis
+                    feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign" + str(i1)]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+                    feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign" + str(i1)]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
 
         # compute running mean for losses
         feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1),
                                                                          [1.0E-6, 1.0E-6, 1.0E-6])
 
-        with open('feed_dict_train.pickle', 'wb') as handle:
-            pickle.dump(feed_dict[input_ph], handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #with open('feed_dict_train.pickle', 'wb') as handle:
+        #    pickle.dump(feed_dict[input_ph], handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # train step
         fetch_list = list()
@@ -292,7 +307,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
 
-            post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess,writer, blob)
+            post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob)
 
         if itr % args.save_interval == 0:
             print("saving weights")
@@ -317,12 +332,20 @@ def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_
         _, _, _, scalar_summary_op, images_summary_op, images_placeholders, _ = preped_assigns[i]
         fetch_list = [scalar_summary_op[valid]]
         # fetch sub_predicitons
-        nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+        # nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+        #
+        # [fetch_list.append(
+        #     network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+        #     in
+        #     range(len(assign["ds_factors"]))]
+        for nw_heads_sub_b in network_heads:
+            nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
-        [fetch_list.append(
-            network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-            in
-            range(len(assign["ds_factors"]))]
+            [fetch_list.append(
+                nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+                in
+                range(len(assign["ds_factors"]))]
+
 
         summary = sess.run(fetch_list, feed_dict=feed_dict)
         writer.add_summary(summary[0], float(itr))
@@ -588,8 +611,7 @@ def run_batch_assign(data_layer, args, assign, training_help,input_placeholder, 
     batch_not_loaded = True
     while batch_not_loaded:
         blob = data_layer[valid].forward(args, [assign], training_help)
-        if int(gt_placeholders[0][0].shape[-1]) != blob[0][0]["assign0"]["gt_map0"].shape[-1] or len(
-                blob[0][0]["gt_boxes"].shape) != 3:
+        if int(gt_placeholders[0][0].shape[-1]) != blob[0][0]["assign0"]["gt_map0"].shape[-1] or len(blob[0][0]["gt_boxes"].shape) != 3:
             print("skipping queue element")
         else:
             batch_not_loaded = False
@@ -682,14 +704,17 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
             print(loss_fetch)
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
-            fetch_list = [scalar_summary_op[0]]
-            # fetch sub_predicitons
-            nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
-            [fetch_list.append(
-                network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-                in
-                range(len(assign["ds_factors"]))]
+            fetch_list = [scalar_summary_op[0]]
+
+            # fetch sub_predicitons for each sub_batch
+            for nw_heads_sub_b in network_heads:
+                nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+
+                [fetch_list.append(
+                    nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+                    in
+                    range(len(assign["ds_factors"]))]
 
             summary = sess.run(fetch_list, feed_dict=feed_dict)
             writer.add_summary(summary[0], float(itr))
@@ -723,12 +748,13 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
             # post to tensorboard
             fetch_list = [scalar_summary_op[1]]
             # fetch sub_predicitons
-            nr_feature_maps = len(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+            for nw_heads_sub_b in network_heads:
+                nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
-            [fetch_list.append(
-                network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-                in
-                range(len(assign["ds_factors"]))]
+                [fetch_list.append(
+                    nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+                    in
+                    range(len(assign["ds_factors"]))]
 
             summary = sess.run(fetch_list, feed_dict=feed_dict)
             writer.add_summary(summary[0], float(itr))
@@ -802,52 +828,56 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
 def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     pix_spacer = 3
 
+    # use first image of batch
+    blob = blob[0]
 
-    #print("doit!")
-    # input image + gt
-    input_gt = overlayed_image(blob["data"][0], gt_boxes=blob["gt_boxes"][0], pred_boxes=None)
+    sub_b_img = []
+    for sub_ind, sub_blob in enumerate(blob):
+        #print("doit!")
+        # input image + gt
+        input_gt = overlayed_image(sub_blob["data"][0], gt_boxes=sub_blob["gt_boxes"][0], pred_boxes=None)
 
-    # input image + prediction
-    #TODO get actual predictions
-    input_pred = overlayed_image(blob["data"][0], gt_boxes=None, pred_boxes=blob["gt_boxes"][0])
+        # input image + prediction
+        #TODO get actual predictions
+        input_pred = overlayed_image(sub_blob["data"][0], gt_boxes=None, pred_boxes=sub_blob["gt_boxes"][0])
 
-    # concat inputs
-    conc = np.concatenate((input_gt, np.zeros((input_gt.shape[0],pix_spacer,3)).astype("uint8"), input_pred), axis = 1)
-    # im = Image.fromarray(conc)
-    # im.save(sys.argv[0][:-17] + "asdfsadfa.png")
+        # concat inputs
+        conc = np.concatenate((input_gt, np.zeros((input_gt.shape[0], pix_spacer, 3)).astype("uint8"), input_pred), axis = 1)
+        # im = Image.fromarray(conc)
+        # im.save(sys.argv[0][:-17] + "asdfsadfa.png")
 
-    # iterate over tasks
-    for i in range(len(assign)):
-        # concat task outputs
-        for ii in range(len(assign[i]["ds_factors"])):
-            sub_map = np.concatenate([gt_visuals[i][ii], np.zeros((gt_visuals[i][ii].shape[0], pix_spacer,3)).astype("uint8"), map_visuals[i][ii]], axis = 1)
-            if sub_map.shape[1] != conc.shape[1]:
-                expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
-                expand[:, 0:sub_map.shape[1]] = sub_map
-                sub_map = expand.astype("uint8")
-            conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1],3)).astype("uint8"),sub_map), axis = 0)
-
-
-    # show loss masks if necessary
-    show_masks = True
-    if show_masks:
+        # iterate over tasks
         for i in range(len(assign)):
             # concat task outputs
             for ii in range(len(assign[i]["ds_factors"])):
-                mask = blob["assign"+str(i)]["mask"+str(ii)]
-                mask = mask/np.max(mask)*255
-                mask = np.concatenate([mask,mask,mask], -1)
-
-                sub_map = np.concatenate(
-                    [gt_visuals[i][ii], np.zeros((gt_visuals[i][ii].shape[0], pix_spacer, 3)).astype("uint8"),
-                     mask.astype("uint8")], axis=1)
+                sub_map = np.concatenate([gt_visuals[i][sub_ind][ii], np.zeros((gt_visuals[i][sub_ind][ii].shape[0], pix_spacer,3)).astype("uint8"), map_visuals[i][ii+sub_ind*len(assign[i]["ds_factors"])]], axis = 1)
                 if sub_map.shape[1] != conc.shape[1]:
                     expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
                     expand[:, 0:sub_map.shape[1]] = sub_map
                     sub_map = expand.astype("uint8")
-                conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1], 3)).astype("uint8"), sub_map), axis=0)
+                conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1],3)).astype("uint8"), sub_map), axis = 0)
 
 
+        # show loss masks if necessary
+        show_masks = True
+        if show_masks:
+            for i in range(len(assign)):
+                # concat task outputs
+                for ii in range(len(assign[i]["ds_factors"])):
+                    mask = sub_blob["assign"+str(i)]["mask"+str(ii)]
+                    mask = mask/np.max(mask)*255
+                    mask = np.concatenate([mask,mask,mask], -1)
+
+                    sub_map = np.concatenate(
+                        [gt_visuals[i][sub_ind][ii], np.zeros((gt_visuals[i][sub_ind][ii].shape[0], pix_spacer, 3)).astype("uint8"),
+                         mask.astype("uint8")], axis=1)
+                    if sub_map.shape[1] != conc.shape[1]:
+                        expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
+                        expand[:, 0:sub_map.shape[1]] = sub_map
+                        sub_map = expand.astype("uint8")
+                    conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1], 3)).astype("uint8"), sub_map), axis=0)
+        sub_b_img.append(conc)
+    conc = np.concatenate(sub_b_img, axis=0)
 
     # prepend additional info
     add_info = Image.fromarray(np.ones((50, conc.shape[1],3), dtype="uint8")*255)
@@ -855,8 +885,8 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     draw = ImageDraw.Draw(add_info)
     font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf", 18)
     draw.text((2, 2), "Iteration Nr: " + str(itr), (0, 0, 0), font=font)
+    # add_info.save(sys.argv[0][:-17] + "add_info.png")
     add_info = np.asarray(add_info).astype("uint8")
-    #add_info.save(sys.argv[0][:-17] + "add_info.png")
     conc = np.concatenate((add_info, conc), axis=0)
     return conc
 
@@ -880,6 +910,8 @@ def get_checkpoint_dir(args):
         image_mode = "music"
     elif "MUSICMA" in args.dataset:
         image_mode = "music_handwritten"
+    elif "macrophages" in args.dataset:
+        image_mode = "macrophages"
     else:
         image_mode = "realistic"
     tbdir = cfg.EXP_DIR + "/" + image_mode + "/" + "pretrain_lvl_" + args.pretrain_lvl + "/" + args.model

@@ -50,7 +50,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
         scalings = None
         sub_batch = []
         for nr_subele, roidb_subele in enumerate(roidb_ele):
-            print(roidb_subele)
+            #print( roidb_subele)
 
             if scalings is None:
                 # figure out scaling factor and crop box for current paired images
