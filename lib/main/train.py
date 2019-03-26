@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=320,
+        parser.add_argument("--max_edge", type=int, default=512,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
 
-    parser.add_argument("--batch_size", type=int, default=3,
+    parser.add_argument("--batch_size", type=int, default=2,
                         help="batch size for training")  # code only works with batchsize 1!
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
