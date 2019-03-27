@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
 
-    parser.add_argument("--batch_size", type=int, default=3,
+    parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  #  code only works with batchsize 1!
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
@@ -135,14 +135,14 @@ def main():
                              'use_obj_seg_cached': True
                              },
 
-                            # # class markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
-                                            "class_resolution": "class", "loss": "softmax"},
-                             'balance_mask': 'by_class_no_bg',
-                             'use_sem_seg': True # use semantic segmentation if avialable
-                             },
+                            # # # class markers
+                            # {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            #  'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
+                            #  'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
+                            #                 "class_resolution": "class", "loss": "softmax"},
+                            #  'balance_mask': 'by_class_no_bg',
+                            #  'use_sem_seg': True # use semantic segmentation if avialable
+                            #  },
 
                             # bbox markers
                             {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
@@ -154,17 +154,17 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000, 1000, 1000, 1000, 10000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 100000, 10000, 1000, 1000, 100000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
                             {"assign": 1, "help": 0, "Itrs": Itrs1},
-                            {"assign": 2, "help": 0, "Itrs": Itrs2},
+                            #{"assign": 2, "help": 0, "Itrs": Itrs2},
 			                {"assign": 0, "help": 0, "Itrs": Itrs0_1}
                          ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1], "loss_factors": [2,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
 		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}
