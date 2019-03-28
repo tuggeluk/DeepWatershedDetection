@@ -238,7 +238,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
 
 
                 elif assign[i1]["stamp_func"][0] == "stamp_class" and assign[i1]["use_sem_seg"] and roidb_subele["semseg_path"] is not None:
-                    print("use semseg")
+
                     im = Image.open(roidb_subele["semseg_path"])
                     canvas = np.array(im, dtype=np.float32)
 
@@ -442,7 +442,13 @@ def _get_image_blob(roidb, scalings, args):
     """
 
     im = Image.open(roidb['image'])
-    im = np.array(im, dtype=np.float32)
+    if im.mode ==  'I;16':
+        # deal with wierd tif format
+        #print("tif")
+        im = np.array(im, dtype=np.float32)/256
+        #Image.fromarray(im.astype(np.uint8)).save("/share/DeepWatershedDetection/tif_test.png")
+    else:
+        im = np.array(im, dtype=np.float32)
 
 
     # #fix last dimension 2

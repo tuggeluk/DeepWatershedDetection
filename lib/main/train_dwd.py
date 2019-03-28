@@ -242,49 +242,48 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
 
     for itr in range(iteration, (iteration + do_comb_itr)):
         # load batch - only use batches with content
-        batch_not_loaded = True
-        while batch_not_loaded:
-            blob = data_layer[0].forward(args, orig_assign, training_help)
-            batch_not_loaded = len(blob[0][0]["gt_boxes"].shape) != 3 or sum(["assign" in key for key in blob[0][0].keys()]) != len(preped_assigns)
-
-        feed_dict = {}
-        data_list = []
-        for ind_batch, batch_ele in enumerate(blob):
-            sub_data_list = []
-            for ind_sub_batch, sub_batch_ele in enumerate(batch_ele):
-                print("asdf")
-                sub_data_list.append(sub_batch_ele["data"])
-            # stack input data
-            if len(sub_data_list) > 1:
-                data_list.append(np.concatenate(sub_data_list, -1))
-            else:
-                data_list.append(sub_data_list[0])
-
-        # stack minibatch
-        if len(data_list) > 1:
-            feed_dict[input_ph] = np.concatenate(data_list, 0)
-        else:
-            feed_dict[input_ph] = data_list[0]
-
-        # pad with zeros if last dim is exactly 2
-        if feed_dict[input_ph].shape[-1] == 2:
-            feed_dict[input_ph] = np.concatenate([feed_dict[input_ph], np.zeros(feed_dict[input_ph].shape[:-1] + (1,))], -1)
-
-        # iterate over assignements
-        for i1 in range(len(preped_assigns)):
-            gt_placeholders = preped_assigns[i1][2]
-            mask_placeholders = preped_assigns[i1][6]
-            # iterate over sub-batch
-            for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
-                # iterate over downsampling
-                for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
-                    # concat over batch axis
-                    feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign" + str(i1)]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
-                    feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign" + str(i1)]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+        # batch_not_loaded = True
+        # while batch_not_loaded:
+        #     blob = data_layer[0].forward(args, orig_assign, training_help)
+        #     batch_not_loaded = len(blob[0][0]["gt_boxes"].shape) != 3 or sum(["assign" in key for key in blob[0][0].keys()]) != len(preped_assigns)
+        #
+        # feed_dict = {}
+        # data_list = []
+        # for ind_batch, batch_ele in enumerate(blob):
+        #     sub_data_list = []
+        #     for ind_sub_batch, sub_batch_ele in enumerate(batch_ele):
+        #         sub_data_list.append(sub_batch_ele["data"])
+        #     # stack input data
+        #     if len(sub_data_list) > 1:
+        #         data_list.append(np.concatenate(sub_data_list, -1))
+        #     else:
+        #         data_list.append(sub_data_list[0])
+        #
+        # # stack minibatch
+        # if len(data_list) > 1:
+        #     feed_dict[input_ph] = np.concatenate(data_list, 0)
+        # else:
+        #     feed_dict[input_ph] = data_list[0]
+        #
+        # # pad with zeros if last dim is exactly 2
+        # if feed_dict[input_ph].shape[-1] == 2:
+        #     feed_dict[input_ph] = np.concatenate([feed_dict[input_ph], np.zeros(feed_dict[input_ph].shape[:-1] + (1,))], -1)
+        #
+        # # iterate over assignements
+        # for i1 in range(len(preped_assigns)):
+        #     gt_placeholders = preped_assigns[i1][2]
+        #     mask_placeholders = preped_assigns[i1][6]
+        #     # iterate over sub-batch
+        #     for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
+        #         # iterate over downsampling
+        #         for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
+        #             # concat over batch axis
+        #             feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign" + str(i1)]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+        #             feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign" + str(i1)]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+        feed_dict, blob = load_feed_dict(data_layer, args, orig_assign, training_help, input_ph, preped_assigns)
 
         # compute running mean for losses
-        feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1),
-                                                                         [1.0E-6, 1.0E-6, 1.0E-6])
+        feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
 
         #with open('feed_dict_train.pickle', 'wb') as handle:
         #    pickle.dump(feed_dict[input_ph], handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -298,7 +297,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         fetches = sess.run(fetch_list, feed_dict=feed_dict)
 
         past_losses[:, :-1] = past_losses[:, 1:]  # move by one timestep
-        past_losses[:, -1] = fetches[-3:]  # add latest loss
+        past_losses[:, -1] = fetches[-past_losses.shape[0]:]  # add latest loss
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
@@ -308,6 +307,22 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         if itr % args.tensorboard_interval == 0 or itr == 1:
 
             post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob)
+
+        if itr % args.validation_loss_task == 0 or True:
+            # approximate validation loss
+            val_loss = 0
+            for i in range(args.validation_loss_task_nr_batch):
+                feed_dict, blob = load_feed_dict(data_layer, args, orig_assign, training_help, input_ph, preped_assigns,  valid=1)
+                feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
+                loss_fetch = sess.run([loss_tot], feed_dict=feed_dict)
+                val_loss += loss_fetch[0]
+
+            val_loss = val_loss/args.validation_loss_task_nr_batch
+            print("Validation loss estimate at itr " + str(itr) + ": " + str(val_loss))
+
+            post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob, valid=1)
+
+
 
         if itr % args.save_interval == 0:
             print("saving weights")
@@ -582,73 +597,23 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
 
     scalar_summary_op = [train_scalar_summary_op, valid_scalar_summary_op]
 
-    # images_sums = []
-    # images_placeholders = []
-    #
-    # # MOVE TO ONE BIG IMAGE THAT IS STITCHED MANUALLY FOR EACH UPDATE
-    # # # feature maps
-    # # for i in range(len(assign["ds_factors"])):
-    # #     sub_prediction_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    # #     images_placeholders.append(sub_prediction_placeholder)
-    # #     images_sums.append(
-    # #         tf.summary.image('sub_prediction_' + str(i) + "_" + get_config_id(assign), sub_prediction_placeholder))
-    # #
-    # # helper_img = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    # # images_placeholders.append(helper_img)
-    # # images_sums.append(tf.summary.image('helper' + str(i) + get_config_id(assign), helper_img))
-    #
-    # #final_pred_placeholder = tf.placeholder(tf.uint8, shape=[1, None, None, 3])
-    #
-    # images_placeholders.append(final_pred_placeholder)
-    # images_sums.append(tf.summary.image('DWD_debug_img', final_pred_placeholder))
-    # images_summary_op = tf.summary.merge(images_sums)
-
     return loss, optim, gt_placeholders, scalar_summary_op, loss_mask_placeholders
 
 
-def run_batch_assign(data_layer, args, assign, training_help,input_placeholder, gt_placeholders, mask_placeholders, sess, optim, loss, valid=0):
+def load_feed_dict(data_layer, args, assign, training_help, input_ph, preped_assigns, valid=0):
+
     # load batch - only use batches with content
     batch_not_loaded = True
     while batch_not_loaded:
-        blob = data_layer[valid].forward(args, [assign], training_help)
-        if int(gt_placeholders[0][0].shape[-1]) != blob[0][0]["assign0"]["gt_map0"].shape[-1] or len(blob[0][0]["gt_boxes"].shape) != 3:
-            print("skipping queue element")
-        else:
-            batch_not_loaded = False
+        blob = data_layer[valid].forward(args, assign, training_help)
+        batch_not_loaded = len(blob[0][0]["gt_boxes"].shape) != 3 or sum(["assign" in key for key in blob[0][0].keys()]) != len(preped_assigns)
 
     feed_dict = {}
-
     data_list = []
     for ind_batch, batch_ele in enumerate(blob):
         sub_data_list = []
         for ind_sub_batch, sub_batch_ele in enumerate(batch_ele):
             sub_data_list.append(sub_batch_ele["data"])
-
-            # all_keys = sub_batch_ele["assign0"].keys()
-            # sub_batch_lists["gt"].append([sub_batch_ele["assign0"][x] for x in all_keys if "gt_map" in x])
-            # sub_batch_lists["masks"].append([sub_batch_ele["assign0"][x] for x in all_keys if "mask" in x])
-            # batch_lists["gt"].append(sub_batch_lists["gt"])
-            # batch_lists["masks"].append(sub_batch_lists["masks"])
-
-
-            # # disable all helpers
-            # sub_batch_ele["helper"] = None
-            # if blob["helper"] is not None:
-            #     input_data = np.concatenate([blob["data"], blob["helper"]], -1)
-            #     feed_dict = {input_placeholder: input_data}
-            # else:
-            #     if len(args.training_help) == 1:
-            #         feed_dict = {input_placeholder: blob["data"]}
-            #     else:
-            #         # pad input with zeros
-            #         input_data = np.concatenate([blob["data"], blob["data"] * 0], -1)
-            #         feed_dict = {input_placeholder: input_data}
-            #
-            # for i in range(len(gt_placeholders)):
-            #     # only one assign
-            #     feed_dict[gt_placeholders[i]] = blob["assign0"]["gt_map" + str(len(gt_placeholders) - i - 1)]
-            #     feed_dict[mask_placeholders[i]] = blob["assign0"]["mask" + str(len(gt_placeholders) - i - 1)]
-
         # stack input data
         if len(sub_data_list) > 1:
             data_list.append(np.concatenate(sub_data_list, -1))
@@ -657,32 +622,28 @@ def run_batch_assign(data_layer, args, assign, training_help,input_placeholder, 
 
     # stack minibatch
     if len(data_list) > 1:
-        feed_dict[input_placeholder] = np.concatenate(data_list, 0)
+        feed_dict[input_ph] = np.concatenate(data_list, 0)
     else:
-        feed_dict[input_placeholder] = data_list[0]
+        feed_dict[input_ph] = data_list[0]
 
-    #pad with zeros if last dim is exactly 2
-    if feed_dict[input_placeholder].shape[-1] == 2:
-        feed_dict[input_placeholder] = np.concatenate([feed_dict[input_placeholder], np.zeros(feed_dict[input_placeholder].shape[:-1] + (1,))], -1)
+    # pad with zeros if last dim is exactly 2
+    if feed_dict[input_ph].shape[-1] == 2:
+        feed_dict[input_ph] = np.concatenate([feed_dict[input_ph], np.zeros(feed_dict[input_ph].shape[:-1] + (1,))], -1)
 
-    # iterate over sub-batch
-    for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
-        # iterate ds-factor
-        for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
-            # concat over batch axis
-            feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign0"]["gt_map"+str(len(gt_sb)-1-index_ds)] for batch_ele in blob], 0)
-            feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign0"]["mask" + str(len(gt_sb)-1-index_ds)] for batch_ele in blob], 0)
+    # iterate over assignements
+    for i1 in range(len(preped_assigns)):
+        gt_placeholders = preped_assigns[i1][2]
+        mask_placeholders = preped_assigns[i1][6]
+        # iterate over sub-batch
+        for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
+            # iterate over downsampling
+            for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
+                # concat over batch axis
+                feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign" + str(i1)]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+                feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign" + str(i1)]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
 
+    return feed_dict, blob
 
-
-    if valid == 0:
-        # train step
-        _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
-    else:
-        # compute validation loss
-       loss_fetch = sess.run([loss], feed_dict=feed_dict)
-
-    return loss_fetch, feed_dict, blob
 
 
 def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
@@ -697,7 +658,9 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
     for itr in range(iteration, (iteration + do_itr)):
 
         # run a training batch
-        loss_fetch, feed_dict, blob = run_batch_assign(data_layer, args, assign, training_help,input_placeholder, gt_placeholders, mask_placeholders, sess, optim, loss)
+        feed_dict, blob = load_feed_dict(data_layer, args, [assign], training_help, input_placeholder, [prepped_assign])
+
+        _, loss_fetch = sess.run([optim, loss], feed_dict=feed_dict)
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr))
@@ -705,74 +668,78 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
 
         if itr % args.tensorboard_interval == 0 or itr == 1:
 
-            fetch_list = [scalar_summary_op[0]]
+            # fetch_list = [scalar_summary_op[0]]
+            #
+            # # fetch sub_predicitons for each sub_batch
+            # for nw_heads_sub_b in network_heads:
+            #     nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+            #
+            #     [fetch_list.append(
+            #         nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+            #         in
+            #         range(len(assign["ds_factors"]))]
+            #
+            # summary = sess.run(fetch_list, feed_dict=feed_dict)
+            # writer.add_summary(summary[0], float(itr))
+            #
+            # # feed one stitched image to summary op
+            # gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
+            # map_visuals = get_map_visuals(summary[1:], assign, show=False)
+            #
+            # stitched_img = get_stitched_tensorboard_image([assign], [gt_visuals], [map_visuals], blob, itr)
+            # stitched_img = np.expand_dims(stitched_img, 0)
+            # # obsolete
+            # #images_feed_dict = get_images_feed_dict(assign, blob, None, None, images_placeholders)
+            # images_feed_dict = dict()
+            # images_feed_dict[images_placeholders[0]] = stitched_img
+            #
+            # # save images to tensorboard
+            # summary = sess.run([images_summary_op[0]], feed_dict=images_feed_dict)
+            # writer.add_summary(summary[0], float(itr))
 
-            # fetch sub_predicitons for each sub_batch
-            for nw_heads_sub_b in network_heads:
-                nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
-
-                [fetch_list.append(
-                    nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-                    in
-                    range(len(assign["ds_factors"]))]
-
-            summary = sess.run(fetch_list, feed_dict=feed_dict)
-            writer.add_summary(summary[0], float(itr))
-
-            # feed one stitched image to summary op
-            gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
-            map_visuals = get_map_visuals(summary[1:], assign, show=False)
-
-            stitched_img = get_stitched_tensorboard_image([assign], [gt_visuals], [map_visuals], blob, itr)
-            stitched_img = np.expand_dims(stitched_img, 0)
-            # obsolete
-            #images_feed_dict = get_images_feed_dict(assign, blob, None, None, images_placeholders)
-            images_feed_dict = dict()
-            images_feed_dict[images_placeholders[0]] = stitched_img
-
-            # save images to tensorboard
-            summary = sess.run([images_summary_op[0]], feed_dict=images_feed_dict)
-            writer.add_summary(summary[0], float(itr))
+            post_assign_to_tensorboard([assign], [prepped_assign], network_heads, feed_dict, itr, sess, writer, blob, valid=0)
 
         if itr % args.validation_loss_task == 0:
             # approximate validation loss
             val_loss = 0
             for i in range(args.validation_loss_task_nr_batch):
-                loss_fetch, feed_dict, blob = run_batch_assign(data_layer, args, assign, training_help, input_placeholder, gt_placeholders, mask_placeholders, sess, optim, loss, valid=1)
+                feed_dict, blob = load_feed_dict(data_layer, args, [assign], training_help, input_placeholder,    valid=1)
+                loss_fetch = sess.run([loss], feed_dict=feed_dict)
                 val_loss += loss_fetch[0]
 
             val_loss = val_loss/args.validation_loss_task_nr_batch
             print("Validation loss estimate at itr " + str(itr) + ": " + str(val_loss))
 
 
-            # post to tensorboard
-            fetch_list = [scalar_summary_op[1]]
-            # fetch sub_predicitons
-            for nw_heads_sub_b in network_heads:
-                nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
-
-                [fetch_list.append(
-                    nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-                    in
-                    range(len(assign["ds_factors"]))]
-
-            summary = sess.run(fetch_list, feed_dict=feed_dict)
-            writer.add_summary(summary[0], float(itr))
-
-            # feed one stitched image to summary op
-            gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
-            map_visuals = get_map_visuals(summary[1:], assign, show=False)
-
-            stitched_img = get_stitched_tensorboard_image([assign], [gt_visuals], [map_visuals], blob, itr)
-            stitched_img = np.expand_dims(stitched_img, 0)
-            # obsolete
-            # images_feed_dict = get_images_feed_dict(assign, blob, None, None, images_placeholders)
-            images_feed_dict = dict()
-            images_feed_dict[images_placeholders[1]] = stitched_img
-
-            # save images to tensorboard
-            summary = sess.run([images_summary_op[1]], feed_dict=images_feed_dict)
-            writer.add_summary(summary[0], float(itr))
+            # # post to tensorboard
+            # fetch_list = [scalar_summary_op[1]]
+            # # fetch sub_predicitons
+            # for nw_heads_sub_b in network_heads:
+            #     nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+            #
+            #     [fetch_list.append(
+            #         nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
+            #         in
+            #         range(len(assign["ds_factors"]))]
+            #
+            # summary = sess.run(fetch_list, feed_dict=feed_dict)
+            # writer.add_summary(summary[0], float(itr))
+            #
+            # # feed one stitched image to summary op
+            # gt_visuals = get_gt_visuals(blob, assign, 0, pred_boxes=None, show=False)
+            # map_visuals = get_map_visuals(summary[1:], assign, show=False)
+            #
+            # stitched_img = get_stitched_tensorboard_image([assign], [gt_visuals], [map_visuals], blob, itr)
+            # stitched_img = np.expand_dims(stitched_img, 0)
+            # # obsolete
+            # # images_feed_dict = get_images_feed_dict(assign, blob, None, None, images_placeholders)
+            # images_feed_dict = dict()
+            # images_feed_dict[images_placeholders[1]] = stitched_img
+            #
+            # # save images to tensorboard
+            # summary = sess.run([images_summary_op[1]], feed_dict=images_feed_dict)
+            # writer.add_summary(summary[0], float(itr))
+            post_assign_to_tensorboard([assign], [prepped_assign], network_heads, feed_dict, itr, sess, writer, blob, valid=1)
 
 
         if itr % args.validation_loss_final == 0:
@@ -824,6 +791,20 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
 #     feed_dict[images_placeholders[len(images_placeholders) - 1]] = img_data
 #     return feed_dict
 
+def get_spacer_pattern(shape):
+    shape_a, shape_b, depth = shape
+
+    x = np.arange(0, shape_b, 1)
+    y = np.arange(0, shape_a, 1)
+    xx, yy = np.meshgrid(x, y, sparse=True)
+    z = (xx + yy)%100
+    spacer = z/np.max(z)*255
+    spacer[spacer==0]=150
+    spacer = np.stack([spacer*0,spacer,spacer*0], axis=-1)
+
+    return spacer
+
+
 
 def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     pix_spacer = 3
@@ -842,7 +823,7 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
         input_pred = overlayed_image(sub_blob["data"][0], gt_boxes=None, pred_boxes=sub_blob["gt_boxes"][0])
 
         # concat inputs
-        conc = np.concatenate((input_gt, np.zeros((input_gt.shape[0], pix_spacer, 3)).astype("uint8"), input_pred), axis = 1)
+        conc = np.concatenate((input_gt, get_spacer_pattern((input_gt.shape[0], pix_spacer, 3)).astype("uint8"), input_pred), axis = 1)
         # im = Image.fromarray(conc)
         # im.save(sys.argv[0][:-17] + "asdfsadfa.png")
 
@@ -850,12 +831,12 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
         for i in range(len(assign)):
             # concat task outputs
             for ii in range(len(assign[i]["ds_factors"])):
-                sub_map = np.concatenate([gt_visuals[i][sub_ind][ii], np.zeros((gt_visuals[i][sub_ind][ii].shape[0], pix_spacer,3)).astype("uint8"), map_visuals[i][ii+sub_ind*len(assign[i]["ds_factors"])]], axis = 1)
+                sub_map = np.concatenate([gt_visuals[i][sub_ind][ii], get_spacer_pattern((gt_visuals[i][sub_ind][ii].shape[0], pix_spacer,3)).astype("uint8"), map_visuals[i][ii+sub_ind*len(assign[i]["ds_factors"])]], axis = 1)
                 if sub_map.shape[1] != conc.shape[1]:
-                    expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
+                    expand = get_spacer_pattern((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
                     expand[:, 0:sub_map.shape[1]] = sub_map
                     sub_map = expand.astype("uint8")
-                conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1],3)).astype("uint8"), sub_map), axis = 0)
+                conc = np.concatenate((conc, get_spacer_pattern((pix_spacer, conc.shape[1],3)).astype("uint8"), sub_map), axis = 0)
 
 
         # show loss masks if necessary
@@ -869,15 +850,16 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
                     mask = np.concatenate([mask,mask,mask], -1)
 
                     sub_map = np.concatenate(
-                        [gt_visuals[i][sub_ind][ii], np.zeros((gt_visuals[i][sub_ind][ii].shape[0], pix_spacer, 3)).astype("uint8"),
+                        [gt_visuals[i][sub_ind][ii], get_spacer_pattern((gt_visuals[i][sub_ind][ii].shape[0], pix_spacer, 3)).astype("uint8"),
                          mask.astype("uint8")], axis=1)
                     if sub_map.shape[1] != conc.shape[1]:
-                        expand = np.zeros((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
+                        expand = get_spacer_pattern((sub_map.shape[0], conc.shape[1], sub_map.shape[2]))
                         expand[:, 0:sub_map.shape[1]] = sub_map
                         sub_map = expand.astype("uint8")
-                    conc = np.concatenate((conc, np.zeros((pix_spacer, conc.shape[1], 3)).astype("uint8"), sub_map), axis=0)
+                    conc = np.concatenate((conc, get_spacer_pattern((pix_spacer, conc.shape[1], 3)).astype("uint8"), sub_map), axis=0)
         sub_b_img.append(conc)
-    conc = np.concatenate(sub_b_img, axis=0)
+        sub_b_img.append(get_spacer_pattern((conc.shape[0], pix_spacer, 3)).astype("uint8"))
+    conc = np.concatenate(sub_b_img, axis=1)
 
     # prepend additional info
     add_info = Image.fromarray(np.ones((50, conc.shape[1],3), dtype="uint8")*255)

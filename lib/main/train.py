@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=1500,
+        parser.add_argument("--max_edge", type=int, default=512,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -95,7 +95,7 @@ def main():
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
 
-    parser.add_argument("--tensorboard_interval", type=int, default=200,
+    parser.add_argument("--tensorboard_interval", type=int, default=1,
                         help="after how many iterations is tensorboard updated")
 
     parser.add_argument("--validation_loss_task", type=int, default=200,
@@ -126,7 +126,7 @@ def main():
                         default=[
 
                             # energy markers
-                            {'ds_factors': [1, 8, 16], 'downsample_marker': True, 'overlap_solution': 'max',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "quadratic"},
@@ -145,7 +145,7 @@ def main():
                             #  },
 
                             # bbox markers
-                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval", "loss": "reg"},
                              'balance_mask': 'mask_bg'
@@ -154,7 +154,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 100000, 10000, 1000, 1000, 100000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 100000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
