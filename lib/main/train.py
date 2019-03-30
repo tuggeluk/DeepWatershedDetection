@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
 
-    parser.add_argument("--batch_size", type=int, default=1,
+    parser.add_argument("--batch_size", type=int, default=6,
                         help="batch size for training")  #  code only works with batchsize 1!
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
@@ -95,13 +95,13 @@ def main():
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
 
-    parser.add_argument("--tensorboard_interval", type=int, default=1,
+    parser.add_argument("--tensorboard_interval", type=int, default=200,
                         help="after how many iterations is tensorboard updated")
 
     parser.add_argument("--validation_loss_task", type=int, default=200,
                         help="Compute validation loss on current task")
 
-    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=3,
+    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=1,
                         help="batch size for validation loss estimation")
 
     parser.add_argument("--validation_loss_final", type=int, default=1000000,
@@ -120,7 +120,7 @@ def main():
 
     parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput / currently unused")
 
-    parser.add_argument('--individual_upsamp', type=str, default="True", help="sample gt into imput")
+    parser.add_argument('--individual_upsamp', type=str, default="sub_task", help="use individual refine-Net heads per task (No,task,sub_task)")
 
     parser.add_argument('--training_assignements', type=list,
                         default=[
@@ -163,8 +163,12 @@ def main():
 			                {"assign": 0, "help": 0, "Itrs": Itrs0_1}
                          ], help="configure how assignements get repeated")
 
+    parser.add_argument('--train_only_combined', type=str, default="True", help="only initialze opt for combined task (save memory space)")
+
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1], "loss_factors": [2,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined}],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+                        default=[{"assigns": [0,1], "loss_factors": [1,0], "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                                 {"assigns": [0,1], "loss_factors": [1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                                 ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
 		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}

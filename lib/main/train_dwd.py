@@ -88,9 +88,13 @@ def main(parsed):
         input = feed_head
 
     print("Initializing Model:" + args.model)
+    used_heads = set()
+    for _,assign in enumerate(args.training_assignements):
+        used_heads.add(assign["stamp_func"][0])
+    used_heads = list(used_heads)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data)
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads="True")
 
     # use just one image summary OP for all tasks
     # train
@@ -170,15 +174,16 @@ def main(parsed):
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
 
-    # execute tasks
-    for do_a in args.do_assign:
-        assign_nr = do_a["assign"]
-        do_itr = do_a["Itrs"]
-        training_help = args.training_help[do_a["help"]]
-        iteration = execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer,
-                                   network_heads,
-                                   do_itr, args.training_assignements[assign_nr], preped_assign[assign_nr], iteration,
-                                   training_help)
+    if args.train_only_combined != "True":
+        # execute tasks
+        for do_a in args.do_assign:
+            assign_nr = do_a["assign"]
+            do_itr = do_a["Itrs"]
+            training_help = args.training_help[do_a["help"]]
+            iteration = execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer,
+                                       network_heads,
+                                       do_itr, args.training_assignements[assign_nr], preped_assign[assign_nr], iteration,
+                                       training_help)
 
     # execute combined tasks
     for do_comb_a in args.combined_assignements:
@@ -560,20 +565,23 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
 
     stacked_components = tf.stack(pair_contrib_loss)
     loss = tf.reduce_mean(stacked_components)
-    # init optimizer
-    var_list = [var for var in tf.trainable_variables()]
-    optimizer_type = args.optim
-    loss_L2 = tf.add_n([tf.nn.l2_loss(v) for v in var_list
-                        if 'bias' not in v.name]) * args.regularization_coefficient
-    loss += loss_L2
-    if optimizer_type == 'rmsprop':
-        optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss,
-                                                                                                  var_list=var_list)
-    elif optimizer_type == 'adam':
-        optim = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss, var_list=var_list)
+    if args.train_only_combined != "True":
+        # init optimizer
+        var_list = [var for var in tf.trainable_variables()]
+        optimizer_type = args.optim
+        loss_L2 = tf.add_n([tf.nn.l2_loss(v) for v in var_list
+                            if 'bias' not in v.name]) * args.regularization_coefficient
+        loss += loss_L2
+        if optimizer_type == 'rmsprop':
+            optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss,
+                                                                                                      var_list=var_list)
+        elif optimizer_type == 'adam':
+            optim = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss, var_list=var_list)
+        else:
+            optim = tf.train.MomentumOptimizer(learning_rate=args.learning_rate, momentum=0.9).minimize(loss,
+                                                                                                        var_list=var_list)
     else:
-        optim = tf.train.MomentumOptimizer(learning_rate=args.learning_rate, momentum=0.9).minimize(loss,
-                                                                                                    var_list=var_list)
+        optim = None
 
     # init summary operations
     # define summary ops
@@ -596,6 +604,7 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
     valid_scalar_summary_op = tf.summary.merge(scalar_sums)
 
     scalar_summary_op = [train_scalar_summary_op, valid_scalar_summary_op]
+
 
     return loss, optim, gt_placeholders, scalar_summary_op, loss_mask_placeholders
 
@@ -703,7 +712,7 @@ def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpo
             # approximate validation loss
             val_loss = 0
             for i in range(args.validation_loss_task_nr_batch):
-                feed_dict, blob = load_feed_dict(data_layer, args, [assign], training_help, input_placeholder,    valid=1)
+                feed_dict, blob = load_feed_dict(data_layer, args, [assign], training_help, input_placeholder, [prepped_assign],  valid=1)
                 loss_fetch = sess.run([loss], feed_dict=feed_dict)
                 val_loss += loss_fetch[0]
 

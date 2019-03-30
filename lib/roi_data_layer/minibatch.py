@@ -41,6 +41,22 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             format(num_images, args.batch_size)
 
     #assert len(roidb) == 1, "Single batch only"
+    # # flip names of macrophage data
+    # path = "/share/DeepWatershedDetection/data/macrophages_2019/test/images/"
+    # files = os.listdir(path)
+    # for f in files:
+    #     os.rename(path+"/"+f, path+"/"+f+"prern")
+    #
+    # files = os.listdir(path)
+    # for f in files:
+    #     if "mCherry" in f:
+    #         os.rename(path + "/" + f, path + "/" + f.split("_")[0] + "_DAPI.tif")
+    #     else:
+    #         os.rename(path + "/" + f, path + "/" + f.split("_")[0] + "_mCherry.tif")
+    #
+    # # files = os.listdir(path)
+    # # for f in files:
+    # #     os.rename(path + "/" + f, path + "/" + f[:3]+"_"+f[3:])
 
 
     # iterate over batch elements
@@ -217,8 +233,12 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                     canvas = canvas[scalings[1][0]:scalings[1][2], scalings[1][1]:scalings[1][3]]
 
 
-                    # cavn_print = im/np.max(im)*255
-                    # Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test.jpg")
+                    cavn_print = blob["data"]/np.max(blob["data"].shape)*255
+                    cavn_print = np.squeeze(cavn_print[0], -1)
+                    Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test_"+str(nr_subele)+".jpg")
+
+                    cavn_print = canvas/np.max(canvas)*255
+                    Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test_gt_"+str(nr_subele)+".jpg")
 
                     blob["assign" + str(i1)] = dict()
                     for i2 in range(len(assign[i1]["ds_factors"])):

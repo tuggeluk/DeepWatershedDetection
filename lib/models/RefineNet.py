@@ -175,7 +175,7 @@ def RefineBlock(high_inputs=None,low_inputs=None):
 
 
 def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True,
-                    individual_upsamp="False"):
+                    individual_upsamp="False", paired_mode=1, used_heads=None, sparse_heads="False"):
     """
     Builds the RefineNet model. 
 
@@ -211,13 +211,41 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
 
     
     net_name = list(end_points.keys())[0].split("/")[0]
+    if used_heads is None:
+        us_stages = ["energy", "direction", "classes", "bbox", "semseg"]
+    else:
+        us_stages = used_heads
 
-    if individual_upsamp == "True":
+    if individual_upsamp == "sub_task":
+        f = [end_points['pool5'], end_points['pool4'],
+             end_points['pool3'], end_points['pool2']]
+        g_outer_list = list()
+        for sub_b in range(paired_mode):
+            g_list = dict()
+            for stage in us_stages:
+                g = [None, None, None, None]
+                h = [None, None, None, None]
+
+                for i in range(4):
+                    h[i] = slim.conv2d(f[i], 256, 1)
+
+                g[0] = RefineBlock(high_inputs=None, low_inputs=h[0])
+                g[1] = RefineBlock(g[0], h[1])
+                g[2] = RefineBlock(g[1], h[2])
+                g[3] = RefineBlock(g[2], h[3])
+
+                g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
+
+                g_list[stage] = g
+            g_outer_list.append(g_list)
+
+        return g_outer_list, init_fn
+
+    elif individual_upsamp == "task":
         f = [end_points['pool5'], end_points['pool4'],
              end_points['pool3'], end_points['pool2']]
 
-        us_stages = ["energy", "classes", "bbox", "semseg"]
-        g_list = list()
+        g_list = dict()
         for stage in us_stages:
             g = [None, None, None, None]
             h = [None, None, None, None]
@@ -232,7 +260,7 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
 
             g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
 
-            g_list.append(g)
+            g_list[stage] = g
 
         return g_list, init_fn
     else:
