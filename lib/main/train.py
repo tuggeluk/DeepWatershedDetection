@@ -95,19 +95,19 @@ def main():
     parser.add_argument("--print_interval", type=int, default=5,
                         help="after how many iterations the loss is printed to console")
 
-    parser.add_argument("--tensorboard_interval", type=int, default=200,
+    parser.add_argument("--tensorboard_interval", type=int, default=100,
                         help="after how many iterations is tensorboard updated")
 
-    parser.add_argument("--validation_loss_task", type=int, default=200,
+    parser.add_argument("--validation_loss_task", type=int, default=100,
                         help="Compute validation loss on current task")
 
-    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=200,
+    parser.add_argument("--validation_loss_task_nr_batch", type=int, default=2,
                         help="batch size for validation loss estimation")
 
     parser.add_argument("--validation_loss_final", type=int, default=1000000,
                         help="Compute validation loss on bounding box level")
 
-    parser.add_argument("--save_interval", type=int, default=2000,
+    parser.add_argument("--save_interval", type=int, default=500,
                         help="after how many iterations are the weights saved")
 
 
