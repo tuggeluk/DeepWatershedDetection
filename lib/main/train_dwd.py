@@ -20,6 +20,7 @@ import pdb
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
+import datetime
 
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, stamp_semseg, \
@@ -305,7 +306,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         past_losses[:, -1] = fetches[-past_losses.shape[0]:]  # add latest loss
 
         if itr % args.print_interval == 0 or itr == 1:
-            print("loss at itr: " + str(itr))
+            print("loss at itr: " + str(itr) + " at: "+ str(datetime.datetime.now()))
             print(fetches[1])
             print(past_losses)
 
@@ -313,7 +314,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
 
             post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob)
 
-        if itr % args.validation_loss_task == 0 or True:
+        if itr % args.validation_loss_task == 0:
             # approximate validation loss
             val_loss = 0
             for i in range(args.validation_loss_task_nr_batch):
