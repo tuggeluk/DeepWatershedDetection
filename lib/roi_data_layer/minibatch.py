@@ -42,7 +42,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
 
     #assert len(roidb) == 1, "Single batch only"
     # # flip names of macrophage data
-    # path = "/share/DeepWatershedDetection/data/macrophages_2019/test/images/"
+    # path = "train/images/"
     # files = os.listdir(path)
     # for f in files:
     #     os.rename(path+"/"+f, path+"/"+f+"prern")
@@ -53,7 +53,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
     #         os.rename(path + "/" + f, path + "/" + f.split("_")[0] + "_DAPI.tif")
     #     else:
     #         os.rename(path + "/" + f, path + "/" + f.split("_")[0] + "_mCherry.tif")
-    #
+    # #
     # # files = os.listdir(path)
     # # for f in files:
     # #     os.rename(path + "/" + f, path + "/" + f[:3]+"_"+f[3:])
