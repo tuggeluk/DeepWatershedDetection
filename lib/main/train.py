@@ -55,7 +55,7 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 0.001  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
     dataset = "macrophages_2019_train"
@@ -92,7 +92,7 @@ def main():
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
                          "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")
 
-    parser.add_argument("--print_interval", type=int, default=5,
+    parser.add_argument("--print_interval", type=int, default=20,
                         help="after how many iterations the loss is printed to console")
 
     parser.add_argument("--tensorboard_interval", type=int, default=100,
@@ -130,19 +130,20 @@ def main():
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "quadratic"},
-                             'balance_mask': 'fg_bg_balanced', # by_class, by_object, fg_bg, mask_bg, None
+                             'balance_mask': 'fg_bg_balanced', # by_class, by_object, fg_bg_balanced, mask_bg, None
+                             'balance_coef': 0.25,  # % of loss given to background
                              'use_obj_seg': True, # use object segmentation if available
                              'use_obj_seg_cached': True
                              },
 
-                            # # # class markers
-                            # {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
-                            #  'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
-                            #  'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
-                            #                 "class_resolution": "class", "loss": "softmax"},
-                            #  'balance_mask': 'by_class_no_bg',
-                            #  'use_sem_seg': True # use semantic segmentation if avialable
-                            #  },
+                            # # class markers
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
+                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
+                                            "class_resolution": "class", "loss": "softmax"},
+                             'balance_mask': 'None',
+                             'use_sem_seg': True # use semantic segmentation if avialable
+                             },
 
                             # bbox markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
@@ -154,7 +155,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 100000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 10000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
@@ -165,9 +166,10 @@ def main():
 
     parser.add_argument('--train_only_combined', type=str, default="True", help="only initialze opt for combined task (save memory space)")
 
+    # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1], "loss_factors": [1,0], "Running_Mean_Length": 5, "Itrs": Itrs_combined},
-                                 {"assigns": [0,1], "loss_factors": [1,1], "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,1], "loss_factors": [0,1], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                                 {"assigns": [0,1], "loss_factors": [1,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
