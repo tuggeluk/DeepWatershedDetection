@@ -408,7 +408,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                         blob["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_copy[0], -1)
 
 
-                    elif assign[i1]["balance_mask"] is None:
+                    elif assign[i1]["balance_mask"] is None or assign[i1]["balance_mask"] == "None":
                         # do nothing / multiply everything by 1
                         blob["assign" + str(i1)]["mask" + str(i2)] = np.ones(blob["assign" + str(i1)]["gt_map" + str(i2)].shape[:-1] + (1,))[0]
 
