@@ -242,7 +242,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
     print("training on combined assignments")
     print("for " + str(do_comb_itr) + " iterations")
 
-    # waste elements off queue because queue clear does not work
+    # waste elements off queue because qu0.eue clear does not work
     for i in range(14):
         data_layer[0].forward(args, orig_assign, training_help)
 
@@ -432,10 +432,9 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
         loss_mask_placeholders.append([tf.placeholder(tf.float32, shape=[None, None, None, 1]) for x in assign["ds_factors"]])
 
 
-
+    pair_contrib_loss = []
     for pair_nr in range(args.paired_data):
         debug_fetch = dict()
-        pair_contrib_loss = []
         if assign["stamp_func"][0] == "stamp_directions":
             loss_components = []
             for x in range(len(assign["ds_factors"])):

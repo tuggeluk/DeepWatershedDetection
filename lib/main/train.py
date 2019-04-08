@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
     parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
 
-    parser.add_argument("--batch_size", type=int, default=2,
+    parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  #  code only works with batchsize 1!
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
@@ -55,7 +55,7 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 10E-4  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
     dataset = "macrophages_2019_train"
@@ -155,7 +155,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 10000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 40000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
@@ -168,8 +168,8 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1], "loss_factors": [0,1], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
-                                 {"assigns": [0,1], "loss_factors": [1,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,2], "loss_factors": [1,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                                 {"assigns": [0,2], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
