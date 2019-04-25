@@ -115,7 +115,7 @@ def main():
     parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
 
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res101",
+    parser.add_argument('--model', type=str, default="RefineNet-Res152",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
 
     parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput / currently unused")
