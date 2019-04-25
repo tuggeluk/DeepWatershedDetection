@@ -2,11 +2,24 @@ from models.RefineNet import build_refinenet
 import tensorflow as tf
 from tensorflow.contrib import slim
 from main.config import cfg
-
+from models.UNet import build_u_net
 
 def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False, individual_upsamp = "False", paired_mode=1,  used_heads=None, sparse_heads="False"):
-    g, init_fn = build_refinenet(input, preset_model=model, num_classes=None, pretrained_dir=pretrained_dir,
-                                 substract_mean=substract_mean,individual_upsamp=individual_upsamp, paired_mode=paired_mode, used_heads=used_heads, sparse_heads=sparse_heads)
+
+    if "RefineNet" in model:
+        g, init_fn = build_refinenet(input, preset_model=model, num_classes=None, pretrained_dir=pretrained_dir,
+                                     substract_mean=substract_mean,individual_upsamp=individual_upsamp, paired_mode=paired_mode, used_heads=used_heads, sparse_heads=sparse_heads)
+    elif "UNet" in model:
+        g, variables, size_diff = build_u_net(input,tf.constant(1, dtype=tf.float32), 3, 256, features_root=32,individual_upsamp=individual_upsamp, paired_mode=paired_mode, used_heads=used_heads)
+        init_fn = None # no pretrained models
+
+    elif "DeepLab" in model:
+        raise NotImplementedError
+
+    else:
+        print("unknown model")
+        raise NotImplementedError
+
 
     if individual_upsamp != "task" and individual_upsamp != "sub_task":
         # copy along tasks

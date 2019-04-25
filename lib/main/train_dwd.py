@@ -160,7 +160,7 @@ def main(parsed):
         init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
         init_fn(sess)
     else:
-        if args.pretrain_lvl == "semseg":
+        if args.pretrain_lvl == "semseg" and init_fn is not None:
             # load all variables except the ones in scope "deep_watershed"
             pretrained_vars = []
             for var in slim.get_model_variables():
@@ -171,7 +171,7 @@ def main(parsed):
             loading_checkpoint_name = refinenet_dir + args.model + ".ckpt"
             init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
             init_fn(sess)
-        elif args.pretrain_lvl == "class":
+        elif args.pretrain_lvl == "class" and init_fn is not None:
             print("Loading pretrained weights for level: " + args.pretrain_lvl)
             init_fn(sess)
         else:
@@ -591,19 +591,19 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
     # init summary operations
     # define summary ops
     scalar_sums = []
-    scalar_sums.append(tf.summary.scalar("train_loss " + get_config_id(assign) + ":", loss))
+    scalar_sums.append(tf.summary.scalar("train_loss_" + get_config_id(assign) + "_", loss))
 
     for comp_nr in range(len(loss_components)):
-        scalar_sums.append(tf.summary.scalar("train_loss_component " + get_config_id(assign) + "Nr" + str(comp_nr) + ":",
+        scalar_sums.append(tf.summary.scalar("train_loss_component_" + get_config_id(assign) + "Nr" + str(comp_nr) + "_",
                                              final_loss_components[comp_nr]))
 
     train_scalar_summary_op = tf.summary.merge(scalar_sums)
 
     scalar_sums = []
-    scalar_sums.append(tf.summary.scalar("valid_loss " + get_config_id(assign) + ":", loss))
+    scalar_sums.append(tf.summary.scalar("valid_loss_" + get_config_id(assign) + "_", loss))
 
     for comp_nr in range(len(loss_components)):
-        scalar_sums.append(tf.summary.scalar("valid_loss_component " + get_config_id(assign) + "Nr" + str(comp_nr) + ":",
+        scalar_sums.append(tf.summary.scalar("valid_loss_component_" + get_config_id(assign) + "Nr" + str(comp_nr) + "_",
                                              final_loss_components[comp_nr]))
 
     valid_scalar_summary_op = tf.summary.merge(scalar_sums)
