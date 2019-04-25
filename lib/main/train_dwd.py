@@ -77,6 +77,11 @@ def main(parsed):
         resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
         refinenet_dir = cfg.PRETRAINED_DIR + "/VOC2012/"
 
+    elif "Dota_2018" in args.dataset:
+        input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
+        resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
+        refinenet_dir = cfg.PRETRAINED_DIR + "/VOC2012/"
+
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
@@ -222,7 +227,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
             loss_tot += preped_assigns[i][0] * loss_scalings_placeholder[i]
 
     # init optimizer
-    with tf.variable_scope("combined_opt" + str(0)):
+    with tf.variable_scope("combined_opt" + str(0), reuse=tf.AUTO_REUSE):
         var_list = [var for var in tf.trainable_variables()]
         loss_L2 = tf.add_n([tf.nn.l2_loss(v) for v in var_list
                             if 'bias' not in v.name]) * args.regularization_coefficient
@@ -903,6 +908,8 @@ def get_checkpoint_dir(args):
         image_mode = "music_handwritten"
     elif "macrophages" in args.dataset:
         image_mode = "macrophages"
+    elif "Dota" in args.dataset:
+        image_mode = "Dota"
     else:
         image_mode = "realistic"
     tbdir = cfg.EXP_DIR + "/" + image_mode + "/" + "pretrain_lvl_" + args.pretrain_lvl + "/" + args.model

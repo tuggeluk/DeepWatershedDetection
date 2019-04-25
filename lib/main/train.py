@@ -31,8 +31,8 @@ def main():
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
-                            help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=1500,
+                            help="Augment synthetic data at the top of  the image")
+        parser.add_argument("--max_edge", type=int, default=256*4,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -55,10 +55,10 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 10E-4  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "macrophages_2019_train"
+    dataset = "Dota_2018_train"
     if dataset == "DeepScores_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
@@ -77,8 +77,8 @@ def main():
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "Dota_2018_train":
-        parser.add_argument("--dataset", type=str, default="Dota_2018_debug", help="DeepScores, voc or coco")
-        parser.add_argument("--dataset_validation", type=str, default="Dota_2018_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--dataset", type=str, default="Dota_2018_train", help="DeepScores, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="Dota_2018_valid", help="DeepScores, voc, coco or no - validation set")
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "voc_2012_train":
         parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
@@ -128,7 +128,7 @@ def main():
                             # energy markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 0.8, "shape": "oval",
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "quadratic"},
                              'balance_mask': 'fg_bg_balanced', # by_class, by_object, fg_bg_balanced, mask_bg, None
                              'balance_coef': 0.25,  # % of loss given to background
@@ -139,9 +139,9 @@ def main():
                             # # class markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval",
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"},
-                             'balance_mask': 'None',
+                             'balance_mask': 'mask_bg',
                              'use_sem_seg': True # use semantic segmentation if avialable
                              },
 
@@ -155,7 +155,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 40000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
@@ -168,8 +168,8 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,2], "loss_factors": [1,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
-                                 {"assigns": [0,2], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,1], "loss_factors": [3,1], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                                 {"assigns": [0,1], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,

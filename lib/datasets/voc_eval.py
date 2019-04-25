@@ -83,11 +83,11 @@ def parse_rec_deepscores(filename, rescale_factor=0.5):
   return objects
 
 
-def parse_rec_dota(filename, rescale_factor=0.5):
+def parse_rec_dota(filename, rescale_factor=1):
     objects = []
     with open(filename, 'r') as f:
         lines = f.readlines()
-        splitlines = [x.strip().split(' ')  for x in lines]
+        splitlines = [x.strip().split(' ') for x in lines]
         i = 0
         for splitline in splitlines:
             if i < 2:
@@ -104,6 +104,10 @@ def parse_rec_dota(filename, rescale_factor=0.5):
                                          int(float(splitline[1]) * rescale_factor),
                                          int(float(splitline[4]) * rescale_factor),
                                          int(float(splitline[5]) * rescale_factor)]
+
+            object_struct['bbox_full'] = [int(float(x) * rescale_factor) for x in splitline[:-2]]
+
+
             w = int(float(splitline[4]) * rescale_factor) - int(float(splitline[0]) * rescale_factor)
             h = int(float(splitline[5]) * rescale_factor) - int(float(splitline[1]) * rescale_factor)
             object_struct['area'] = w * h

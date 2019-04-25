@@ -34,9 +34,9 @@ class dota(imdb):
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
       else devkit_path
-    self._data_path = os.path.join(self._devkit_path, 'segmentation_detection')
-    self._split_path = os.path.join(self._devkit_path, 'train_val_test')
-    self._classes = list(pa.read_csv(self._devkit_path + "/Dota_classification/class_names.csv", header=None)[1])
+    self._data_path = os.path.join(self._devkit_path, 'dota_'+image_set)
+    self._classes = ["background", "plane", "ship", "storage-tank", "baseball-diamond", "tennis-court", "basketball-court", "ground-track-field", "harbor", "bridge", "large-vehicle", "small-vehicle",
+                     "helicopter", "roundabout", "soccer-ball-field", "swimming-pool","container-crane"]
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._image_ext = '.png'
@@ -66,11 +66,16 @@ class dota(imdb):
     """
     return self.image_path_from_index(self._image_index[i])
 
+
+  def semseg_index(self):
+    return None
+
+
   def image_path_from_index(self, index):
     """
     Construct an image path from the image's "index" identifier.
     """
-    image_path = os.path.join(self._data_path, 'images_png',
+    image_path = os.path.join(self._data_path, 'images',
                               index + self._image_ext)
     assert os.path.exists(image_path), \
       'Path does not exist: {}'.format(image_path)
@@ -82,23 +87,24 @@ class dota(imdb):
     """
     # Example path to image set file:
     # image_set_file =  os.path.join(self._devkit_path, "VOCdevkit2007/VOC2007/ImageSets/Main/val.txt")
-    images_path = os.path.join(self._data_path, 'images_png')
+    images_path = os.path.join(self._data_path, 'images')
     assert os.path.exists(images_path), \
       'Path does not exist: {}'.format(images_path)
 
     images = os.listdir(images_path)
 
     #read according file
-    with open(self._split_path+"/"+self._image_set+".txt") as f:
-      allowed_names = f.readlines()
-
-    allowed_names = [x.strip() for x in allowed_names]
+    # with open(self._split_path+"/"+self._image_set+".txt") as f:
+    #   allowed_names = f.readlines()
+    #
+    # allowed_names = [x.strip() for x in allowed_names]
 
     # strip extension
     images = [x[:-4] for x in images]
 
     # intersection of existing and allowed files
-    image_index = list(set(allowed_names).intersection(images))
+    #image_index = list(set(allowed_names).intersection(images))
+    image_index = images
 
     return image_index
 
@@ -106,7 +112,7 @@ class dota(imdb):
     """
     Return the default path where PASCAL VOC is expected to be installed.
     """
-    return os.path.join(cfg.DATA_DIR, 'Dota_' + self._year)
+    return os.path.join(cfg.DATA_DIR, 'dota')
 
   def gt_roidb(self):
     """
@@ -153,14 +159,15 @@ class dota(imdb):
 
   def _load_musical_annotation(self, index):
     """
-    Load image and bounding boxes info from XML file in the PASCAL VOC
+    Load image and bounding boxes info from TXT file in the DOTAv1.5
     format.
     """
-    filename = os.path.join(self._data_path, 'xml_annotations', index + '.txt')
+    filename = os.path.join(self._data_path, 'task1_5_tilted', index + '.txt')
     objs = parse_rec_dota(filename)
     num_objs = len(objs)
 
     boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+    boxes_full = np.zeros((num_objs, 8), dtype=np.uint16)
     gt_classes = np.zeros((num_objs), dtype=np.int32)
     overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
     # "Seg" area for pascal is just the box area
@@ -176,10 +183,12 @@ class dota(imdb):
       gt_classes[ix] = cls
       overlaps[ix, cls] = 1.0
       seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
+      boxes_full[ix, :] = obj['bbox_full']
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
 
     return {'boxes': boxes,
+            'boxes_full': boxes_full,
             'gt_classes': gt_classes,
             'gt_overlaps': overlaps,
             'flipped': False,

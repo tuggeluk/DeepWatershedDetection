@@ -73,7 +73,7 @@ for year in ['2017']:
 
 # Set up for Dota_2018_<split>
 for year in ['2018']:
-  for split in ['train', 'val', 'test', 'debug']:
+  for split in ['train', 'valid', 'test', 'debug']:
     name = 'Dota_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: dota(split, year))
 

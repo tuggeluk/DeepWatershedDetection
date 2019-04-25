@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import math
 import sys
+import copy
 
 marker_size = [4,4]
 
@@ -100,13 +101,18 @@ def sanatize_coords(canvas_shape, coords):
 
 def get_partial_marker(canvas_shape, coords, mark):
 
+    if canvas_shape is None or coords is None or mark is None:
+        return None, None
 
-    # if coords are outside of bbox
-    crop_coords = np.asarray(coords)
-    crop_coords = np.maximum(crop_coords, 0)
-    crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], canvas_shape[0]-1)
-    crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], canvas_shape[1]-1)
-
+    try:
+        # if coords are outside of bbox
+        crop_coords = np.asarray(coords)
+        crop_coords = np.maximum(crop_coords, 0)
+        crop_coords[[1,3]] = np.minimum(crop_coords[[1,3]], canvas_shape[0]-1)
+        crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], canvas_shape[1]-1)
+    except Exception as e:
+        print("debug partial marker")
+        raise e
     # if a dimension collapses kill element
     if crop_coords[0] == crop_coords[2] or crop_coords[1]==crop_coords[3]:
         return None, None
@@ -213,13 +219,13 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
     # downsample size and bounding boxes
     samp_factor = 1.0/objectness_settings["ds_factors"][downsample_ind]
-    sampled_size = (int(size[1]*samp_factor),int(size[2]*samp_factor))
+    sampled_size = (int(size[1]*samp_factor), int(size[2]*samp_factor))
 
-    sampled_gt = [x*[samp_factor,samp_factor,samp_factor,samp_factor,1] for x in gt]
+    sampled_gt = [[x[0]*samp_factor, x[1]] for x in gt if x is not None]
 
 
     #init canvas
-    last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"],nr_classes)
+    last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"], nr_classes)
 
 
     if objectness_settings["stamp_args"]["loss"] == "softmax":
@@ -232,52 +238,65 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         canvas = canvas - 10
 
     used_coords = []
+    #print(sampled_gt)
     for bbox in sampled_gt:
-        stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
-        stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
-
-        if stamp is None:
-            print("skipping element")
+        # import matplotlib.pyplot as plt
+        # plt.plot(bbox[0][0::2], bbox[0][1::2])
+        # plt.show()
+        try:
             stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
-            stamp, coords = get_partial_marker(canvas.shape, coords, stamp)
-            print(bbox)
-            continue #skip this element
+            stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
 
-        if objectness_settings["stamp_args"]["loss"] == "softmax":
-            stamp_zeros = stamp[:, :, 0] == 1
-            stamp_zeros = np.expand_dims(stamp_zeros,-1).astype("int")
-            stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
+            if stamp is None:
+                #print("skipping element None")
+                stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+                #stamp, coords = get_partial_marker(canvas.shape, coords, stamp)
+                #print(bbox)
+                # import matplotlib.pyplot as plt
+                # plt.plot(bbox[0][0::2],bbox[0][1::2])
+                # plt.show()
+                continue #skip this element
 
-        else:
-            stamp_zeros = stamp == 0
-            stamp_zeros = stamp_zeros.astype("int")
-            stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
-
-        if objectness_settings["overlap_solution"] == "max":
-            if objectness_settings["stamp_args"]["loss"]=="softmax":
-                maskout_map = np.argmax(canvas[coords[1]:coords[3],coords[0]:(coords[2])], -1) < np.argmax(stamp,-1)
-                canvas[coords[1]:coords[3], coords[0]:coords[2]][maskout_map] = stamp[maskout_map]
-            else:
-                canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.expand_dims(np.max(np.concatenate([canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp],-1),-1),-1)
-        elif objectness_settings["overlap_solution"] == "no":
-            canvas[coords[1]:coords[3], coords[0]:coords[2]] = stamp
-        elif objectness_settings["overlap_solution"] == "nearest":
-            closest_mask = get_closest_mask(coords, used_coords)
             if objectness_settings["stamp_args"]["loss"] == "softmax":
-                closest_mask = np.expand_dims(closest_mask,-1)
-                canvas[coords[1]:coords[3],coords[0]:coords[2]] = \
-                    (1 - closest_mask) * canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask * stamp
+                stamp_zeros = stamp[:, :, 0] == 1
+                stamp_zeros = np.expand_dims(stamp_zeros,-1).astype("int")
+                stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
+
             else:
-                if len(closest_mask.shape) < len(stamp.shape):
+                stamp_zeros = stamp == 0
+                stamp_zeros = stamp_zeros.astype("int")
+                stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
+
+            if objectness_settings["overlap_solution"] == "max":
+                if objectness_settings["stamp_args"]["loss"]=="softmax":
+                    maskout_map = np.argmax(canvas[coords[1]:coords[3],coords[0]:(coords[2])], -1) < np.argmax(stamp,-1)
+                    canvas[coords[1]:coords[3], coords[0]:coords[2]][maskout_map] = stamp[maskout_map]
+                else:
+                    canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.expand_dims(np.max(np.concatenate([canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp],-1),-1),-1)
+            elif objectness_settings["overlap_solution"] == "no":
+                canvas[coords[1]:coords[3], coords[0]:coords[2]] = stamp
+            elif objectness_settings["overlap_solution"] == "nearest":
+                closest_mask = get_closest_mask(coords, used_coords)
+                if objectness_settings["stamp_args"]["loss"] == "softmax":
                     closest_mask = np.expand_dims(closest_mask,-1)
+                    canvas[coords[1]:coords[3],coords[0]:coords[2]] = \
+                        (1 - closest_mask) * canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask * stamp
+                else:
+                    if len(closest_mask.shape) < len(stamp.shape):
+                        closest_mask = np.expand_dims(closest_mask,-1)
 
-                canvas[coords[1]:coords[3], coords[0]:coords[2]] = (1-closest_mask)*canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask*stamp
+                    canvas[coords[1]:coords[3], coords[0]:coords[2]] = (1-closest_mask)*canvas[coords[1]:coords[3], coords[0]:coords[2]] + closest_mask*stamp
 
-            used_coords.append(coords)
-            # get overlapping bboxes
-            # shave off pixels that are closer to another center
-        else:
-            raise NotImplementedError("overlap solution unkown")
+                used_coords.append(coords)
+                # get overlapping bboxes
+                # shave off pixels that are closer to another center
+            else:
+                raise NotImplementedError("overlap solution unkown")
+        except Exception as e:
+            print("Exception at get_markers _____________________________________________")
+            print(bbox)
+            print("______________________________________________________________________")
+            print(e)
     #color_map(canvas, objectness_settings, True)
     # set base energ y to minus 10
 
@@ -465,78 +484,181 @@ def stamp_energy(bbox,args,nr_classes):
 
     if args["marker_dim"] is None:
         # use bbox size
-
         # determine marker size
-        marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
+        marker_size = (int(args["size_percentage"]*(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))),
+                       int(args["size_percentage"]*(np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))))
 
     else:
         marker_size = args["marker_dim"]
 
     # transpose marker size bc of wierd bbox definition
     marker_size = np.asarray(marker_size)[[1,0]]
+    if marker_size[0] < 2 or marker_size[1] < 2:
+        return None, None
 
-    coords_offset = np.round(([bbox[2]-bbox[0], bbox[3]-bbox[1]] - np.asarray(marker_size))*0.5)
-    topleft = np.round([bbox[0]+coords_offset[0],bbox[1]+coords_offset[1]]).astype(np.int)
+
+    coords_offset = np.round(((np.max(bbox[0][0::2])-np.min(bbox[0][0::2]),
+                              np.max(bbox[0][1::2]) - np.min(bbox[0][1::2])) - np.asarray(marker_size))*0.5)
+
+    topleft = np.round([np.min(bbox[0][0::2])+coords_offset[0],np.min(bbox[0][1::2])+coords_offset[1]]).astype(np.int)
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
-    marker = get_energy_marker(marker_size, args["shape"])
+    marker = get_energy_marker(marker_size,bbox, args["shape"],args["size_percentage"])
 
-    # apply shape function
-    if args["energy_shape"] == "linear":
-        1==1 # do nothing
-    elif args["energy_shape"] == "root":
-        marker = np.sqrt(marker)
-        marker = marker/np.max(marker)* (cfg.TRAIN.MAX_ENERGY-1)
-    elif args["energy_shape"] == "quadratic":
-        marker = np.square(marker)
-        marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY-1)
+    try:
+        # apply shape function
+        if args["energy_shape"] == "linear":
+            1==1 # do nothing
+        elif args["energy_shape"] == "root":
+            marker = np.sqrt(marker)
+            marker = marker/np.max(marker)* (cfg.TRAIN.MAX_ENERGY-1)
+        elif args["energy_shape"] == "quadratic":
+            marker = np.square(marker)
+            marker = marker / (np.max(marker)+0.000001) * (cfg.TRAIN.MAX_ENERGY-1)
 
-    if args["loss"]== "softmax":
-        marker = np.round(marker).astype(np.int32)
-        marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
-        # turn into one-hot softmax targets
-    else:
-        # expand last dim
-        marker = np.expand_dims(marker,-1)
+        if args["loss"]== "softmax":
+            marker = np.round(marker).astype(np.int32)
+            marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
+            # turn into one-hot softmax targets
+        else:
+            # expand last dim
+            marker = np.expand_dims(marker,-1)
+    except Exception as e:
+        print("Exception at softmax energy _____________________________________________")
+        print(bbox)
+        print("______________________________________________________________________")
+        print(e)
 
-
+    # [coords[2]-coords[0],coords[3]-coords[1]]
     return marker, coords
 
 
-def get_energy_marker(size, shape):
-    if shape == "square":
-        sy = size[0] / 2
-        sx = size[1] / 2
-        if size[0]%2 == 1:
-            grid_y = np.concatenate((range(sy),range(sy,-1,-1)))
-        else:
-            grid_y = np.concatenate((range(sy), range(sy-1, -1, -1)))
+def get_energy_marker(size, bbox=None, shape="oval", size_percentage=1):
 
-        if size[1]%2 == 1:
-            grid_x = np.concatenate((range(sx), range(sx, -1, -1)))
-        else:
-            grid_x = np.concatenate((range(sx), range(sx-1, -1, -1)))
+    bbox_local = copy.deepcopy(bbox)
+    try:
+        # left hand side
+        left_side_map = {"[1 1]": [-1,1], "[ 1 -1]": [1,1], "[-1 -1]":[1,-1], "[-1  1]": [-1,-1],
+                         "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
 
+        # normalize points to x-min, y-min
 
-        marker = np.min(np.stack(np.meshgrid(grid_x, grid_y)),0)
+        bbox_local[0][1::2] = bbox_local[0][1::2] - np.min(bbox_local[0][1::2])
+        bbox_local[0][0::2] = bbox_local[0][0::2] - np.min(bbox_local[0][0::2])
+        # compute full size and shrink using cv2
+        bbox_local[0] = (bbox_local[0] * size_percentage).astype(np.int)
 
-        if min(marker.shape) > 0:
-            marker = marker/float(np.max(marker))*(cfg.TRAIN.MAX_ENERGY-1)
-        return marker
-    if shape == "oval":
-        center = np.asanyarray(size) *0.5
+        xv, yv = np.meshgrid(range(np.max(bbox_local[0][0::2])), range(np.max(bbox_local[0][1::2])), sparse=False, indexing='ij')
 
-        y_coords = np.array(range(size[0]))+0.5
-        x_coords = np.array(range(size[1]))+0.5
-        coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
+        inside = np.ones(xv.shape)
+        min_dist = np.ones(xv.shape) * 1E10
+        for point in range(int(len(bbox_local[0]) / 2)):
+            dp = 2*point
+            p = bbox_local[0][dp:dp + 2]
 
-        marker = np.sqrt(np.square((coords_grid[0] - center[0])/(size[0])) + np.square((coords_grid[1] - center[1])/(size[1])))
-        largest = max(marker[int(center[1]),0],marker[0,int(center[0])])
-        marker = 1-(marker / float(np.max(largest)))
-        marker[marker < 0] = 0
-        marker = marker * (cfg.TRAIN.MAX_ENERGY-1)
-        return marker
+            dp = 2*(point+1)
+            if dp == len(bbox_local[0]):
+                dp = 0
+            p1 = bbox_local[0][dp:dp + 2]
+
+            u = p1-p
+            u_len = np.dot(u,u)
+
+            v = [xv, yv] - np.expand_dims(np.expand_dims(p, -1), -1)
+             # u dot v / u_len
+            gamma = (u[0]*v[0] + u[1]*v[1])/u_len
+            proj = (v - [(gamma*u[0]), (gamma*u[1])])
+            proj[abs(proj) < 10e-10] = 0
+
+            signs = left_side_map[str(np.sign(u))]
+            inside = np.min((inside,np.sign(proj[0]) == signs[0],np.sign(proj[1]) == signs[1] ),0)
+            min_dist = np.min((min_dist, np.linalg.norm(proj,2,0)),0)
+        #Image.fromarray((((distance_maps[1][0] + distance_maps[1][1]) > 0) * 255).astype(np.uint8)).save("test.png")
+
+        min_dist[inside == 0] = 0
+
+        # debug energy stamp
+        # y_coords, x_coords = np.where(min_dist == 0)
+        # y_counts = np.unique(y_coords, return_counts = True)
+        # x_counts = np.unique(x_coords, return_counts=True)
+        # if np.sum(y_counts[1] == min_dist.shape[1]) + np.sum(x_counts[1] == min_dist.shape[0]) > 2:
+        #     print("debug this stamp")
+        #     bbox_local = copy.deepcopy(bbox)
+        #     # left hand side
+        #     left_side_map = {"[1 1]": [-1, 1], "[ 1 -1]": [1, 1], "[-1 -1]": [1, -1], "[-1  1]": [-1, -1],
+        #                      "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
+        #
+        #     # normalize points to x-min, y-min
+        #
+        #     bbox_local[0][1::2] = bbox_local[0][1::2] - np.min(bbox_local[0][1::2])
+        #     bbox_local[0][0::2] = bbox_local[0][0::2] - np.min(bbox_local[0][0::2])
+        #     # compute full size and shrink using cv2
+        #     bbox_local[0] = (bbox_local[0] * size_percentage).astype(np.int)
+        #
+        #     xv, yv = np.meshgrid(range(np.max(bbox_local[0][0::2])), range(np.max(bbox_local[0][1::2])), sparse=False, indexing='ij')
+        #
+        #     inside = np.ones(xv.shape)
+        #     min_dist = np.ones(xv.shape) * 1E10
+        #     for point in range(int(len(bbox_local[0]) / 2)):
+        #         dp = 2 * point
+        #         p = bbox_local[0][dp:dp + 2]
+        #
+        #         dp = 2 * (point + 1)
+        #         if dp == len(bbox_local[0]):
+        #             dp = 0
+        #         p1 = bbox_local[0][dp:dp + 2]
+        #
+        #         u = p1 - p
+        #         u_len = np.dot(u, u)
+        #
+        #         v = [xv, yv] - np.expand_dims(np.expand_dims(p, -1), -1)
+        #         # u dot v / u_len
+        #         gamma = (u[0] * v[0] + u[1] * v[1]) / u_len
+        #         proj = (v - [(gamma * u[0]), (gamma * u[1])])
+        #         proj[abs(proj) < 10e-10] = 0
+        #
+        #         signs = left_side_map[str(np.sign(u))]
+        #         inside = np.min((inside, np.sign(proj[0]) == signs[0], np.sign(proj[1]) == signs[1]), 0)
+        #         min_dist = np.min((min_dist, np.linalg.norm(proj, 2, 0)), 0)
+        #     # Image.fromarray((((distance_maps[1][0] + distance_maps[1][1]) > 0) * 255).astype(np.uint8)).save("test.png")
+        #
+        #     min_dist[inside == 0] = 0
+        if shape == "oval":
+            center = np.average(np.where(inside == 1),1)
+            center_dist = np.sqrt(np.square((xv - center[0])) + np.square((yv - center[1])))
+            center_dist = 1 - (center_dist / np.max(center_dist))
+
+            if not np.max(min_dist) == 0:
+                min_dist = min_dist / np.max(min_dist)
+
+            marker = center_dist * min_dist
+            if not np.max(marker) == 0:
+                marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY - 1)
+
+            marker = np.transpose(marker, axes=(1, 0))
+            return marker
+
+        if shape == "hull":
+            if not np.max(min_dist) == 0:
+                # normalize
+                min_dist = min_dist/np.max(min_dist)*(cfg.TRAIN.MAX_ENERGY-1)
+
+            # transpose marker due to defintions
+            min_dist = np.transpose(min_dist,axes=(1,0))
+
+            return min_dist
+            # outdated
+            # compute scalar prods
+            # for each point compute vector to all hull nodes
+            # for each point compute all n+1 scala prods
+            # if one of them is more than 90 degrees point is out
+    except Exception as e:
+        print("Exception at get_energy_marker _____________________________________________")
+        print(bbox)
+        print("______________________________________________________________________")
+        print(e)
+
     return None
 
 
@@ -559,40 +681,54 @@ def stamp_class(bbox, args, nr_classes):
             return 2
         else:
             return nr_classes
-
+    #bbox = [np.array([1.0080e+03, 0.0000e+00, 1.0126e+03, 0.0000e+00, 1.0120e+03, 1.0000e+00]), 11]
     if args["marker_dim"] is None:
         # use bbox size
         # determine marker size
-        marker_size = (int(args["size_percentage"] * (bbox[3] - bbox[1])), int(args["size_percentage"] * (bbox[2] - bbox[0])))
+        marker_size = (int(args["size_percentage"]*(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))),
+                       int(args["size_percentage"]*(np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))))
+
     else:
         marker_size = args["marker_dim"]
 
 
-    coords_offset = np.round(([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5)
-    topleft = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0]]).astype(np.int)
+    # transpose marker size bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1,0]]
+    if marker_size[0] < 2 or marker_size[1] < 2:
+        return None, None
+
+
+    coords_offset = np.round(((np.max(bbox[0][0::2])-np.min(bbox[0][0::2]),
+                              np.max(bbox[0][1::2]) - np.min(bbox[0][1::2])) - np.asarray(marker_size))*0.5)
+
+    topleft = np.round([np.min(bbox[0][0::2])+coords_offset[0],np.min(bbox[0][1::2])+coords_offset[1]]).astype(np.int)
     coords = [topleft[0],topleft[1],
-              topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
+              topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
+    marker = get_energy_marker(marker_size,bbox, args["shape"], args["size_percentage"])
+    if marker is None:
+        return None, None
+    try:
+        if args["class_resolution"] == "class":
+            marker[marker <= (cfg.TRAIN.MAX_ENERGY / 2)] = 0
+            marker[marker > (cfg.TRAIN.MAX_ENERGY/2)] = int(bbox[1])
 
-    # transpose bc of wierd bbox definition
-    marker_size = np.asarray(marker_size)[[1, 0]]
+            marker = marker.astype(np.int)
+            # turn into one-hot softmax targets
+            marker = np.eye(nr_classes)[marker[:, :]]
+        elif args["class_resolution"] == "binary":
+            marker[marker != 0] = 1
+            marker = marker.astype(np.int)
+            # turn into one-hot softmax targets
+            marker = np.eye(2)[marker[:, :]]
 
-    # piggy back on energy marker
-    marker = get_energy_marker(marker_size, args["shape"])
-
-    if args["class_resolution"] == "class":
-        marker[marker != 0] = int(bbox[4])
-        marker = marker.astype(np.int)
-        # turn into one-hot softmax targets
-        marker = np.eye(nr_classes)[marker[:, :]]
-    elif args["class_resolution"] == "binary":
-        marker[marker != 0] = 1
-        marker = marker.astype(np.int)
-        # turn into one-hot softmax targets
-        marker = np.eye(2)[marker[:, :]]
-
-    else:
-        raise NotImplementedError("unknown class resolution:"+args["class_resolution"])
+        else:
+            raise NotImplementedError("unknown class resolution:"+args["class_resolution"])
+    except Exception as e:
+        print("Exception at stam_class _____________________________________________")
+        print(bbox)
+        print("______________________________________________________________________")
+        print(e)
 
     return marker, coords
 
@@ -617,25 +753,31 @@ def stamp_bbox(bbox, args, nr_classes):
     if args["marker_dim"] is None:
         # use bbox size
         # determine marker size
-        marker_size = (int(args["size_percentage"] * (bbox[3] - bbox[1])), int(args["size_percentage"] * (bbox[2] - bbox[0])))
+        marker_size = (int(args["size_percentage"]*(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))),
+                       int(args["size_percentage"]*(np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))))
+
     else:
         marker_size = args["marker_dim"]
 
+    # transpose marker size bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1,0]]
+    if marker_size[0] < 2 or marker_size[1] < 2:
+        return None, None
 
-    coords_offset = np.round(([bbox[3]-bbox[1],bbox[2]-bbox[0]] - np.asarray(marker_size))*0.5)
-    topleft = np.round([bbox[0]+coords_offset[1],bbox[1]+coords_offset[0]]).astype(np.int)
+
+    coords_offset = np.round(((np.max(bbox[0][0::2])-np.min(bbox[0][0::2]),
+                              np.max(bbox[0][1::2]) - np.min(bbox[0][1::2])) - np.asarray(marker_size))*0.5)
+
+    topleft = np.round([np.min(bbox[0][0::2])+coords_offset[0],np.min(bbox[0][1::2])+coords_offset[1]]).astype(np.int)
     coords = [topleft[0],topleft[1],
-              topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
-
-    # transpose bc of wierd bbox definition
-    marker_size = np.asarray(marker_size)[[1, 0]]
+              topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
     # piggy back on energy marker
-    marker = get_energy_marker(marker_size, args["shape"])
+    marker = get_energy_marker(marker_size,bbox, args["shape"],args["size_percentage"])
 
-    # expand marker and multiply by bbox size
+    # expand marker and multiply by bbox  size
     marker = np.expand_dims(marker,-1)
-    bbox_marker = np.concatenate([(bbox[3] - bbox[1])*(marker>0), (bbox[2] - bbox[0])*(marker>0)], -1)
+    bbox_marker = np.concatenate([(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))*(marker>0), (np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))*(marker>0)], -1)
     return bbox_marker, coords
 
 
@@ -731,13 +873,13 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     draw = ImageDraw.Draw(im)
     if gt_boxes is not None:
         for row in gt_boxes:
-            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[0], outline=outline[0])
+            draw.polygon([x for x in zip(row[0][::2],row[0][1::2])], fill=fill[0], outline=outline[0])
 
     if pred_boxes is not None:
         for row in pred_boxes:
-            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[1], outline=outline[1])
+            draw.polygon([x for x in zip(row[0][::2], row[0][1::2])], fill=fill[0], outline=outline[0])
     if show:
-        im.save(sys.argv[0][:-17] + "inp.png")
+        im.save(sys.argv[0][:-17] + "in33p.png")
         im.show()
     return np.asarray(im).astype("uint8")
 
