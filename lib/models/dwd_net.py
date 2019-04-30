@@ -10,7 +10,7 @@ def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False,
         g, init_fn = build_refinenet(input, preset_model=model, num_classes=None, pretrained_dir=pretrained_dir,
                                      substract_mean=substract_mean,individual_upsamp=individual_upsamp, paired_mode=paired_mode, used_heads=used_heads, sparse_heads=sparse_heads)
     elif "UNet" in model:
-        g, variables, size_diff = build_u_net(input,tf.constant(1, dtype=tf.float32), 3, 256, features_root=32,individual_upsamp=individual_upsamp, paired_mode=paired_mode, used_heads=used_heads)
+        g, variables, size_diff = build_u_net(input,tf.constant(1, dtype=tf.float32), channels=3, n_class=256,layers=5, features_root=124,individual_upsamp=individual_upsamp, paired_mode=paired_mode, used_heads=used_heads)
         init_fn = None # no pretrained models
 
     elif "DeepLab" in model:

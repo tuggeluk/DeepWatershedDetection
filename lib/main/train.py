@@ -33,7 +33,7 @@ def main():
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of  the image")
         parser.add_argument("--max_edge", type=int, default=256*4,
-                            help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
+                            help="if there is no cropping - scale such that  the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
     parser.add_argument("--substract_mean", type=str, default="False",
@@ -48,7 +48,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  #  code only works with batchsize 1!
 
-    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
@@ -115,8 +115,9 @@ def main():
     parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
 
 
-    parser.add_argument('--model', type=str, default="UNet",
-                        help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152")
+    parser.add_argument('--model', type=str, default="RefineNet-Res152",
+                        help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152"
+                             "                                  UNet")
 
     parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput / currently unused")
 
@@ -129,7 +130,7 @@ def main():
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
-                                            "loss": "softmax", "energy_shape": "quadratic"},
+                                            "loss": "softmax", "energy_shape": "linear"},
                              'balance_mask': 'fg_bg_balanced', # by_class, by_object, fg_bg_balanced, mask_bg, None
                              'balance_coef': 0.25,  # % of loss given to background
                              'use_obj_seg': True, # use object segmentation if available
@@ -137,7 +138,7 @@ def main():
                              },
 
                             # # class markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1],  'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
                                             "class_resolution": "class", "loss": "softmax"},
@@ -146,7 +147,7 @@ def main():
                              },
 
                             # bbox markers
-                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1],  'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval", "loss": "reg"},
                              'balance_mask': 'mask_bg'
@@ -168,7 +169,7 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1], "loss_factors": [3,1], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,1], "loss_factors": [3,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  {"assigns": [0,1], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     

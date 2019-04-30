@@ -198,7 +198,7 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     return fnc(exec_grid)
 
 
-def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, maps_list = []):
+def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, maps_list = [], model=""):
 
     #   ds_factors, downsample_marker, overlap_solution, samp_func, samp_args
     #
@@ -218,7 +218,9 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
 
     # downsample size and bounding boxes
+
     samp_factor = 1.0/objectness_settings["ds_factors"][downsample_ind]
+
     sampled_size = (int(size[1]*samp_factor), int(size[2]*samp_factor))
 
     sampled_gt = [[x[0]*samp_factor, x[1]] for x in gt if x is not None]
@@ -300,8 +302,14 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     #color_map(canvas, objectness_settings, True)
     # set base energ y to minus 10
 
+    shapes = None
+    if "Refine" in model:
+        shapes = ds_shapes_refinenet(size[2:0:-1], None)
+    if "UNet" in model:
+        shapes = ds_shapes_unet(size[2:0:-1], None)
 
-
+    # print(shapes)
+    # print(size[2:0:-1])
 
     # if downsample marker --> use cv2 to downsample gt
     if objectness_settings["downsample_marker"]:
@@ -309,20 +317,22 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
             sm_dim = canvas.shape[-1]
             canvas_un_oh = np.argmax(canvas, -1).astype("uint8")
 
-            for x in objectness_settings["ds_factors"][1:]:
-                shape = (int(np.ceil(float(canvas_un_oh.shape[1]) / x)), int(np.ceil(float(canvas_un_oh.shape[0]) / x)))
+            for i_ds, x in enumerate(objectness_settings["ds_factors"]):
+                shape = tuple(shapes[x-1])
+
                 resized = np.round(cv2.resize(canvas_un_oh, shape, cv2.INTER_NEAREST))
                 resized_oh = np.eye(sm_dim)[resized[:,:]]
                 maps_list.append(np.expand_dims(resized_oh,0))
         else:
-            for x in objectness_settings["ds_factors"][1:]:
+            for i_ds, x in enumerate(objectness_settings["ds_factors"]):
                 # if has 3rd dimension downsample dim3 one by one
                 # if len(canvas.shape) == 3:
                 #     for dim in range(3):
                 #         rez_l = []
                 #         rez_l.append()
                 # else:
-                shape = (int(np.ceil(float(canvas.shape[1]) / x)), int(np.ceil(float(canvas.shape[0]) / x)))
+                shape = tuple(shapes[x - 1])
+
                 resized = cv2.resize(canvas, shape, cv2.INTER_NEAREST)
                 if len(resized.shape) < len(canvas.shape):
                     maps_list.append(np.expand_dims(np.expand_dims(resized, -1),0))
@@ -330,7 +340,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                     maps_list.append(np.expand_dims(resized, 0))
 
         # one-hot encoding
-        maps_list.insert(0,np.expand_dims(canvas, 0))
+        # maps_list.insert(0,np.expand_dims(canvas, 0))
     # if do not downsample marker, recursively rebuild for each ds level
     else:
         if (downsample_ind+1) == len(objectness_settings["ds_factors"]):
@@ -339,6 +349,32 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
             return get_markers(size, gt, nr_classes, objectness_settings,downsample_ind+1, maps_list)
 
     return maps_list
+
+
+def ds_shapes_unet(in_shape,args):
+    #layers, filter_size, pool_size = args
+    layers, filter_size, pool_size = 5,3,2
+    size = np.array(in_shape)
+    sizes = []
+    for layer in range(0, layers):
+        size -= 2 * 2 * (filter_size // 2)  # valid conv
+        if layer < layers - 1:
+            size = (size / pool_size).astype(np.int)
+    sizes.append(size)
+    for layer in range(layers - 2, -1, -1):
+        size = size * pool_size
+        size -= 2 * 2 * (filter_size // 2)  #
+        sizes.append(size)
+    sizes.reverse()
+
+    return sizes
+
+
+def ds_shapes_refinenet(in_shape,args):
+    shapes = []
+    for x in [1,8,16,32]:
+        shapes.append([int(np.ceil(float(in_shape[0]) / x)), int(np.ceil(float(in_shape[1]) / x))])
+    return shapes
 
 
 def get_closest_mask(coords, used_coords):

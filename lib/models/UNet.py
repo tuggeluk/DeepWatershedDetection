@@ -35,7 +35,7 @@ from models.unet_utils import (weight_variable, weight_variable_devonc, bias_var
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
-def build_u_net(x, keep_prob, channels, n_class, layers=3, features_root=16, filter_size=3, pool_size=2, individual_upsamp="False", paired_mode=1,
+def build_u_net(x, keep_prob, channels, n_class, layers=4, features_root=16, filter_size=3, pool_size=2, individual_upsamp="False", paired_mode=1,
                 used_heads=None):
     """
     Creates a new convolutional unet for the given parametrization.
@@ -60,7 +60,7 @@ def build_u_net(x, keep_prob, channels, n_class, layers=3, features_root=16, fil
     dw_h_convs = OrderedDict()
     up_h_convs = OrderedDict()
 
-    in_size = 1000
+    in_size = 256*4
     size = in_size
 
     # down layers
@@ -134,8 +134,10 @@ def build_u_net(x, keep_prob, channels, n_class, layers=3, features_root=16, fil
                         biases.append((b1, b2))
                         convs.append((conv1, conv2))
 
-                        size *= pool_size
-                        size -= 2 * 2 * (filter_size // 2)  # valid conv
+                        if sub_b == 0 and stage == "stamp_energy":
+                            print(size)
+                            size *= pool_size
+                            size -= 2 * 2 * (filter_size // 2)  # valid conv
                 g_list[stage] = g
             g_outer_list.append(g_list)
         output_map = g_outer_list
@@ -172,8 +174,9 @@ def build_u_net(x, keep_prob, channels, n_class, layers=3, features_root=16, fil
                     biases.append((b1, b2))
                     convs.append((conv1, conv2))
 
-                    size *= pool_size
-                    size -= 2 * 2 * (filter_size // 2)  # valid conv
+                    if stage == "stamp_energy":
+                        size *= pool_size
+                        size -= 2 * 2 * (filter_size // 2)  # valid conv
             g_list[stage] = g
         output_map = g
     else:

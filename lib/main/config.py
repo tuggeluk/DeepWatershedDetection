@@ -32,7 +32,7 @@ __C.TRAIN.BG_THRESH_LO = 0.1
 __C.TRAIN.USE_ALL_GT = True
 
 # how many softmax levels are to be used for energy
-__C.TRAIN.MAX_ENERGY = 20
+__C.TRAIN.MAX_ENERGY = 7
 
 
 #

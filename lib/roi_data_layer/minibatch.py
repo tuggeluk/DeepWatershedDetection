@@ -556,7 +556,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
 
                 else:
                     # bbox based assign
-                    markers_list = get_markers(blob['data'].shape, gt_boxes, args.nr_classes[0], assign[i1], 0, [])
+                    markers_list = get_markers(blob['data'].shape, gt_boxes, args.nr_classes[0], assign[i1], 0, [],args.model)
                     blob["assign" + str(i1)] = dict()
                     for i2 in range(len(assign[i1]["ds_factors"])):
                         blob["assign" + str(i1)]["gt_map" + str(i2)] = markers_list[i2]
