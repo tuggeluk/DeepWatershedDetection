@@ -39,7 +39,7 @@ class musicma(imdb):
         self._split_path = os.path.join(self._devkit_path, 'train_val_test')
 
         classes = pa.read_csv(self._devkit_path + "/MUSICMA_classification/class_names.csv", header=None)
-        classes[classes[2] != "x"][1]
+
         self._classes = list(classes[classes[2] != "x"][1])
         for i in range(len(self._classes)):
             if self.classes[i][:3] == 'let':

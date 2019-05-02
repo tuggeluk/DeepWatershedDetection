@@ -58,6 +58,10 @@ class RoIDataLayer(object):
 
     return db_inds
 
+  def _fast_forward(self, nr, batch_size):
+    for i in range(nr):
+      self._get_next_minibatch_inds(batch_size)
+
   def _get_next_minibatch(self, args, assign, helper,lock):
     """Return the blobs to be used for the next minibatch.
 
@@ -74,7 +78,13 @@ class RoIDataLayer(object):
     minibatch_db = [self._roidb[i] for i in db_inds]
     return get_minibatch(minibatch_db, args, assign, helper, augmentation_type=self.augmentation)
       
-  def forward(self, args, assign, helper=None,lock=None):
+  def forward(self, args=None, assign=None, helper=None, lock=None, ff=False, nr=0, batch_size=0):
     """Get blobs and copy them into this layer's top blob vector."""
-    blobs = self._get_next_minibatch(args, assign, helper,lock)
+    if ff:
+      for i in range(nr):
+        self._get_next_minibatch_inds(batch_size)
+      return None
+    else:
+      blobs = self._get_next_minibatch(args, assign, helper,lock)
+
     return blobs

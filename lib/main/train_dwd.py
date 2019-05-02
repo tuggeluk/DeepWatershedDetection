@@ -13,14 +13,18 @@ from tensorflow.contrib import slim
 from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
-from utils.prefetch_wrapper import PrefetchWrapper
+#from utils.prefetch_wrapper import PrefetchWrapper
+from utils.prefetch_wrapper_cache import PrefetchWrapperCache as PrefetchWrapper
+
+
 from tensorflow.python.ops import array_ops
 import pickle
-import pdb
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
 import datetime
+import json
+import hashlib
 
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, stamp_semseg, \
@@ -47,6 +51,8 @@ def main(parsed):
     nr_classes = len(imdb_train._classes)
     args.nr_classes.append(nr_classes)
     args.semseg_ind = imdb_train.semseg_index()
+
+    fingerprint = build_config_fingerprint(args)
 
     # replaces keywords with function handles in training assignements
     save_objectness_function_handles(args)
@@ -189,7 +195,7 @@ def main(parsed):
             iteration = execute_assign(args, input, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer,
                                        network_heads,
                                        do_itr, args.training_assignements[assign_nr], preped_assign[assign_nr], iteration,
-                                       training_help)
+                                       training_help,fingerprint)
 
     # execute combined tasks
     for do_comb_a in args.combined_assignements:
@@ -201,7 +207,7 @@ def main(parsed):
         training_help = None  # unused atm
         execute_combined_assign(args, data_layer, training_help, orig_assign, preped_assigns, loss_factors, do_comb_itr,
                                 iteration, input, rm_length,
-                                network_heads, sess, checkpoint_dir, checkpoint_name, saver, writer)
+                                network_heads, sess, checkpoint_dir, checkpoint_name, saver, writer,fingerprint)
 
     print("done :)")
 
@@ -211,10 +217,10 @@ def run_batch_combined_assign():
 
 def execute_combined_assign(args, data_layer, training_help, orig_assign, preped_assigns, loss_factors, do_comb_itr,
                             iteration, input_ph, rm_length,
-                            network_heads, sess, checkpoint_dir, checkpoint_name, saver, writer):
+                            network_heads, sess, checkpoint_dir, checkpoint_name, saver, writer,fingerprint):
     # init data layer
     if args.prefetch == "True":
-        data_layer = PrefetchWrapper(data_layer.forward, args.prefetch_len, args, orig_assign, training_help)
+        data_layer[0] = PrefetchWrapper(data_layer[0].forward, args.prefetch_len, args.prefetch_size, args.prefetch_cache_dir, args.prefetch_proc,fingerprint, args, orig_assign, training_help)
 
     # combine losses
     past_losses = np.ones((len(loss_factors), rm_length), np.float32)
@@ -661,11 +667,11 @@ def load_feed_dict(data_layer, args, assign, training_help, input_ph, preped_ass
 
 
 def execute_assign(args, input_placeholder, saver, sess, checkpoint_dir, checkpoint_name, data_layer, writer, network_heads,
-                   do_itr, assign, prepped_assign, iteration, training_help):
+                   do_itr, assign, prepped_assign, iteration, training_help, fingerprint):
     loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, mask_placeholders = prepped_assign
 
     if args.prefetch == "True":
-        data_layer[0] = PrefetchWrapper(data_layer[0].forward, args.prefetch_len, args, [assign], training_help)
+        data_layer[0] = PrefetchWrapper(data_layer[0].forward, args.prefetch_len, args.prefetch_size, args.prefetch_cache_dir, args.prefetch_proc, fingerprint, args, args, [assign], training_help)
 
     print("training on:" + str(assign))
     print("for " + str(do_itr) + " iterations")
@@ -950,6 +956,22 @@ def save_objectness_function_handles(args):
         obj_setting["stamp_func"] = [obj_setting["stamp_func"], FUNCTION_MAP[obj_setting["stamp_func"]]]
 
     return args
+
+
+def build_config_fingerprint(config):
+
+    m = hashlib.sha224()
+    relevant_args = [config.crop, config.crop_top_left_bias, config.augmentation_type, config.max_edge,
+                     config.use_flipped,config.substract_mean,config.pad_to, config.pad_with, config.batch_size,
+                     config.dataset, config.prefetch_size]
+    for x in config.scale_list:
+        relevant_args.append(x)
+    relevant_args.append(json.dumps(config.training_assignements, sort_keys=True))
+
+    for i in relevant_args:
+        m.update(str(i).encode('utf-8'))
+
+    return m.hexdigest()
 
 
 def load_database(args):

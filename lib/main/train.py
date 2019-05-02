@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of  the image")
-        parser.add_argument("--max_edge", type=int, default=256*4,
+        parser.add_argument("--max_edge", type=int, default=256*3,
                             help="if there is no cropping - scale such that  the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -42,13 +42,17 @@ def main():
                         help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0, help="use this number to pad images")
 
-    parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
-    parser.add_argument("--prefetch_len", type=int, default=1, help="prefetch queue len")
+    parser.add_argument("--prefetch", type=str, default="True", help="use additional process to fetch batches")
+    parser.add_argument("--prefetch_len", type=int, default=100, help="prefetch queue len")
+    parser.add_argument("--prefetch_proc", type=int, default=4, help="how many processes should be spawned to prefetch batches")
+    parser.add_argument("--prefetch_cache_dir", type=str, default="../../data/cache/prefetch_chunks", help="where to store the used cache chunks for next execution")
+    parser.add_argument("--prefetch_size", type=int, default=10, help="number of batches stored in one chunk")
+
 
     parser.add_argument("--batch_size", type=int, default=1,
-                        help="batch size for training")  #  code only works with batchsize 1!
+                        help="batch size for training")
 
-    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
@@ -115,7 +119,7 @@ def main():
     parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
 
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res152",
+    parser.add_argument('--model', type=str, default="RefineNet-Res101",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152"
                              "                                  UNet")
 
@@ -165,6 +169,7 @@ def main():
 			                {"assign": 0, "help": 0, "Itrs": Itrs0_1}
                          ], help="configure how assignements get repeated")
 
+    # current prefetcher only works with TRUE
     parser.add_argument('--train_only_combined', type=str, default="True", help="only initialze opt for combined task (save memory space)")
 
     # when assigned in both overrides stuff defined in assign
