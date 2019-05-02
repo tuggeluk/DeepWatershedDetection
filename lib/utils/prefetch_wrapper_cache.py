@@ -11,6 +11,7 @@ class PrefetchWrapperCache:
     cache_checked = Value('b', False)
     nr_processes = 5
     index_lock = None
+    rw_lock = None
     wait_list = []
 
     active_chunks_dir = "../../active_prefetch_chunks"
@@ -22,19 +23,21 @@ class PrefetchWrapperCache:
     def __init__(self,fp, prefetch_len,prefetch_size, cache_dir, nr_proc, fingerprint,  *args):
 
         self.index_lock = Lock()
+        self.rw_lock = Lock()
         self.nr_processes = nr_proc
         self.config_fingerprint = fingerprint
         self.cache_dir = cache_dir
 
         # clear active dict
-        try:
-            shutil.rmtree(self.active_chunks_dir)
-        except:
-            pass
-        os.mkdir(self.active_chunks_dir)
-        self.forward(args)
+        # try:
+        #     shutil.rmtree(self.active_chunks_dir)
+        # except:
+        #     pass
+        # os.mkdir(self.active_chunks_dir)
+
+        #self.forward(args)
         #self.execute_func(fp, prefetch_len,prefetch_size,self.active_chunks_dir, cache_dir, self.index_lock, fingerprint, *args)
-        self.p = [Process(target=self.execute_func, args=(fp, prefetch_len,prefetch_size,self.active_chunks_dir, cache_dir, self.index_lock, fingerprint, *args)) for x in range(self.nr_processes)]
+        self.p = [Process(target=self.execute_func, args=(fp, prefetch_len,prefetch_size,self.active_chunks_dir, cache_dir, self.index_lock, self.rw_lock, fingerprint, *args)) for x in range(self.nr_processes)]
         [prc.start() for prc in self.p]
 
     def forward(self, *args):
@@ -42,11 +45,18 @@ class PrefetchWrapperCache:
             # try to load next cache chunk until done
             chunk_loaded = False
             while not chunk_loaded:
-                if "chunk exists":
-                    self.wait_list = pickle.load("datachunk")
-                    self.chunk_ind.value += 1
-                    chunk_loaded = True
+                chunk_files = os.listdir(self.active_chunks_dir)
+                if len(chunk_files) > 0:
+                    id_c = min([int(x.split("_")[0]) for x in chunk_files])
 
+                    self.rw_lock.acquire()
+                    self.wait_list = pickle.load(open(self.active_chunks_dir+"/"+
+                                                 str(id_c)+"_prefetch.p", "rb"))
+                    self.rw_lock.release()
+                    shutil.move(self.active_chunks_dir+"/"+str(id_c)+"_prefetch.p",
+                                self.cache_dir+"/"+self.config_fingerprint+"/"+str(id_c)+"_prefetch.p")
+
+                    chunk_loaded = True
                 else:
                     print("------------------------")
                     print("Waiting for pickle cache")
@@ -62,8 +72,9 @@ class PrefetchWrapperCache:
         print("joined")
         return None
 
-    def execute_func(self, fp, prefetch_len,prefetch_size,active_chunks, cache_dir, index_lock,fingerprint, *args):
+    def execute_func(self, fp, prefetch_len,prefetch_size,active_chunks, cache_dir, index_lock, rw_lock, fingerprint, *args):
         # aquire lock
+        rw_lock.acquire()
         index_lock.acquire()
         # if chache non-empty and cache_checked == false
         if not self.cache_checked.value:
@@ -72,7 +83,7 @@ class PrefetchWrapperCache:
             #   move full cache
                 chunks = os.listdir(cache_dir + "/" + fingerprint)
                 for chunk in chunks:
-                    shutil.move(cache_dir + "/" + fingerprint+"/"+chunk, active_chunks+"/"+chunk)
+                    shutil.copy(cache_dir + "/" + fingerprint+"/"+chunk, active_chunks+"/"+chunk)
             #   fast forward batch index on data generator
                 self.chunk_ind.value += len(chunks)
                 nr_b = len(chunks) * prefetch_size
@@ -82,6 +93,7 @@ class PrefetchWrapperCache:
 
         # release lock
         index_lock.release()
+        rw_lock.release()
 
         while not self.done.value:
             chunk_l = []
@@ -94,7 +106,9 @@ class PrefetchWrapperCache:
             self.chunk_ind.value += 1
             index_lock.release()
 
-            pickle.dump(chunk_l, open(active_chunks +"/"+ str(chunk_nr)+"_prefetch.p", "wb"))
+            rw_lock.acquire()
+            pickle.dump(chunk_l, open(active_chunks + "/" + str(chunk_nr) + "_prefetch.p", "wb"))
+            rw_lock.release()
 
             if len(os.listdir(active_chunks)) > prefetch_len:
                 print("prefetch full -------------- taking a break")
