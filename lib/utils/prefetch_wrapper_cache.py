@@ -28,12 +28,12 @@ class PrefetchWrapperCache:
         self.config_fingerprint = fingerprint
         self.cache_dir = cache_dir
 
-        # clear active dict
-        # try:
-        #     shutil.rmtree(self.active_chunks_dir)
-        # except:
-        #     pass
-        # os.mkdir(self.active_chunks_dir)
+        #clear active dict
+        try:
+            shutil.rmtree(self.active_chunks_dir)
+        except:
+            pass
+        os.mkdir(self.active_chunks_dir)
 
         #self.forward(args)
         #self.execute_func(fp, prefetch_len,prefetch_size,self.active_chunks_dir, cache_dir, self.index_lock, fingerprint, *args)
@@ -50,18 +50,24 @@ class PrefetchWrapperCache:
                     id_c = min([int(x.split("_")[0]) for x in chunk_files])
 
                     self.rw_lock.acquire()
-                    self.wait_list = pickle.load(open(self.active_chunks_dir+"/"+
-                                                 str(id_c)+"_prefetch.p", "rb"))
-                    self.rw_lock.release()
-                    shutil.move(self.active_chunks_dir+"/"+str(id_c)+"_prefetch.p",
-                                self.cache_dir+"/"+self.config_fingerprint+"/"+str(id_c)+"_prefetch.p")
+                    try:
+                        self.wait_list = pickle.load(open(self.active_chunks_dir+"/"+
+                                                     str(id_c)+"_prefetch.p", "rb"))
+                        shutil.move(self.active_chunks_dir + "/" + str(id_c) + "_prefetch.p",
+                                    self.cache_dir + "/" + self.config_fingerprint + "/" + str(id_c) + "_prefetch.p")
 
-                    chunk_loaded = True
+                        chunk_loaded = True
+                    except:
+                        print("invalid pickle")
+                        time.sleep(5)
+                        pass
+                    self.rw_lock.release()
+
                 else:
                     print("------------------------")
                     print("Waiting for pickle cache")
                     print("------------------------")
-                    time.sleep(2)
+                    time.sleep(5)
 
         return self.wait_list.pop()
 
@@ -83,7 +89,8 @@ class PrefetchWrapperCache:
             #   move full cache
                 chunks = os.listdir(cache_dir + "/" + fingerprint)
                 for chunk in chunks:
-                    shutil.copy(cache_dir + "/" + fingerprint+"/"+chunk, active_chunks+"/"+chunk)
+                    shutil.move(cache_dir + "/" + fingerprint+"/"+chunk, active_chunks+"/"+chunk)
+
             #   fast forward batch index on data generator
                 self.chunk_ind.value += len(chunks)
                 nr_b = len(chunks) * prefetch_size
@@ -106,9 +113,10 @@ class PrefetchWrapperCache:
             self.chunk_ind.value += 1
             index_lock.release()
 
-            rw_lock.acquire()
+            # handled by python direclty?
+            #rw_lock.acquire()
             pickle.dump(chunk_l, open(active_chunks + "/" + str(chunk_nr) + "_prefetch.p", "wb"))
-            rw_lock.release()
+            #rw_lock.release()
 
             if len(os.listdir(active_chunks)) > prefetch_len:
                 print("prefetch full -------------- taking a break")

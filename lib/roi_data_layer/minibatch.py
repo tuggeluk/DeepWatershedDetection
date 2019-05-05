@@ -18,7 +18,7 @@ import numpy.random as npr
 import cv2
 from main.config import cfg
 from utils.blob import im_list_to_blob, compute_scalings
-from datasets.fcn_groundtruth import get_markers, stamp_class
+from datasets.fcn_groundtruth import get_markers, ds_shapes_unet, ds_shapes_refinenet
 import sys
 from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
 from PIL import Image, ImageDraw
@@ -91,15 +91,16 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                 # For the COCO ground truth boxes, exclude the  ones that are ''iscrowd''
                 gt_inds = np.where(roidb_subele['gt_classes'] != 0 & np.all(roidb_subele['gt_overlaps'].toarray() > -1.0, axis=1))[0]
 
-            gt_boxes = np.empty((len(gt_inds), 9), dtype=np.float32)
+            #gt_boxes = np.empty((len(gt_inds), 9), dtype=np.float32)
             gt_boxes = [[[None],None] for i in range(len(gt_inds))]
             # translate all bboxes in 4 point path format
             if "boxes_full" in roidb_subele.keys():
                 roidb_subele["boxes"] = roidb_subele["boxes_full"]
             else:
+                roidb_subele["boxes"] = np.concatenate((roidb_subele["boxes"],np.zeros(roidb_subele["boxes"].shape)), -1)
                 for idx, elem in enumerate(roidb_subele["boxes"]):
-                    x1, y1, x2, y2 = elem
-                    roidb_subele["boxes"][idx] = [x1, y1, x1, y2, x2, y2, x1, y2]
+                    x1, y1, x2, y2,_,_,_,_ = elem
+                    roidb_subele["boxes"][idx] = [x1, y1, x1, y2, x2, y2, x2, y1]
 
 
             #gt_boxes[:, 8] = roidb_subele['gt_classes'][gt_inds]
@@ -319,22 +320,22 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                     gt_boxes[ix][0][0::2] = gt_boxes[ix][0][0::2] - scalings[1][1]
                     gt_boxes[ix][0][1::2] = gt_boxes[ix][0][1::2] - scalings[1][0]
 
-                    try:
-                        stamp, coords = assign[0]["stamp_func"][1](gt_boxes[ix], assign[0]["stamp_args"], args.nr_classes[0])
-                    except Exception as e:
-                        print("debug stamp")
-                        import matplotlib.pyplot as plt
-                        plt.plot(np.concatenate((gt_box[0::2],np.expand_dims(gt_box[0],-1))),
-                                 np.concatenate((gt_box[1::2], np.expand_dims(gt_box[1], -1))))
-                        plt.plot(np.concatenate((crop_path[0::2],np.expand_dims(crop_path[0],-1))),
-                                 np.concatenate((crop_path[1::2], np.expand_dims(crop_path[1], -1))))
-                        plt.plot(np.concatenate((np.concatenate(new_path_ordered)[0::2],np.expand_dims(np.concatenate(new_path_ordered)[0],-1))),
-                                 np.concatenate((np.concatenate(new_path_ordered)[1::2], np.expand_dims(np.concatenate(new_path_ordered)[1], -1))))
-                        plt.show()
-                        plt.plot(np.concatenate((np.concatenate(new_path_ordered)[0::2],np.expand_dims(np.concatenate(new_path_ordered)[0],-1))),
-                                 np.concatenate((np.concatenate(new_path_ordered)[1::2], np.expand_dims(np.concatenate(new_path_ordered)[1], -1))))
-                        plt.show()
-                        stamp, coords = assign[0]["stamp_func"][1](gt_boxes[ix], assign[0]["stamp_args"], args.nr_classes[0])
+                    # try:
+                    #     stamp, coords = assign[0]["stamp_func"][1](gt_boxes[ix], assign[0]["stamp_args"], args.nr_classes[0])
+                    # except Exception as e:
+                    #     print("debug stamp")
+                    #     import matplotlib.pyplot as plt
+                    #     plt.plot(np.concatenate((gt_box[0::2],np.expand_dims(gt_box[0],-1))),
+                    #              np.concatenate((gt_box[1::2], np.expand_dims(gt_box[1], -1))))
+                    #     plt.plot(np.concatenate((crop_path[0::2],np.expand_dims(crop_path[0],-1))),
+                    #              np.concatenate((crop_path[1::2], np.expand_dims(crop_path[1], -1))))
+                    #     plt.plot(np.concatenate((np.concatenate(new_path_ordered)[0::2],np.expand_dims(np.concatenate(new_path_ordered)[0],-1))),
+                    #              np.concatenate((np.concatenate(new_path_ordered)[1::2], np.expand_dims(np.concatenate(new_path_ordered)[1], -1))))
+                    #     plt.show()
+                    #     plt.plot(np.concatenate((np.concatenate(new_path_ordered)[0::2],np.expand_dims(np.concatenate(new_path_ordered)[0],-1))),
+                    #              np.concatenate((np.concatenate(new_path_ordered)[1::2], np.expand_dims(np.concatenate(new_path_ordered)[1], -1))))
+                    #     plt.show()
+                    #     stamp, coords = assign[0]["stamp_func"][1](gt_boxes[ix], assign[0]["stamp_args"], args.nr_classes[0])
 
                 # # subtract crop distance
                 # for ix, ele in enumerate(gt_boxes):
@@ -497,23 +498,29 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                     canvas = canvas[scalings[1][0]:scalings[1][2], scalings[1][1]:scalings[1][3]]
 
 
-                    cavn_print = blob["data"]/np.max(blob["data"].shape)*255
-                    cavn_print = np.squeeze(cavn_print[0], -1)
-                    Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test_"+str(nr_subele)+".jpg")
+                    # cavn_print = blob["data"]/np.max(blob["data"].shape)*255
+                    # cavn_print = np.squeeze(cavn_print[0], -1)
+                    # Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test_"+str(nr_subele)+".jpg")
+                    #
+                    # cavn_print = canvas/np.max(canvas)*255
+                    # Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test_gt_"+str(nr_subele)+".jpg")
 
-                    cavn_print = canvas/np.max(canvas)*255
-                    Image.fromarray(cavn_print.astype(np.uint8)).save("/share/DeepWatershedDetection/data/macrophages_2019/test_gt_"+str(nr_subele)+".jpg")
+                    shapes = None
+                    if "Refine" in args.model:
+                        shapes = ds_shapes_refinenet(canvas.shape[::-1], None)
+                    if "UNet" in args.model:
+                        shapes = ds_shapes_unet(canvas.shape[::-1], None)
 
                     blob["assign" + str(i1)] = dict()
                     for i2 in range(len(assign[i1]["ds_factors"])):
+                        shape = tuple(shapes[i2 ])
                         # downsample
-                        canv_downsamp = cv2.resize(canvas, None, None, fx=1/assign[i1]["ds_factors"][i2], fy=1/assign[i1]["ds_factors"][i2],
-                                    interpolation=cv2.INTER_NEAREST)
+                        canv_downsamp = cv2.resize(canvas, shape, interpolation=cv2.INTER_NEAREST)
 
                         # one-hot encode
                         if assign[i1]["stamp_args"]["loss"] == "softmax":
                             canv_downsamp = np.round(canv_downsamp).astype(np.int32)
-                            canv_downsamp = np.eye(cfg.TRAIN.MAX_ENERGY)[canv_downsamp[:, :]]
+                            canv_downsamp = np.eye(int(np.max(canv_downsamp))+1)[canv_downsamp[:, :]]
                         else:
                             canv_downsamp = np.expand_dims(canv_downsamp, -1)
 
@@ -538,10 +545,18 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                     # do cropping
                     canvas = canvas[scalings[1][0]:scalings[1][2], scalings[1][1]:scalings[1][3]]
 
+                    shapes = None
+                    if "Refine" in args.model:
+                        shapes = ds_shapes_refinenet(canvas.shape[::-1], None)
+                    if "UNet" in args.model:
+                        shapes = ds_shapes_unet(canvas.shape[::-1], None)
+
                     blob["assign" + str(i1)] = dict()
                     for i2 in range(len(assign[i1]["ds_factors"])):
                         # downsample
-                        canv_downsamp = cv2.resize(canvas, None, None, fx=assign[i1]["ds_factors"][i2], fy=assign[i1]["ds_factors"][i2],
+                        shape = tuple(shapes[i2 ])
+                        # downsample
+                        canv_downsamp = cv2.resize(canvas, shape,
                                     interpolation=cv2.INTER_NEAREST)
 
                         # one-hot encode
@@ -684,6 +699,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             # set helper to None
             blob["helper"] = None
             gt_boxes.extend(new_boxes)
+            gt_boxes = [x for x in gt_boxes if x is not None]
             blob['gt_boxes'] = np.expand_dims(gt_boxes, 0)
             blob['im_info'] = np.array(
                 [[new_blob.shape[1], new_blob.shape[2], scalings[0]]],

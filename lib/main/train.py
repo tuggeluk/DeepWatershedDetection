@@ -42,14 +42,14 @@ def main():
                         help="pad the final image to have edge lengths that are a multiple of this - use 0 to do nothing")
     parser.add_argument("--pad_with", type=int, default=0, help="use this number to pad images")
 
-    parser.add_argument("--prefetch", type=str, default="True", help="use additional process to fetch batches")
-    parser.add_argument("--prefetch_len", type=int, default=100, help="prefetch queue len")
-    parser.add_argument("--prefetch_proc", type=int, default=4, help="how many processes should be spawned to prefetch batches")
+    parser.add_argument("--prefetch", type=str, default="False", help="use additional process to fetch batches")
+    parser.add_argument("--prefetch_len", type=int, default=20, help="prefetch queue len")
+    parser.add_argument("--prefetch_proc", type=int, default=2, help="how many processes should be spawned to prefetch batches")
     parser.add_argument("--prefetch_cache_dir", type=str, default="../../data/cache/prefetch_chunks", help="where to store the used cache chunks for next execution")
-    parser.add_argument("--prefetch_size", type=int, default=10, help="number of batches stored in one chunk")
+    parser.add_argument("--prefetch_size", type=int, default=40, help="number of batches stored in one chunk")
 
 
-    parser.add_argument("--batch_size", type=int, default=1,
+    parser.add_argument("--batch_size", type=int, default=2,
                         help="batch size for training")
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
@@ -62,8 +62,8 @@ def main():
     regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "Dota_2018_train"
-    if dataset == "DeepScores_2017_train":
+    dataset = "macrophages_2019_train"
+    if dataset == "DeepScores_2017_debug":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                             help="DeepScores, voc, coco or no - validation set")
@@ -96,7 +96,7 @@ def main():
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
                          "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")
 
-    parser.add_argument("--print_interval", type=int, default=20,
+    parser.add_argument("--print_interval", type=int, default=1,
                         help="after how many iterations the loss is printed to console")
 
     parser.add_argument("--tensorboard_interval", type=int, default=100,
@@ -119,7 +119,7 @@ def main():
     parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
 
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res101",
+    parser.add_argument('--model', type=str, default="UNet",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152"
                              "                                  UNet")
 
@@ -153,7 +153,7 @@ def main():
                             # bbox markers
                             {'ds_factors': [1],  'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval", "loss": "reg"},
+                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval", "loss": "reg"},
                              'balance_mask': 'mask_bg'
                              }
 
@@ -174,8 +174,8 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1], "loss_factors": [3,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
-                                 {"assigns": [0,1], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,2], "loss_factors": [3,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                                 {"assigns": [0,2], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,

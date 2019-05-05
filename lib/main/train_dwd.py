@@ -25,6 +25,9 @@ from PIL import ImageDraw
 import datetime
 import json
 import hashlib
+import copy
+import datetime
+
 
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, stamp_semseg, \
@@ -54,6 +57,7 @@ def main(parsed):
 
     fingerprint = build_config_fingerprint(args)
 
+    args_txt = copy.deepcopy(args)
     # replaces keywords with function handles in training assignements
     save_objectness_function_handles(args)
 
@@ -185,6 +189,11 @@ def main(parsed):
 
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
+    #store config
+    with open(checkpoint_dir+"/"+datetime.datetime.now().isoformat()+
+            "__"+fingerprint+".txt", "w") as text_file:
+        text_file.write(str(args_txt))
+
 
     if args.train_only_combined != "True":
         # execute tasks
