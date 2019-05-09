@@ -27,70 +27,70 @@ from datasets.macrophages import macrophages
 for year in ['2007', '2012']:
   for split in ['train', 'val', 'trainval', 'test']:
     name = 'voc_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: pascal_voc(split, year))
+    __sets[name] = (lambda args, split=split, year=year: pascal_voc(args, split, year))
 
 # Set up DeepScores dataset
 for year in ['2017']:
   for split in ['train', 'val', 'test', 'debug','train100','train10000', 'test100']:
     name = 'DeepScores_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: deep_scores(split, year))
+    __sets[name] = (lambda args, split=split, year=year: deep_scores(args, split, year))
 
 # Set up DeepScores_300dpi dataset
 for year in ['2017']:
   for split in ['train', 'val', 'test', 'debug']:
     name = 'DeepScores_300dpi_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: deep_scores_300dpi(split, year))
+    __sets[name] = (lambda args, split=split, year=year: deep_scores_300dpi(args, split, year))
 
 # Set up DeepScores_300dpi dataset
 for year in ['2017']:
   for split in ['train', 'val', 'test', 'debug']:
     name = 'DeepScores_ipad_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: deep_scores_ipad(split, year))
+    __sets[name] = (lambda args, split=split, year=year: deep_scores_ipad(args, split, year))
 
 # Set up coco_2014_<split>
 for year in ['2014']:
   for split in ['train', 'val', 'minival', 'valminusminival', 'trainval']:
     name = 'coco_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: coco(split, year))
+    __sets[name] = (lambda args, split=split, year=year: coco(args, split, year))
 
 # Set up coco_2015_<split>
 for year in ['2015']:
   for split in ['test', 'test-dev']:
     name = 'coco_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: coco(split, year))
+    __sets[name] = (lambda args, split=split, year=year: coco(args, split, year))
 
 # Set up for Musicma++
 for year in ['2017']:
   for split in ['train', 'test', 'val']:
     name = 'MUSICMA++_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: musicma(split, year))
+    __sets[name] = (lambda args, split=split, year=year: musicma(args, split, year))
 
 # Set up coco_2014_<split>
 for year in ['2017']:
   for split in ['train', 'val']:
     name = 'coco_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: coco(split, year))
+    __sets[name] = (lambda args, split=split, year=year: coco(args, split, year))
 
 # Set up for Dota_2018_<split>
 for year in ['2018']:
   for split in ['train', 'valid', 'test', 'debug']:
     name = 'Dota_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: dota(split, year))
+    __sets[name] = (lambda args, split=split, year=year: dota(args, split, year))
 
 
 # Set up for macrophages_2019_<split>
 for year in ['2019']:
   for split in ['train', 'test', 'debug']:
     name = 'macrophages_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: macrophages(split, year))
+    __sets[name] = (lambda args, split=split, year=year: macrophages(args, split, year))
 
-def get_imdb(name):
+def get_imdb(args,name):
   """Get an imdb (image database) by name."""
   print(name)
   if name not in __sets:
     raise KeyError('Unknown dataset: {}'.format(name))
-  print(__sets[name]())
-  return __sets[name]()
+  print(__sets[name](args))
+  return __sets[name](args)
 
 
 def list_imdbs():

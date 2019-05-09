@@ -22,15 +22,15 @@ import pickle
 import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
-from main.config import cfg
+#from main.config import cfg
 import random
 from datasets.voc_eval import parse_rec
 import math
 
 
 class musicma(imdb):
-    def __init__(self, image_set, year, devkit_path=None):
-        imdb.__init__(self, 'MUSICMA++' + year + '_' + image_set)
+    def __init__(self,args, image_set, year, devkit_path=None):
+        imdb.__init__(self, 'MUSICMA++' + year + '_' + image_set,args)
         self._year = year
         self._image_set = image_set
         self._devkit_path = self._get_default_path() if devkit_path is None \
@@ -116,7 +116,7 @@ class musicma(imdb):
         """
         Return the default path where PASCAL VOC is expected to be installed.
         """
-        return os.path.join(cfg.DATA_DIR, 'MUSICMA++_' + self._year)
+        return os.path.join(self.args.data_dir, 'MUSICMA++_' + self._year)
 
     def gt_roidb(self):
         """
@@ -299,10 +299,10 @@ class musicma(imdb):
         print('-----------------------------------------------------')
         print('Computing results with the official MATLAB eval code.')
         print('-----------------------------------------------------')
-        path = os.path.join(cfg.ROOT_DIR, 'lib', 'datasets',
+        path = os.path.join(self.args.root_dir, 'lib', 'datasets',
                             'VOCdevkit-matlab-wrapper')
         cmd = 'cd {} && '.format(path)
-        cmd += '{:s} -nodisplay -nodesktop '.format(cfg.MATLAB)
+        cmd += '{:s} -nodisplay -nodesktop '.format("")
         cmd += '-r "dbstop if error; '
         cmd += 'voc_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\'); quit;"' \
             .format(self._devkit_path, self._get_comp_id(),

@@ -6,6 +6,7 @@ import argparse
 import numpy.random as ran
 import random
 import pdb
+import os.path as osp
 
 
 def rnd(lower, higher):
@@ -17,7 +18,27 @@ def rnd(lower, higher):
 def main():
     parser = argparse.ArgumentParser()
 
-    # default arguments for deep-scores
+
+    parser.add_argument("--random_seed", type=int, default=317,
+                        help="init randon number generator")
+
+    root_dir = osp.abspath(osp.join(osp.dirname(__file__), '..', '..'))
+    parser.add_argument("--root_dir", type=str, default=root_dir,
+                        help="directory of the project")
+
+    parser.add_argument("--data_dir", type=str, default=osp.abspath(osp.join(root_dir, 'data')),
+                        help="directory of the project")
+
+    parser.add_argument("--pretrained_dir", type=str, default=osp.abspath(osp.join(root_dir, 'pretrained')),
+                        help="directory of the project")
+
+    parser.add_argument("--exp_dir", type=str, default=osp.abspath(osp.join(root_dir, 'experiments')),
+                        help="directory of the project")
+
+    parser.add_argument("--out_dir", type=str, default=osp.abspath(osp.join(root_dir, 'output')),
+                        help="directory of the project")
+
+
     parser.add_argument("--scale_list", type=list, default=[1],
                         help="global scaling factor randomly chosen from this list")
     parser.add_argument("--crop", type=str, default="True", help="should images be cropped")
@@ -52,7 +73,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=2,
                         help="batch size for training")
 
-    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
@@ -62,39 +83,56 @@ def main():
     regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
+
     dataset = "macrophages_2019_train"
     if dataset == "DeepScores_2017_debug":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_debug", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug",
                             help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
+
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "DeepScores_300dpi_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_val", help="dataset to perform inference on, we use val for evaluation, test can be used only visually")
+
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "DeepScores_ipad_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_ipad_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "MUSICMA++_2017_train":
         parser.add_argument("--dataset", type=str, default="MUSICMA++_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_debug", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
+
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "Dota_2018_train":
         parser.add_argument("--dataset", type=str, default="Dota_2018_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="Dota_2018_valid", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--test_set", type=str, default="Dota_2018_valid", help="--> test can only used visually")
+
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "voc_2012_train":
         parser.add_argument("--dataset", type=str, default="voc_2012_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="voc_2012_val", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--test_set", type=str, default="voc_2012_val", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
+
         parser.add_argument("--paired_data", type=int, default=1, help="is data paired? use 1 for unpaired")
     elif dataset == "macrophages_2019_train":
         parser.add_argument("--dataset", type=str, default="macrophages_2019_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="macrophages_2019_test", help="DeepScores, voc, coco or no - validation set")
+        parser.add_argument("--test_set", type=str, default="macrophages_2019_test", help="dataset to perform inference on")
+
         parser.add_argument("--paired_data", type=int, default=2, help="is data paired? use 1 for unpaired")
     else:
         raise ValueError("This dataset is not supported, the only supported datasets are DeepScores_2017_train, DeepScores_300dpi_2017_train, DeepScores_ipad_2017_train, MUSICMA++_2017_train, "
                          "Dota_2018_train and voc_2012_train. Are you sure that you are using the correct dataset?")
+
+    parser.add_argument("--use_all_gt", type=str, default="True",
+                        help="also include iscrowd tagged gt from COCO")
 
     parser.add_argument("--print_interval", type=int, default=1,
                         help="after how many iterations the loss is printed to console")
@@ -119,7 +157,7 @@ def main():
     parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
 
 
-    parser.add_argument('--model', type=str, default="UNet",
+    parser.add_argument('--model', type=str, default="RefineNet-Res101",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152"
                              "                                  UNet")
 
@@ -158,6 +196,13 @@ def main():
                              }
 
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
+
+    parser.add_argument('--max_energy', type=int, default=20, help="energy level for center")
+
+    parser.add_argument('--bbox_estimation', type=str, default="energy_shape", help="compute bbox by estimating from energy or by bbox layer, (bbox_head/energy_shape)")
+    parser.add_argument('--bbox_angle', type=str, default="aligned", help="does the bbox have to be parallel to the image (aligned/estimated)")
+    parser.add_argument('--class_estimation', type=str, default="energy_foreground", help="compute class by estimating from energy (only works for one class) or by bbox layer, (class_head/energy_foreground)")
+
 
 
     Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 1000000

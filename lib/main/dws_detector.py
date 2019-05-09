@@ -13,32 +13,39 @@ tf.set_random_seed(314)
 
 
 class DWSDetector:
-    def __init__(self, imdb, path, pa, individual_upsamp = False):
+    def __init__(self, parsed, path, imdb):
         self.model_path = path
-        self.model_name = pa.net_type
-        self.saved_net = pa.saved_net
-        # has to be adjusted according to the training scheme used
-        self.energy_loss = pa.energy_loss
-        self.class_loss = pa.class_loss
-        self.bbox_loss = pa.bbox_loss
+        self.config = parsed
+        self.imdb = imdb
+
+        self.saved_net = "backbone"
 
         self.tf_session = None
-        self.root_dir = cfg.ROOT_DIR
         self.sess = tf.Session()
         print('Loading model')
 
-        if "realistic" in self.model_path:
+        if "DeepScores" not in self.model_path:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         else:
             self.input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
 
-        self.network_heads, self.init_fn = build_dwd_net(self.input, model=self.model_name, num_classes=imdb.num_classes,
-                                               pretrained_dir="", substract_mean=False,  individual_upsamp = individual_upsamp)
+        print("Initializing Model:" + self.config.model)
+        used_heads = set()
+        self.used_heads_loss =[]
+        for _, assign in enumerate(self.config.training_assignements):
+            used_heads.add(assign["stamp_func"])
+            self.used_heads_loss.append([assign["stamp_func"],assign["stamp_args"]["loss"]])
+        self.used_heads = list(used_heads)
+
+
+        self.network_heads, init_fn = build_dwd_net(
+        self.input, model=parsed.model, num_classes=len(self.imdb._classes), pretrained_dir="",
+             substract_mean=False, individual_upsamp = self.config.individual_upsamp, paired_mode=self.config.paired_data, used_heads=self.used_heads, sparse_heads="True")
 
         self.saver = tf.train.Saver(max_to_keep=1000)
         self.sess.run(tf.global_variables_initializer())
         print("Loading weights")
-        self.saver.restore(self.sess, self.root_dir + "/" + self.model_path + "/" + self.saved_net)
+        self.saver.restore(self.sess, self.model_path + "/" + self.saved_net)
         self.tf_session = self.sess
         self.counter = 0
 
@@ -48,7 +55,7 @@ class DWSDetector:
         we have observed that it is very robust to perturbations of those values.
         inputs:
             img - the image, an ndarray
-            cutoff - the cutoff we do for the enrgy
+            cutoff - the cutoff we do for the energy
             min_component_size - the minimum size of the connected component
         returns:
             dws_list - the list of bounding boxes the dwdnet infers
@@ -59,42 +66,61 @@ class DWSDetector:
         if img.shape[-1] > 3:
             img = np.expand_dims(img, -1)
 
-        y_mulity = int(np.ceil(img.shape[1] / 160.0))
-        x_mulity = int(np.ceil(img.shape[2] / 160.0))
-        if "realistic" not in self.model_path:
-            canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
-            canv = np.expand_dims(np.expand_dims(canv, -1), 0)
-        else:
-            canv = np.ones([y_mulity * 160, x_mulity * 160, 3], dtype=np.uint8) * 255
-            canv = np.expand_dims(canv, 0)
-
-        canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
+        # y_mulity = int(np.ceil(img.shape[1] / 160.0))
+        # x_mulity = int(np.ceil(img.shape[2] / 160.0))
+        # if "realistic" not in self.model_path:
+        #     canv = np.ones([y_mulity * 160, x_mulity * 160], dtype=np.uint8) * 255
+        #     canv = np.expand_dims(np.expand_dims(canv, -1), 0)
+        # else:
+        #     canv = np.ones([y_mulity * 160, x_mulity * 160, 3], dtype=np.uint8) * 255
+        #     canv = np.expand_dims(canv, 0)
+        #
+        # canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
 
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
 
-        pred_energy, pred_class, pred_bbox = self.tf_session.run(
-            [self.network_heads["stamp_energy"][self.energy_loss][-1],
-             self.network_heads["stamp_class"][self.class_loss][-1],
-             self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
+        # create fetch list
+        print("create fetch list")
+        fetch_list = []
 
+        for pair in range(self.config.paired_data):
+            for head in self.used_heads_loss:
+                fetch_list.append(self.network_heads[pair][head[0]][head[1]][-1])
+
+        preds = self.tf_session.run([fetch_list], feed_dict={self.input: img})
+        preds = preds[0]
 
         #save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
 
-        if self.energy_loss == "softmax":
-            pred_energy = np.argmax(pred_energy, axis=3)
+        # Apply softmax where necessary
+        i = 0
+        for pair in range(self.config.paired_data):
+            for head in self.used_heads_loss:
+                if head[1] == "softmax":
+                    preds[i] = np.argmax(preds[i], axis=-1)
+                i += 1
 
-        if self.class_loss == "softmax":
-            pred_class = np.argmax(pred_class, axis=3)
 
-        if self.bbox_loss == "softmax":
-            pred_bbox = np.argmax(pred_bbox, axis=3)
-
-
-        dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
+        #dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
         #save_images(canv, dws_list, True, False, self.counter)
+        i = 0
+        for pair in range(self.config.paired_data):
+            pred_dict = {}
+            for head in self.used_heads_loss:
+                if head[0] == "stamp_energy":
+                    pred_dict["stamp_energy"] = preds[i]
+                elif head[0] == "stamp_class" and False: # check config.class_estimation
+                    pred_dict["stamp_class"] = preds[i]
+                elif head[0] == "stamp_bbox" and self.config.bbox_estimation == "bbox_head":
+                    pred_dict["stamp_bbox"] = preds[i]
+                i += 1
+            dws_list = perform_dws(pred_dict, cutoff, min_ccoponent_size,self.config)
+
+
 
         self.counter += 1
+        dws_list = []
 
         return dws_list
 

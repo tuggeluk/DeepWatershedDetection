@@ -9,7 +9,7 @@ from __future__ import print_function
 
 from datasets.imdb import imdb
 import datasets.ds_utils as ds_utils
-from main.config import cfg
+#from main.config import cfg
 import os.path as osp
 import sys
 import os
@@ -25,15 +25,15 @@ from pycocotools.cocoeval import COCOeval
 from pycocotools import mask as COCOmask
 
 class coco(imdb):
-  def __init__(self, image_set, year):
-    imdb.__init__(self, 'coco_' + year + '_' + image_set)
+  def __init__(self, args, image_set, year):
+    imdb.__init__(self, 'coco_' + year + '_' + image_set, args)
     # COCO specific config options
     self.config = {'use_salt': True,
                    'cleanup': True}
     # name, paths
     self._year = year
     self._image_set = image_set
-    self._data_path = osp.join(cfg.DATA_DIR, 'coco')
+    self._data_path = osp.join(self.args.data_dir, 'coco')
     # load COCO API, classes, class <-> id mappings
     self._COCO = COCO(self._get_ann_file())
     cats = self._COCO.loadCats(self._COCO.getCatIds())

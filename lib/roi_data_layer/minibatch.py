@@ -16,7 +16,7 @@ import pickle
 import numpy as np
 import numpy.random as npr
 import cv2
-from main.config import cfg
+#from main.config import cfg
 from utils.blob import im_list_to_blob, compute_scalings
 from datasets.fcn_groundtruth import get_markers, ds_shapes_unet, ds_shapes_refinenet
 import sys
@@ -84,7 +84,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             blob = {'data': im_blob}
 
             # gt boxes: (x1, y1, x2, y2, cls)
-            if cfg.TRAIN.USE_ALL_GT:
+            if args.use_all_gt == "True":
                 # Include all ground truth boxes
                 gt_inds = np.where(roidb_subele['gt_classes'] != 0)[0]
             else:
@@ -481,7 +481,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                                 save_val += 1
 
                             # add to canvas
-                            im = im/np.max(im)*(cfg.TRAIN.MAX_ENERGY-1)
+                            im = im/np.max(im)*(args.max_energy-1)
                             canvas += im
 
                         # cache

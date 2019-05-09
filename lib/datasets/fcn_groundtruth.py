@@ -7,7 +7,7 @@
 from PIL import Image, ImageDraw
 import numpy as np
 import random
-from main.config import cfg
+# from main.config import cfg
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -494,7 +494,7 @@ def stamp_semseg(bbox,args,nr_classes):
 
     print("not implemented")
 
-def stamp_energy(bbox,args,nr_classes):
+def stamp_energy(bbox, assign, nr_classes,args):
 
     #   for bbox == -1 return dim
     #
@@ -512,20 +512,20 @@ def stamp_energy(bbox,args,nr_classes):
     #   return patch, and coords
 
     if bbox is None:
-        if args["loss"]== "softmax":
-            return cfg.TRAIN.MAX_ENERGY
+        if assign["loss"]== "softmax":
+            return args.max_energy
         else:
             return 1
 
 
-    if args["marker_dim"] is None:
+    if assign["marker_dim"] is None:
         # use bbox size
         # determine marker size
-        marker_size = (int(args["size_percentage"]*(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))),
-                       int(args["size_percentage"]*(np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))))
+        marker_size = (int(assign["size_percentage"] * (np.max(bbox[0][1::2]) - np.min(bbox[0][1::2]))),
+                       int(assign["size_percentage"] * (np.max(bbox[0][0::2]) - np.min(bbox[0][0::2]))))
 
     else:
-        marker_size = args["marker_dim"]
+        marker_size = assign["marker_dim"]
 
     # transpose marker size bc of wierd bbox definition
     marker_size = np.asarray(marker_size)[[1,0]]
@@ -540,22 +540,22 @@ def stamp_energy(bbox,args,nr_classes):
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
-    marker = get_energy_marker(marker_size,bbox, args["shape"],args["size_percentage"])
+    marker = get_energy_marker(args, marker_size, bbox, assign["shape"], assign["size_percentage"])
 
     try:
         # apply shape function
-        if args["energy_shape"] == "linear":
+        if assign["energy_shape"] == "linear":
             1==1 # do nothing
-        elif args["energy_shape"] == "root":
+        elif assign["energy_shape"] == "root":
             marker = np.sqrt(marker)
-            marker = marker/np.max(marker)* (cfg.TRAIN.MAX_ENERGY-1)
-        elif args["energy_shape"] == "quadratic":
+            marker = marker/np.max(marker)* (args.max_energyY-1)
+        elif assign["energy_shape"] == "quadratic":
             marker = np.square(marker)
-            marker = marker / (np.max(marker)+0.000001) * (cfg.TRAIN.MAX_ENERGY-1)
+            marker = marker / (np.max(marker)+0.000001) * (args.max_energy-1)
 
-        if args["loss"]== "softmax":
+        if assign["loss"]== "softmax":
             marker = np.round(marker).astype(np.int32)
-            marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
+            marker = np.eye(args.max_energy)[marker[:, :]]
             # turn into one-hot softmax targets
         else:
             # expand last dim
@@ -570,7 +570,7 @@ def stamp_energy(bbox,args,nr_classes):
     return marker, coords
 
 
-def get_energy_marker(size, bbox=None, shape="oval", size_percentage=1):
+def get_energy_marker(args,size, bbox=None, shape="oval", size_percentage=1):
 
     bbox_local = copy.deepcopy(bbox)
     try:
@@ -670,7 +670,7 @@ def get_energy_marker(size, bbox=None, shape="oval", size_percentage=1):
 
             marker = center_dist * min_dist
             if not np.max(marker) == 0:
-                marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY - 1)
+                marker = marker / np.max(marker) * (args.max_energy - 1)
 
             marker = np.transpose(marker, axes=(1, 0))
             return marker
@@ -678,7 +678,7 @@ def get_energy_marker(size, bbox=None, shape="oval", size_percentage=1):
         if shape == "hull":
             if not np.max(min_dist) == 0:
                 # normalize
-                min_dist = min_dist/np.max(min_dist)*(cfg.TRAIN.MAX_ENERGY-1)
+                min_dist = min_dist/np.max(min_dist)*(args.max_energy-1)
 
             # transpose marker due to defintions
             min_dist = np.transpose(min_dist,axes=(1,0))
@@ -698,7 +698,7 @@ def get_energy_marker(size, bbox=None, shape="oval", size_percentage=1):
     return None
 
 
-def stamp_class(bbox, args, nr_classes):
+def stamp_class(bbox, assign, nr_classes, args):
 
     #   for bbox == -1 return dim
     #
@@ -713,19 +713,19 @@ def stamp_class(bbox, args, nr_classes):
     #
     #   return patch, and coords
     if bbox is None:
-        if args["class_resolution"]== "binary":
+        if assign["class_resolution"]== "binary":
             return 2
         else:
             return nr_classes
     #bbox = [np.array([1.0080e+03, 0.0000e+00, 1.0126e+03, 0.0000e+00, 1.0120e+03, 1.0000e+00]), 11]
-    if args["marker_dim"] is None:
+    if assign["marker_dim"] is None:
         # use bbox size
         # determine marker size
-        marker_size = (int(args["size_percentage"]*(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))),
-                       int(args["size_percentage"]*(np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))))
+        marker_size = (int(assign["size_percentage"] * (np.max(bbox[0][1::2]) - np.min(bbox[0][1::2]))),
+                       int(assign["size_percentage"] * (np.max(bbox[0][0::2]) - np.min(bbox[0][0::2]))))
 
     else:
-        marker_size = args["marker_dim"]
+        marker_size = assign["marker_dim"]
 
 
     # transpose marker size bc of wierd bbox definition
@@ -741,25 +741,25 @@ def stamp_class(bbox, args, nr_classes):
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
-    marker = get_energy_marker(marker_size,bbox, args["shape"], args["size_percentage"])
+    marker = get_energy_marker(marker_size, bbox, assign["shape"], assign["size_percentage"])
     if marker is None:
         return None, None
     try:
-        if args["class_resolution"] == "class":
-            marker[marker <= (cfg.TRAIN.MAX_ENERGY / 2)] = 0
-            marker[marker > (cfg.TRAIN.MAX_ENERGY/2)] = int(bbox[1])
+        if assign["class_resolution"] == "class":
+            marker[marker <= (args.max_energy / 2)] = 0
+            marker[marker > (args.max_energy / 2)] = int(bbox[1])
 
             marker = marker.astype(np.int)
             # turn into one-hot softmax targets
             marker = np.eye(nr_classes)[marker[:, :]]
-        elif args["class_resolution"] == "binary":
+        elif assign["class_resolution"] == "binary":
             marker[marker != 0] = 1
             marker = marker.astype(np.int)
             # turn into one-hot softmax targets
             marker = np.eye(2)[marker[:, :]]
 
         else:
-            raise NotImplementedError("unknown class resolution:"+args["class_resolution"])
+            raise NotImplementedError("unknown class resolution:" + assign["class_resolution"])
     except Exception as e:
         print("Exception at stam_class _____________________________________________")
         print(bbox)

@@ -1,10 +1,10 @@
 from models.RefineNet import build_refinenet
 import tensorflow as tf
 from tensorflow.contrib import slim
-from main.config import cfg
+#from main.config import cfg
 from models.UNet import build_u_net
 
-def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False, individual_upsamp = "False", paired_mode=1,  used_heads=None, sparse_heads="False"):
+def build_dwd_net(input,model,num_classes,pretrained_dir, max_energy, substract_mean = False, individual_upsamp = "False", paired_mode=1,  used_heads=None, sparse_heads="False"):
 
     if "RefineNet" in model:
         g, init_fn = build_refinenet(input, preset_model=model, num_classes=None, pretrained_dir=pretrained_dir,
@@ -62,7 +62,7 @@ def build_dwd_net(input,model,num_classes,pretrained_dir,substract_mean = False,
                 # energy marker - regression
                 network_heads["stamp_energy"]["reg"] = [slim.conv2d(g[pair_nr]["stamp_energy"][x], 1, [1, 1], activation_fn=None, scope='energy_reg_' + 'pair' + str(pair_nr) + '_' + str(x)) for x in range(0, len(g[pair_nr]["stamp_energy"]))]
                 # energy marker - logits
-                network_heads["stamp_energy"]["softmax"] = [slim.conv2d(g[pair_nr]["stamp_energy"][x], cfg.TRAIN.MAX_ENERGY, [1, 1], activation_fn=None, scope='energy_logits_' + 'pair' + str(pair_nr) + '_' + str(x)) for x
+                network_heads["stamp_energy"]["softmax"] = [slim.conv2d(g[pair_nr]["stamp_energy"][x], max_energy, [1, 1], activation_fn=None, scope='energy_logits_' + 'pair' + str(pair_nr) + '_' + str(x)) for x
                                                             in range(0, len(g[pair_nr]["stamp_energy"]))]
             if "stamp_bbox" in used_heads:
                 # bounding boxes

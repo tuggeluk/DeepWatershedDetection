@@ -16,13 +16,13 @@ import PIL
 from utils.bbox import bbox_overlaps
 import numpy as np
 import scipy.sparse
-from main.config import cfg
+#from main.config import cfg
 
 
 class imdb(object):
   """Image database."""
 
-  def __init__(self, name, classes=None):
+  def __init__(self, name, args, classes=None):
     self._name = name
     self._num_classes = 0
     if not classes:
@@ -33,8 +33,10 @@ class imdb(object):
     self._obj_proposer = 'gt'
     self._roidb = None
     self._roidb_handler = self.default_roidb
+    self.args = args
     # Use this dict for storing dataset specific config options
     self.config = {}
+
 
   @property
   def name(self):
@@ -78,7 +80,7 @@ class imdb(object):
 
   @property
   def cache_path(self):
-    cache_path = osp.abspath(osp.join(cfg.DATA_DIR, 'cache'))
+    cache_path = osp.abspath(osp.join(self.args.data_dir, 'cache'))
     if not os.path.exists(cache_path):
       os.makedirs(cache_path)
     return cache_path

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import cv2
-import pickle as cPickle
+import pickle
 from PIL import Image
 import sys
 sys.path.insert(0, '/DeepWatershedDetection/lib')
@@ -9,30 +9,20 @@ sys.path.insert(0, os.path.dirname(__file__)[:-4])
 import pdb
 from datasets.factory import get_imdb
 from main.dws_detector import DWSDetector
-from main.config import cfg
-import argparse
+#from main.config import cfg
 import time
+import datetime
 
 
-def main(parsed):
-    parsed = parsed[0]
+def main(parsed, model_dir , do_debug= False):
+
     imdb = get_imdb(parsed.test_set)
-    if parsed.dataset == 'DeepScores':
-        path = os.path.join("/experiments/music/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
-    elif parsed.dataset == "DeepScores_300dpi":
-        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/", parsed.net_type, parsed.net_id)
-    elif parsed.dataset == "MUSCIMA":
-        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
-    elif parsed.dataset == "Dota":
-        path = os.path.join("/experiments/realistic/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
-    elif parsed.dataset == "VOC":
-        path = os.path.join("/experiments/realistic/pretrain_lvl_class", parsed.net_type, parsed.net_id)
-    if not parsed.debug:
-        net = DWSDetector(imdb=imdb, path=path, pa=parsed, individual_upsamp=parsed.individual_upsamp)
+    if not do_debug:
+        net = DWSDetector(parsed, model_dir, imdb)
 
-        all_boxes = test_net(net, imdb, parsed, path)
+        all_boxes = test_net(net, imdb, parsed, model_dir)
     else:
-        all_boxes = test_net(False, imdb, parsed, path, parsed.debug)
+        all_boxes = test_net(False, parsed, do_debug)
 
 
 def test_net(net, imdb, parsed, path, debug=False):
@@ -60,12 +50,24 @@ def test_net(net, imdb, parsed, path, debug=False):
             start_time = time.time()
             if i%500 == 0:
                 print(i)
-            if "realistic" not in path:
+            if "DeepScores" in path:
                 im = Image.open(imdb.image_path_at(i)).convert('L')
             else:
-                im = Image.open(imdb.image_path_at(i))
+                if parsed.paired_data > 1:
+                    # hacky only for macrophages
+                    im_1 = Image.open(imdb.image_path_at(i))
+                    im_1 = np.array(im_1, dtype=np.float32) / 256
+
+                    im_2 = Image.open(imdb.image_path_at(i).replace("DAPI", "mCherry"))
+                    im_2 = np.array(im_2, dtype=np.float32) / 256
+
+                    im = np.stack([im_2, im_1, np.zeros(im_1.shape)], -1)
+
+                else:
+                    im = Image.open(imdb.image_path_at(i))
+
             im = np.asanyarray(im)
-            im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
+            im = cv2.resize(im, None, None, fx=parsed.scale_list[0], fy=parsed.scale_list[0], interpolation=cv2.INTER_LINEAR)
             if im.shape[0]*im.shape[1]>3837*2713:
                 continue
 
@@ -94,12 +96,12 @@ def test_net(net, imdb, parsed, path, debug=False):
 
         # inspect all_boxes variable
         with open(det_file, 'wb') as f:
-            cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+            pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 
     else:
         pdb.set_trace()
         with open(det_file, "rb") as f:
-            all_boxes = cPickle.load(f)
+            all_boxes = pickle.load(f)
 
     print('Evaluating detections')
     imdb.evaluate_detections(all_boxes, output_dir, path)
@@ -107,34 +109,63 @@ def test_net(net, imdb, parsed, path, debug=False):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
-    dataset = 'DeepScores'
-    if dataset == 'MUSCIMA':
-        parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
-        parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
-    elif dataset == 'DeepScores':
-        parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
-        parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
-    elif dataset == 'DeepScores_300dpi':
-        parser.add_argument("--dataset", type=str, default='DeepScores_300dpi', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
-        parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_val", help="dataset to perform inference on, we use val for evaluation, test can be used only visually")
-    elif dataset == 'Dota':
-        parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
-        parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
-    elif dataset == 'VOC':
-        parser.add_argument("--dataset", type=str, default='VOC', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
-        parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
-    parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of resnet used (RefineNet-Res152/101)")
-    parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
 
-    parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
-    parser.add_argument("--energy_loss", type=str, default="softmax", help="type of the energy loss")
-    parser.add_argument("--class_loss", type=str, default="softmax", help="type of the class loss")
-    parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
-    parser.add_argument("--debug", type=bool, default=False, help="if set to True, it is in debug mode, and instead of running the images on the net, it only evaluates from a previous run")
+    # test
+    # config_files = [['2019-03-06T09:15:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p'],
+    #                 ['2019-04-06T09:15:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p'],
+    #                 ['2018-05-06T09:15:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p'],
+    #                 ['2019-05-06T09:15:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p'],
+    #                 ['2019-05-06T09:30:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p']
+    #                 ]
+
+    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/picked_mod/run_15_best"
+
+    # get latest config
+    now = datetime.datetime.now()
+    config_files = [x.split("__") for x in os.listdir(trained_model_dir) if x[-2:] == '.p']
+
+    for ix, ele in enumerate(config_files):
+        ele.append(now-datetime.datetime.strptime(ele[0], '%Y-%m-%dT%H:%M:%S.%f'))
+
+    config_files.sort(key=lambda x: x[2])
+
+    with open(trained_model_dir+"/"+config_files[0][0]+"__"+config_files[0][1], "rb") as f:
+        config = pickle.load(f)
 
 
-    parsed = parser.parse_known_args()
-    main(parsed)
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--scaling", type=int, default=1, help="scale factor applied to images after loading")
+    # dataset = 'DeepScores'
+    # if dataset == 'MUSCIMA':
+    #     parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+    #     parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
+    # elif dataset == 'DeepScores':
+    #     parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+    #     parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
+    # elif dataset == 'DeepScores_300dpi':
+    #     parser.add_argument("--dataset", type=str, default='DeepScores_300dpi', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+    #     parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_val", help="dataset to perform inference on, we use val for evaluation, test can be used only visually")
+    # elif dataset == 'Dota':
+    #     parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+    #     parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
+    # elif dataset == 'VOC':
+    #     parser.add_argument("--dataset", type=str, default='VOC', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
+    #     parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
+    # elif dataset == 'macrophages':
+    #     parser.add_argument("--dataset", type=str, default='macrophages_2019_train', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
+    #     parser.add_argument("--test_set", type=str, default="macrophages_2019_test", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
+    #
+    # parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of network used")
+    # parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
+    #
+    # parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
+    # parser.add_argument("--energy_loss", type=str, default="softmax", help="type of the energy loss")
+    # parser.add_argument("--class_loss", type=str, default="softmax", help="type of the class loss")
+    # parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
+    # parser.add_argument("--debug", type=bool, default=False, help="if set to True, it is in debug mode, and instead of running the images on the net, it only evaluates from a previous run")
+    #
+    #
+    # parsed = parser.parse_known_args()
+
+    main(config,trained_model_dir)
 

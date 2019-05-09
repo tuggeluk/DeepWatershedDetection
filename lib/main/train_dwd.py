@@ -4,7 +4,7 @@ import numpy as np
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__)[:-4])
-from main.config import cfg
+#from main.config import cfg
 
 from models.dwd_net import build_dwd_net
 
@@ -22,7 +22,6 @@ import pickle
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
-import datetime
 import json
 import hashlib
 import copy
@@ -40,8 +39,9 @@ store_dict = True
 def main(parsed):
     args = parsed[0]
     print(args)
+
     iteration = 1
-    np.random.seed(cfg.RNG_SEED)
+    np.random.seed(args.random_seed)
 
     # load database
     imdb_train, roidb_train, imdb_val, roidb_val, data_layer_train, data_layer_val = load_database(args)
@@ -69,33 +69,33 @@ def main(parsed):
     # input and output tensors
     if "DeepScores_300dpi" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        resnet_dir = cfg.PRETRAINED_DIR + "/DeepScores/"
-        refinenet_dir = cfg.PRETRAINED_DIR + "/DeepScores_semseg/"
+        resnet_dir = args.pretrained_dir + "/DeepScores/"
+        refinenet_dir = args.pretrained_dir + "/DeepScores_semseg/"
 
     elif "DeepScores" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        resnet_dir = cfg.PRETRAINED_DIR + "/DeepScores/"
-        refinenet_dir = cfg.PRETRAINED_DIR + "/DeepScores_semseg/"
+        resnet_dir = args.pretrained_dir + "/DeepScores/"
+        refinenet_dir = args.pretrained_dir + "/DeepScores_semseg/"
 
     elif "MUSICMA" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 1])
-        resnet_dir = cfg.PRETRAINED_DIR + "/DeepScores/"
-        refinenet_dir = cfg.PRETRAINED_DIR + "/DeepScores_semseg/"
+        resnet_dir = args.pretrained_dir + "/DeepScores/"
+        refinenet_dir = args.pretrained_dir + "/DeepScores_semseg/"
 
     elif "macrophages" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
-        resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
-        refinenet_dir = cfg.PRETRAINED_DIR + "/VOC2012/"
+        resnet_dir = args.pretrained_dir + "/ImageNet/"
+        refinenet_dir = args.pretrained_dir + "/VOC2012/"
 
     elif "Dota_2018" in args.dataset:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
-        resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
-        refinenet_dir = cfg.PRETRAINED_DIR + "/VOC2012/"
+        resnet_dir = args.pretrained_dir + "/ImageNet/"
+        refinenet_dir = args.pretrained_dir + "/VOC2012/"
 
     else:
         input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
-        resnet_dir = cfg.PRETRAINED_DIR + "/ImageNet/"
-        refinenet_dir = cfg.PRETRAINED_DIR + "/VOC2012/"
+        resnet_dir = args.pretrained_dir + "/ImageNet/"
+        refinenet_dir = args.pretrained_dir + "/VOC2012/"
 
     if not (len(args.training_help) == 1 and args.training_help[0] is None):
         # initialize helper_input
@@ -110,7 +110,7 @@ def main(parsed):
     used_heads = list(used_heads)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads="True")
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads="True")
 
     # use just one image summary OP for all tasks
     # train
@@ -157,7 +157,7 @@ def main(parsed):
             if not ("class_pred" in var.name):
                 pretrained_vars.append(var)
         print("Loading network pretrained on Deepscores for Muscima")
-        loading_checkpoint_name = cfg.PRETRAINED_DIR + "/DeepScores_to_Muscima/" + "backbone"
+        loading_checkpoint_name = args.pretrained_dir + "/DeepScores_to_Muscima/" + "backbone"
         init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
         init_fn(sess)
     elif args.pretrain_lvl == "DeepScores_to_300dpi":
@@ -166,7 +166,7 @@ def main(parsed):
             if not ("class_pred" in var.name):
                 pretrained_vars.append(var)
         print("Loading network pretrained on Deepscores for Muscima")
-        loading_checkpoint_name = cfg.PRETRAINED_DIR + "/DeepScores_to_300dpi/" + "backbone"
+        loading_checkpoint_name = args.pretrained_dir+ "/DeepScores_to_300dpi/" + "backbone"
         init_fn = slim.assign_from_checkpoint_fn(loading_checkpoint_name, pretrained_vars)
         init_fn(sess)
     else:
@@ -189,10 +189,14 @@ def main(parsed):
 
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
-    #store config
+    # store config
     with open(checkpoint_dir+"/"+datetime.datetime.now().isoformat()+
-            "__"+fingerprint+".txt", "w") as text_file:
-        text_file.write(str(args_txt))
+            "__"+fingerprint+".txt", "w") as text_config:
+        text_config.write(str(args_txt))
+    # pickle config
+    with open(checkpoint_dir + "/" + datetime.datetime.now().isoformat() +
+              "__" + fingerprint + ".p", "wb") as pickle_config:
+        pickle.dump(args_txt,pickle_config)
 
 
     if args.train_only_combined != "True":
@@ -445,7 +449,7 @@ def focal_loss(prediction_tensor, target_tensor, weights=None, alpha=0.25, gamma
 
 
 def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input, args):
-    gt_placeholders = get_gt_placeholders(assign, imdb, args.paired_data,args.nr_classes[0])
+    gt_placeholders = get_gt_placeholders(assign, imdb, args.paired_data,args.nr_classes[0],args)
 
     loss_mask_placeholders = []
     for pair_nr in range(args.paired_data):
@@ -901,10 +905,10 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     conc = np.concatenate((add_info, conc), axis=0)
     return conc
 
-def get_gt_placeholders(assign, imdb, paired_data, nr_classes):
+def get_gt_placeholders(assign, imdb, paired_data, nr_classes, args):
     gt_placehoders = []
     for pair_nr in range(paired_data):
-        gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes)
+        gt_dim = assign["stamp_func"][1](None, assign["stamp_args"], nr_classes, args)
         gt_placehoders.append([tf.placeholder(tf.float32, shape=[None, None, None, gt_dim]) for x in assign["ds_factors"]])
     return gt_placehoders
 
@@ -927,7 +931,7 @@ def get_checkpoint_dir(args):
         image_mode = "Dota"
     else:
         image_mode = "realistic"
-    tbdir = cfg.EXP_DIR + "/" + image_mode + "/" + "pretrain_lvl_" + args.pretrain_lvl + "/" + args.model
+    tbdir = args.exp_dir + "/" + image_mode + "/" + "pretrain_lvl_" + args.pretrain_lvl + "/" + args.model
     if not os.path.exists(tbdir):
         os.makedirs(tbdir)
     runs_dir = os.listdir(tbdir)
@@ -985,14 +989,14 @@ def build_config_fingerprint(config):
 
 def load_database(args):
     print("Setting up image database: " + args.dataset)
-    imdb = get_imdb(args.dataset)
+    imdb = get_imdb(args,args.dataset)
     print('Loaded dataset `{:s}` for training'.format(imdb.name))
     roidb = get_training_roidb(imdb, args.use_flipped == "True")
     print('{:d} roidb entries'.format(len(roidb)))
 
     if args.dataset_validation != "no":
         print("Setting up validation image database: " + args.dataset_validation)
-        imdb_val = get_imdb(args.dataset_validation)
+        imdb_val = get_imdb(args,args.dataset_validation)
         print('Loaded dataset `{:s}` for validation'.format(imdb_val.name))
         roidb_val = get_training_roidb(imdb_val, False)
         print('{:d} roidb entries'.format(len(roidb_val)))

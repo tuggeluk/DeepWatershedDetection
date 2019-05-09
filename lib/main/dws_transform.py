@@ -6,12 +6,10 @@ from itertools import product
 from utils.ufarray import *
 import numpy as np
 
-def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, return_ccomp_img = False):
+def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None,  return_ccomp_img = False):
     bbox_list = []
 
-    dws_energy = np.squeeze(dws_energy)
-    class_map = np.squeeze(class_map)
-    bbox_map = np.squeeze(bbox_map)
+    dws_energy = np.squeeze(predict_dict["stamp_energy"])
 
     # Treshhold and binarize dws energy
     binar_energy = (dws_energy <= cutoff) * 255
@@ -32,6 +30,8 @@ def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, r
         if len(labels_inv[key]) < min_ccoponent_size:
             del labels_inv[key]
 
+    class_map = np.squeeze(class_map)
+    bbox_map = np.squeeze(bbox_map)
 
     for key in labels_inv.keys():
         # add additional dict structure to each component and convert to numpy array
