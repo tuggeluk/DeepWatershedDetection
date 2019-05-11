@@ -110,7 +110,7 @@ def main(parsed):
     used_heads = list(used_heads)
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads="True")
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads=args.sparse_heads)
 
     # use just one image summary OP for all tasks
     # train
@@ -976,7 +976,8 @@ def build_config_fingerprint(config):
     m = hashlib.sha224()
     relevant_args = [config.crop, config.crop_top_left_bias, config.augmentation_type, config.max_edge,
                      config.use_flipped,config.substract_mean,config.pad_to, config.pad_with, config.batch_size,
-                     config.dataset, config.prefetch_size]
+                     config.dataset, config.prefetch_size, config.max_energy, config.bbox_angle, config.class_estimation,
+                     config.sparse_heads]
     for x in config.scale_list:
         relevant_args.append(x)
     relevant_args.append(json.dumps(config.training_assignements, sort_keys=True))

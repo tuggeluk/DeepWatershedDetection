@@ -16,7 +16,7 @@ import datetime
 
 def main(parsed, model_dir , do_debug= False):
 
-    imdb = get_imdb(parsed.test_set)
+    imdb = get_imdb(parsed,parsed.test_set)
     if not do_debug:
         net = DWSDetector(parsed, model_dir, imdb)
 
@@ -35,7 +35,7 @@ def test_net(net, imdb, parsed, path, debug=False):
         path - the path (string format) for the location of the net
         debug - set it to true if the inference has been already done, and you just want to load the values. Used for debugging purposes.
     """
-    output_dir = cfg.OUT_DIR
+    output_dir = ""
     num_images = len(imdb.image_index)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
@@ -61,7 +61,7 @@ def test_net(net, imdb, parsed, path, debug=False):
                     im_2 = Image.open(imdb.image_path_at(i).replace("DAPI", "mCherry"))
                     im_2 = np.array(im_2, dtype=np.float32) / 256
 
-                    im = np.stack([im_2, im_1, np.zeros(im_1.shape)], -1)
+                    im = np.stack([im_1, im_2, np.zeros(im_1.shape)], -1)
 
                 else:
                     im = Image.open(imdb.image_path_at(i))
@@ -118,7 +118,7 @@ if __name__ == '__main__':
     #                 ['2019-05-06T09:30:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p']
     #                 ]
 
-    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/picked_mod/run_15_best"
+    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/RefineNet-Res101/run_3"
 
     # get latest config
     now = datetime.datetime.now()

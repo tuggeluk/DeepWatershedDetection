@@ -4,7 +4,7 @@ import tensorflow as tf
 from models.dwd_net import build_dwd_net
 from main.dws_transform import perform_dws
 from PIL import Image
-from main.config import cfg
+#from main.config import cfg
 from datasets import fcn_groundtruth
 
 
@@ -39,7 +39,7 @@ class DWSDetector:
 
 
         self.network_heads, init_fn = build_dwd_net(
-        self.input, model=parsed.model, num_classes=len(self.imdb._classes), pretrained_dir="",
+        self.input, model=parsed.model, num_classes=len(self.imdb._classes), pretrained_dir="", max_energy=parsed.max_energy,
              substract_mean=False, individual_upsamp = self.config.individual_upsamp, paired_mode=self.config.paired_data, used_heads=self.used_heads, sparse_heads="True")
 
         self.saver = tf.train.Saver(max_to_keep=1000)
@@ -177,7 +177,7 @@ def show_images(data, gt_boxes=None, gt=False, text=False):
     im_gt.show()
 
 
-def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
+def save_images(data, preds, gt_boxes=None, gt=False, text=False, counter=0):
     """
     Utility function which saves the results of get_images.
     arguments:
@@ -191,13 +191,13 @@ def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
     """
     im_input, im_gt = get_images(data, gt_boxes, gt, text)
 
-    im_input.save(cfg.ROOT_DIR + "/output_images/inference/" + 'input' + str(counter)+ '.png')
-    im_gt.save(cfg.ROOT_DIR + "/output_images/inference/" + 'gt' + str(counter) +'.png')
+    im_input.save(preds.root_dir + "/output_images/inference/" + 'input' + str(counter)+ '.png')
+    im_gt.save(preds.root_dir + "/output_images/inference/" + 'gt' + str(counter) +'.png')
 
     return
 
 
-def save_debug_panes(pred_energy, pred_class, pred_bbox, counter=0):
+def save_debug_panes(pred_energy, pred_class, pred_bbox,preds, counter=0):
     """
     Utility function which saves the output panes from the Network directly as images
     arguments:
@@ -215,7 +215,7 @@ def save_debug_panes(pred_energy, pred_class, pred_bbox, counter=0):
     for pane in panes_list:
         pan_vis = fcn_groundtruth.color_map(pane[0], {"stamp_func": [pane[1]], "stamp_args": {"loss": pane[2]}})
         im = Image.fromarray(pan_vis[0])
-        im.save(cfg.ROOT_DIR + "/output_images/inference/" + pane[1] + str(counter) + '.png')
+        im.save(preds.root_dir + "/output_images/inference/" + pane[1] + str(counter) + '.png')
 
 
     return

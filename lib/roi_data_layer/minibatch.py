@@ -96,10 +96,15 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             # translate all bboxes in 4 point path format
             if "boxes_full" in roidb_subele.keys():
                 roidb_subele["boxes"] = roidb_subele["boxes_full"]
-            else:
+
+            if roidb_subele["boxes"].shape[1] == 4:
                 roidb_subele["boxes"] = np.concatenate((roidb_subele["boxes"],np.zeros(roidb_subele["boxes"].shape)), -1)
                 for idx, elem in enumerate(roidb_subele["boxes"]):
-                    x1, y1, x2, y2,_,_,_,_ = elem
+                    try:
+                        x1, y1, x2, y2,_,_,_,_ = elem
+                    except:
+                        print("error unpack")
+                        raise
                     roidb_subele["boxes"][idx] = [x1, y1, x1, y2, x2, y2, x2, y1]
 
 
@@ -443,7 +448,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                 if assign[i1]["stamp_func"][0] == "stamp_energy" and assign[i1]["use_obj_seg"] and "objseg_path" in roidb_subele.keys():
                     canvas = None
 
-                    cache_path = roidb_subele["objseg_path"][0].replace("object_masks", "semseg_cache").split("/")
+                    cache_path = roidb_subele["objseg_path"][0].replace("object_masks", "semseg_cache"+"_"+str(args.max_energy)).split("/")
                     cache_path = "/"+os.path.join(*cache_path[:-1])+cache_path[-1][-8:-4]
 
                     if assign[i1]["use_obj_seg_cached"] and os.path.exists(cache_path+".npy"):
@@ -571,7 +576,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
 
                 else:
                     # bbox based assign
-                    markers_list = get_markers(blob['data'].shape, gt_boxes, args.nr_classes[0], assign[i1], 0, [],args.model)
+                    markers_list = get_markers(blob['data'].shape, gt_boxes, args.nr_classes[0], assign[i1], 0, [],args.model,args)
                     blob["assign" + str(i1)] = dict()
                     for i2 in range(len(assign[i1]["ds_factors"])):
                         blob["assign" + str(i1)]["gt_map" + str(i2)] = markers_list[i2]

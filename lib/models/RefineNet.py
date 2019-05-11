@@ -211,8 +211,8 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
 
     
     net_name = list(end_points.keys())[0].split("/")[0]
-    if used_heads is None:
-        us_stages = ["energy", "direction", "classes", "bbox", "semseg"]
+    if used_heads is None or sparse_heads == "False":
+        us_stages = ["stamp_energy", "stamp_directions", "stamp_class", "stamp_bbox", "stamp_semseg"]
     else:
         us_stages = used_heads
 

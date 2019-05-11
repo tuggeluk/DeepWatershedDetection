@@ -53,7 +53,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of  the image")
-        parser.add_argument("--max_edge", type=int, default=256*3,
+        parser.add_argument("--max_edge", type=int, default=256*5,
                             help="if there is no cropping - scale such that  the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -70,17 +70,17 @@ def main():
     parser.add_argument("--prefetch_size", type=int, default=40, help="number of batches stored in one chunk")
 
 
-    parser.add_argument("--batch_size", type=int, default=2,
+    parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")
 
     parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
-    learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
+    learning_rate = 1e-4  # rnd(3, 5) # gets a numb er (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 6e-3  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
 
@@ -134,7 +134,7 @@ def main():
     parser.add_argument("--use_all_gt", type=str, default="True",
                         help="also include iscrowd tagged gt from COCO")
 
-    parser.add_argument("--print_interval", type=int, default=1,
+    parser.add_argument("--print_interval", type=int, default=20,
                         help="after how many iterations the loss is printed to console")
 
     parser.add_argument("--tensorboard_interval", type=int, default=100,
@@ -161,9 +161,11 @@ def main():
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152"
                              "                                  UNet")
 
-    parser.add_argument('--training_help', type=list, default=[None], help="sample gt into imput / currently unused")
+    parser.add_argument('--training_help',  type=list, default=[None], help="sample gt into imput / currently unused")
 
     parser.add_argument('--individual_upsamp', type=str, default="sub_task", help="use individual refine-Net heads per task (No,task,sub_task)")
+    parser.add_argument('--sparse_heads', type=str, default="True", help="only initialize used heads (True/False)")
+
 
     parser.add_argument('--training_assignements', type=list,
                         default=[

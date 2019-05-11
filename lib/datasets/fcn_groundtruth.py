@@ -198,7 +198,7 @@ def objectness_marker(sx=3,sy=3,fnc=func_nothing):
     return fnc(exec_grid)
 
 
-def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, maps_list = [], model=""):
+def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, maps_list = [], model="", args=None):
 
     #   ds_factors, downsample_marker, overlap_solution, samp_func, samp_args
     #
@@ -227,7 +227,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
 
     #init canvas
-    last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"], nr_classes)
+    last_dim = objectness_settings["stamp_func"][1](None,objectness_settings["stamp_args"], nr_classes, args)
 
 
     if objectness_settings["stamp_args"]["loss"] == "softmax":
@@ -246,12 +246,12 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         # plt.plot(bbox[0][0::2], bbox[0][1::2])
         # plt.show()
         try:
-            stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+            stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes, args)
             stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
 
             if stamp is None:
                 #print("skipping element None")
-                stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+                stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes,args)
                 #stamp, coords = get_partial_marker(canvas.shape, coords, stamp)
                 #print(bbox)
                 # import matplotlib.pyplot as plt
@@ -769,7 +769,7 @@ def stamp_class(bbox, assign, nr_classes, args):
     return marker, coords
 
 
-def stamp_bbox(bbox, args, nr_classes):
+def stamp_bbox(bbox, assign, nr_classes, args):
 
     #   for bbox == -1 return dim
     #
@@ -786,14 +786,14 @@ def stamp_bbox(bbox, args, nr_classes):
     if bbox is None:
         return 2
 
-    if args["marker_dim"] is None:
+    if assign["marker_dim"] is None:
         # use bbox size
         # determine marker size
-        marker_size = (int(args["size_percentage"]*(np.max(bbox[0][1::2])-np.min(bbox[0][1::2]))),
-                       int(args["size_percentage"]*(np.max(bbox[0][0::2])-np.min(bbox[0][0::2]))))
+        marker_size = (int(assign["size_percentage"] * (np.max(bbox[0][1::2]) - np.min(bbox[0][1::2]))),
+                       int(assign["size_percentage"] * (np.max(bbox[0][0::2]) - np.min(bbox[0][0::2]))))
 
     else:
-        marker_size = args["marker_dim"]
+        marker_size = assign["marker_dim"]
 
     # transpose marker size bc of wierd bbox definition
     marker_size = np.asarray(marker_size)[[1,0]]
@@ -809,7 +809,7 @@ def stamp_bbox(bbox, args, nr_classes):
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
     # piggy back on energy marker
-    marker = get_energy_marker(marker_size,bbox, args["shape"],args["size_percentage"])
+    marker = get_energy_marker(args,marker_size, bbox, assign["shape"], assign["size_percentage"])
 
     # expand marker and multiply by bbox  size
     marker = np.expand_dims(marker,-1)
