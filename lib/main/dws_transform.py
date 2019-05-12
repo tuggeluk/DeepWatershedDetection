@@ -5,6 +5,7 @@ import math, random
 from itertools import product
 from utils.ufarray import *
 import numpy as np
+import cv2
 
 def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None,  return_ccomp_img = False):
     bbox_list = []
@@ -12,10 +13,12 @@ def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None,  return
     dws_energy = np.squeeze(predict_dict["stamp_energy"])
 
     # Treshhold and binarize dws energy
-    binar_energy = (dws_energy <= cutoff) * 255
+    binar_energy = (dws_energy > cutoff) * 255
 
     # get connected components
-    labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
+    #labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
+
+    retval, labels = cv2.connectedComponents(binar_energy.astype(np.uint8))
     # invert labels dict
     labels_inv = {}
     for k, v in labels.items():

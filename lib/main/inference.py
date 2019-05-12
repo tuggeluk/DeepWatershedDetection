@@ -14,7 +14,7 @@ import time
 import datetime
 
 
-def main(parsed, model_dir , do_debug= False):
+def main(parsed, model_dir, do_debug= False):
 
     imdb = get_imdb(parsed,parsed.test_set)
     if not do_debug:
@@ -62,6 +62,7 @@ def test_net(net, imdb, parsed, path, debug=False):
                     im_2 = np.array(im_2, dtype=np.float32) / 256
 
                     im = np.stack([im_1, im_2, np.zeros(im_1.shape)], -1)
+                    im = np.round(im)
 
                 else:
                     im = Image.open(imdb.image_path_at(i))
@@ -71,7 +72,7 @@ def test_net(net, imdb, parsed, path, debug=False):
             if im.shape[0]*im.shape[1]>3837*2713:
                 continue
 
-            boxes = net.classify_img(im, 1, 4)
+            boxes = net.classify_img(im, 7, 4)
             if len(boxes) > 800:
                 boxes = []
             no_objects = len(boxes)
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     #                 ['2019-05-06T09:30:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p']
     #                 ]
 
-    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/RefineNet-Res101/run_3"
+    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/RefineNet-Res101/run_2"
 
     # get latest config
     now = datetime.datetime.now()

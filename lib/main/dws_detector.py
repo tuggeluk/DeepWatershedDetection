@@ -87,8 +87,10 @@ class DWSDetector:
             for head in self.used_heads_loss:
                 fetch_list.append(self.network_heads[pair][head[0]][head[1]][-1])
 
+        img_test = np.stack((img[:,:,:,0], img[:,:,:,1], img[:,:,:,2]), -1)
         preds = self.tf_session.run([fetch_list], feed_dict={self.input: img})
         preds = preds[0]
+        #print(np.unique(np.argmax(preds[0], axis=-1)))
 
         #save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
