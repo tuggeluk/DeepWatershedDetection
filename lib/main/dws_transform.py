@@ -7,7 +7,7 @@ from utils.ufarray import *
 import numpy as np
 import cv2
 
-def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None,  return_ccomp_img = False):
+def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None):
     bbox_list = []
 
     dws_energy = np.squeeze(predict_dict["stamp_energy"])
@@ -17,48 +17,64 @@ def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None,  return
 
     # get connected components
     #labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
+    # invert labels dict
+    # labels_inv = {}
+    # for k, v in labels.items():
+    #     labels_inv[v] = labels_inv.get(v, [])
+    #     labels_inv[v].append(k)
+    #
+    #
+    # # filter components that are too small
+    # for key in list(labels_inv):
+    #     # print(key)
+    #     # print(len(labels_inv[key]))
+    #     if len(labels_inv[key]) < min_ccoponent_size:
+    #         del labels_inv[key]
 
     retval, labels = cv2.connectedComponents(binar_energy.astype(np.uint8))
-    # invert labels dict
-    labels_inv = {}
-    for k, v in labels.items():
-        labels_inv[v] = labels_inv.get(v, [])
-        labels_inv[v].append(k)
+
+    for comp in range(1,retval):
+        if np.sum(labels == comp) <  min_ccoponent_size:
+            labels[labels == comp] = 0
 
 
-    # filter components that are too small
-    for key in list(labels_inv):
-        # print(key)
-        # print(len(labels_inv[key]))
-        if len(labels_inv[key]) < min_ccoponent_size:
-            del labels_inv[key]
 
-    class_map = np.squeeze(class_map)
-    bbox_map = np.squeeze(bbox_map)
+    if "stamp_class" in predict_dict.keys():
+        print("get classes")
 
-    for key in labels_inv.keys():
-        # add additional dict structure to each component and convert to numpy array
-        labels_inv[key] = dict(pixel_coords=np.asanyarray(labels_inv[key]))
-        # use average over all pixel coordinates
-        labels_inv[key]["center"] = np.average(labels_inv[key]["pixel_coords"],0).astype(int)
-        # mayority vote for class --> transposed
-        labels_inv[key]["class"] = np.bincount(class_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]).argmax()
-        # average for box size --> transposed
-        #labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
-        labels_inv[key]["bbox_size"] = np.amax(
-            bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]], 0).astype(int)
+    else:
+        classes = np.ones(retval-1)
 
-        # produce bbox element, append to list
-        bbox = []
-        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmin
-        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymin
-        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmax
-        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymax
-        bbox.append(int(labels_inv[key]["class"]))
-        bbox_list.append(bbox)
+    if "stamp_bbox" in predict_dict.keys():
+        print("boxes")
+    else:
+        print("boxes")
 
-    if return_ccomp_img:
-        return bbox_list, out_img
+    # class_map = np.squeeze(class_map)
+    # bbox_map = np.squeeze(bbox_map)
+
+    # for key in labels_inv.keys():
+    #     # add additional dict structure to each component and convert to numpy array
+    #     labels_inv[key] = dict(pixel_coords=np.asanyarray(labels_inv[key]))
+    #     # use average over all pixel coordinates
+    #     labels_inv[key]["center"] = np.average(labels_inv[key]["pixel_coords"],0).astype(int)
+    #     # mayority vote for class --> transposed
+    #     labels_inv[key]["class"] = np.bincount(class_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]).argmax()
+    #     # average for box size --> transposed
+    #     #labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
+    #     labels_inv[key]["bbox_size"] = np.amax(
+    #         bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]], 0).astype(int)
+    #
+    #     # produce bbox element, append to list
+    #     bbox = []
+    #     bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmin
+    #     bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymin
+    #     bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmax
+    #     bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymax
+    #     bbox.append(int(labels_inv[key]["class"]))
+    #     bbox_list.append(bbox)
+
+
     return bbox_list
 
 

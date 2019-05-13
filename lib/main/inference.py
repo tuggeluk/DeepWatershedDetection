@@ -119,7 +119,7 @@ if __name__ == '__main__':
     #                 ['2019-05-06T09:30:03.387376', '6b534eeae099fd5e5ba35e9e78a3ca9d3f56af43139f7998d6721b42.p']
     #                 ]
 
-    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/RefineNet-Res101/run_2"
+    trained_model_dir = "/share/DeepWatershedDetection/experiments/macrophages/pretrain_lvl_class/RefineNet-Res101/run_3"
 
     # get latest config
     now = datetime.datetime.now()
