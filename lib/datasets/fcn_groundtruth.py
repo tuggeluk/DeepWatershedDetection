@@ -885,7 +885,7 @@ def color_map(img_map, assign,show=False):
 
     if show:
         im = Image.fromarray(colored_map)
-        im.save(sys.argv[0][:-24]+"gt.png")
+        im.save(sys.argv[0][:-24]+"asdfsdf.png")
         im.show()
     return colored_map
 

@@ -108,9 +108,11 @@ def main(parsed):
     for _,assign in enumerate(args.training_assignements):
         used_heads.add(assign["stamp_func"][0])
     used_heads = list(used_heads)
+    used_heads.sort()
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy, substract_mean=False, individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads=args.sparse_heads)
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy, substract_mean=False,
+        individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads=args.sparse_heads)
 
     # use just one image summary OP for all tasks
     # train
@@ -186,6 +188,8 @@ def main(parsed):
             init_fn(sess)
         else:
             print("Not loading a pretrained network")
+
+    #sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='deep_watershed/energy_logits_pair0'))
 
     # set up tensorboard
     writer = tf.summary.FileWriter(checkpoint_dir, sess.graph)
@@ -315,10 +319,10 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         # compute running mean for losses
         feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
 
-        #with open('feed_dict_train.pickle', 'wb') as handle:
+        # with open('feed_dict_train.pickle', 'wb') as handle:
         #    pickle.dump(feed_dict[input_ph], handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        # train step
+        #train step
         fetch_list = list()
         fetch_list.append(optim)
         fetch_list.append(loss_tot)
@@ -334,7 +338,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
             print(fetches[1])
             print(past_losses)
 
-        if itr % args.tensorboard_interval == 0 or itr == 1:
+        if itr % args.tensorboard_interval == 0 or itr == 1 or True:
 
             post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob)
 

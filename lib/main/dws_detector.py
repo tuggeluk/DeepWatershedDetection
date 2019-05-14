@@ -6,6 +6,7 @@ from main.dws_transform import perform_dws
 from PIL import Image
 #from main.config import cfg
 from datasets import fcn_groundtruth
+import scipy.special as sc
 
 
 np.random.seed(314)
@@ -36,14 +37,23 @@ class DWSDetector:
             used_heads.add(assign["stamp_func"])
             self.used_heads_loss.append([assign["stamp_func"],assign["stamp_args"]["loss"]])
         self.used_heads = list(used_heads)
-
+        self.used_heads.sort()
+        # for now:
+        #self.used_heads = ['stamp_class', 'stamp_bbox', 'stamp_energy']
+        self.used_heads = ['stamp_class', 'stamp_energy', 'stamp_bbox']
+        #self.used_heads = ['stamp_bbox', 'stamp_class', 'stamp_energy']
+        #self.used_heads = ['stamp_bbox', 'stamp_energy', 'stamp_class']
+        #self.used_heads = ['stamp_energy', 'stamp_class', 'stamp_bbox']
+        #self.used_heads = ['stamp_energy', 'stamp_bbox', 'stamp_class']
 
         self.network_heads, init_fn = build_dwd_net(
         self.input, model=parsed.model, num_classes=len(self.imdb._classes), pretrained_dir="", max_energy=parsed.max_energy,
-             substract_mean=False, individual_upsamp = self.config.individual_upsamp, paired_mode=self.config.paired_data, used_heads=self.used_heads, sparse_heads="True")
+             substract_mean=False, individual_upsamp = self.config.individual_upsamp, paired_mode=self.config.paired_data,
+            used_heads=self.used_heads, sparse_heads=parsed.sparse_heads)
 
         self.saver = tf.train.Saver(max_to_keep=1000)
-        self.sess.run(tf.global_variables_initializer())
+        # self.sess.run(tf.global_variables_initializer())
+        # self.sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='deep_watershed/energy_logits_pair0_3'))
         print("Loading weights")
         self.saver.restore(self.sess, self.model_path + "/" + self.saved_net)
         self.tf_session = self.sess
@@ -78,6 +88,8 @@ class DWSDetector:
         # canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
 
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+        import pickle
+        feed_train = pickle.load(open("feed_dict_train.pickle","rb"))
 
         # create fetch list
         print("create fetch list")
@@ -87,9 +99,12 @@ class DWSDetector:
             for head in self.used_heads_loss:
                 fetch_list.append(self.network_heads[pair][head[0]][head[1]][-1])
 
-        img_test = np.stack((img[:,:,:,1], img[:,:,:,0], img[:,:,:,2]), -1)
+        #fetch_list = self.network_heads[0]["stamp_energy"]["softmax"]
+        img_test = np.stack((img[:,:,:,0], img[:,:,:,1], img[:,:,:,2]), -1)
+
         preds = self.tf_session.run([fetch_list], feed_dict={self.input: img})
         preds = preds[0]
+
         print(np.unique(np.argmax(preds[0], axis=-1)))
 
         #save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
