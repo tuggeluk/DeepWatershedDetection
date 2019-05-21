@@ -73,14 +73,14 @@ def main():
     parser.add_argument("--batch_size", type=int, default=2,
                         help="batch size for training")
 
-    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint True/False/Last")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
-    learning_rate = 5e-5  # rnd(3, 5) # gets a numb er (log uniformly) on interval 10^(-3) to 10^(-5)
+    learning_rate = 1e-4  # rnd(3, 5) # gets a numb er (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 6.3e-4  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 10e-3  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
 
@@ -207,7 +207,7 @@ def main():
 
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 25000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 5, 5, 5, 5, 100000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
@@ -221,7 +221,7 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,2], "loss_factors": [3,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,2], "loss_factors": [1,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": None, "" "Itrs": Itrs_combined},
                                  #{"assigns": [0,2], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     

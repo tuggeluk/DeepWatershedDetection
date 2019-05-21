@@ -150,10 +150,13 @@ def voc_ap(rec, prec, use_07_metric=False):
 
 
 def voc_eval(detpath,
-             annopath,
-             imagesetfile,
+             # annopath,
+             # imagesetfile,
+             # cachedir,
+             roidb,
+             pair,
              classname,
-             cachedir,
+             classind,
              ovthresh=0.5,
              use_07_metric=False):
   """rec, prec, ap = voc_eval(detpath,
@@ -179,65 +182,68 @@ def voc_eval(detpath,
   # assumes imagesetfile is a text file with each line an image name
   # cachedir caches the annotations in a pickle file
 
-  if classname == "notehead-full":
-    print("nh-full")
-
-  # first load gt
-  if not os.path.isdir(cachedir):
-    os.mkdir(cachedir)
-  cachefile = os.path.join(cachedir, '%s_annots.pkl' % imagesetfile)
-  # read list of images
-  with open(imagesetfile, 'r') as f:
-    lines = f.readlines()
-  imagenames = [x.strip() for x in lines]
-
-  # remove files not present on disk
-  present_files = os.listdir(annopath[:-9])
-  present_files = set([x[:-4] for x in present_files])
-  imagenames = set(imagenames)
-  imagenames = list(imagenames.intersection(present_files))
-
-  if not os.path.isfile(cachefile):
-    # load annotations
-    recs = {}
-    for i, imagename in enumerate(imagenames):
-      if "DeepScores" in detpath:
-        recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
-      elif "MUSICMA" in detpath:
-        recs[imagename] = parse_rec(annopath.format(imagename), muscima = True)
-
-      elif "Dota" in detpath:
-        recs[imagename] = parse_rec_dota(annopath.format(imagename))
-
-      else:
-        recs[imagename] = parse_rec(annopath.format(imagename), musicma = False)
-      if i % 100 == 0:
-        print('Reading annotation for {:d}/{:d}'.format(
-          i + 1, len(imagenames)))
-    # save
-    print('Saving cached annotations to {:s}'.format(cachefile))
-    with open(cachefile, 'w') as f:
-      pickle.dump(recs, f)
-  else:
-    # load
-    with open(cachefile, 'rb') as f:
-      try:
-        recs = pickle.load(f)
-      except:
-        recs = pickle.load(f, encoding='bytes')
+  # if classname == "notehead-full":
+  #   print("nh-full")
+  #
+  # # first load gt
+  # if not os.path.isdir(cachedir):
+  #   os.mkdir(cachedir)
+  # cachefile = os.path.join(cachedir, '%s_annots.pkl' % imagesetfile)
+  # # read list of images
+  # with open(imagesetfile, 'r') as f:
+  #   lines = f.readlines()
+  # imagenames = [x.strip() for x in lines]
+  #
+  # # remove files not present on disk
+  # present_files = os.listdir(annopath[:-9])
+  # present_files = set([x[:-4] for x in present_files])
+  # imagenames = set(imagenames)
+  # imagenames = list(imagenames.intersection(present_files))
+  #
+  # if not os.path.isfile(cachefile):
+  #   # load annotations
+  #   recs = {}
+  #   for i, imagename in enumerate(imagenames):
+  #     if "DeepScores" in detpath:
+  #       recs[imagename] = parse_rec_deepscores(annopath.format(imagename))
+  #     elif "MUSICMA" in detpath:
+  #       recs[imagename] = parse_rec(annopath.format(imagename), muscima = True)
+  #
+  #     elif "Dota" in detpath:
+  #       recs[imagename] = parse_rec_dota(annopath.format(imagename))
+  #
+  #     else:
+  #       recs[imagename] = parse_rec(annopath.format(imagename), musicma = False)
+  #     if i % 100 == 0:
+  #       print('Reading annotation for {:d}/{:d}'.format(
+  #         i + 1, len(imagenames)))
+  #   # save
+  #   print('Saving cached annotations to {:s}'.format(cachefile))
+  #   with open(cachefile, 'w') as f:
+  #     pickle.dump(recs, f)
+  # else:
+  #   # load
+  #   with open(cachefile, 'rb') as f:
+  #     try:
+  #       recs = pickle.load(f)
+  #     except:
+  #       recs = pickle.load(f, encoding='bytes')
 
   # extract gt objects for this class
   class_recs = {}
   npos = 0
-  for imagename in imagenames:
-    R = [obj for obj in recs[imagename] if obj['name'] == classname]
+  for roidb_ind, roidb_entry in enumerate(roidb):
+    roidb_entry = roidb_entry[pair]
+    imagename = roidb_entry["semseg_path"].split("/")[-1][:-4]
+    #R = [obj for obj in recs[imagename] if obj['name'] == classname]
+    #bbox = np.array([x['bbox'] for x in R])
     # if len(R) == 0:
     #   continue
+    bbox = roidb_entry["boxes"][roidb_entry["gt_classes"] == classind]
+    R = list([*bbox])
 
-    bbox = np.array([x['bbox'] for x in R])
 
-
-    if len(R) > 0 and "difficult" not in R[0].keys():
+    if len(R) > 0 and R[0].__class__ != dict or "difficult" not in R[0].keys():
       difficult = np.zeros(len(R)).astype(np.bool)
     else:
       difficult = np.array([x['difficult'] for x in R]).astype(np.bool)

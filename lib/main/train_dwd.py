@@ -26,6 +26,7 @@ import json
 import hashlib
 import copy
 import datetime
+import shutil
 
 
 
@@ -150,6 +151,13 @@ def main(parsed):
     # load model weights
     checkpoint_dir = get_checkpoint_dir(args)
     checkpoint_name = "backbone"
+    if args.continue_training == "Last":
+        shutil.rmtree(checkpoint_dir)
+        old_path, nr = checkpoint_dir.rsplit("_",1)
+        old_path = old_path + "_" + str(int(nr) - 1)
+        shutil.copytree(old_path, checkpoint_dir)
+        args.continue_training = "True"
+
     if args.continue_training == "True":
         print("Loading checkpoint")
         saver.restore(sess, checkpoint_dir + "/" + checkpoint_name)
@@ -240,7 +248,9 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         data_layer[0] = PrefetchWrapper(data_layer[0].forward, args.prefetch_len, args.prefetch_size, args.prefetch_cache_dir, args.prefetch_proc,fingerprint, args, orig_assign, training_help)
 
     # combine losses
-    past_losses = np.ones((len(loss_factors), rm_length), np.float32)
+    if rm_length is not None:
+        past_losses = np.ones((len(loss_factors), rm_length), np.float32)
+
     loss_scalings_placeholder = tf.placeholder(tf.float32, [len(loss_factors)])
     loss_tot = None
     for i in range(len(preped_assigns)):
@@ -317,7 +327,10 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         feed_dict, blob = load_feed_dict(data_layer, args, orig_assign, training_help, input_ph, preped_assigns)
 
         # compute running mean for losses
-        feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
+        if rm_length is not None:
+            feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
+        else:
+            feed_dict[loss_scalings_placeholder] = loss_factors
 
         # with open('feed_dict_train.pickle', 'wb') as handle:
         #    pickle.dump(feed_dict[input_ph], handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -330,15 +343,17 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
             fetch_list.append(preped_a[0])
         fetches = sess.run(fetch_list, feed_dict=feed_dict)
 
-        past_losses[:, :-1] = past_losses[:, 1:]  # move by one timestep
-        past_losses[:, -1] = fetches[-past_losses.shape[0]:]  # add latest loss
+        if rm_length is not None:
+            past_losses[:, :-1] = past_losses[:, 1:]  # move by one timestep
+            past_losses[:, -1] = fetches[-past_losses.shape[0]:]  # add latest loss
 
         if itr % args.print_interval == 0 or itr == 1:
             print("loss at itr: " + str(itr) + " at: "+ str(datetime.datetime.now()))
             print(fetches[1])
-            print(past_losses)
+            if rm_length is not None:
+                print(past_losses)
 
-        if itr % args.tensorboard_interval == 0 or itr == 1 or True:
+        if itr % args.tensorboard_interval == 0 or itr == 1:
 
             post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob)
 
@@ -347,7 +362,10 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
             val_loss = 0
             for i in range(args.validation_loss_task_nr_batch):
                 feed_dict, blob = load_feed_dict(data_layer, args, orig_assign, training_help, input_ph, preped_assigns,  valid=1)
-                feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
+                if rm_length is not None:
+                    feed_dict[loss_scalings_placeholder] = loss_factors / np.maximum(np.mean(past_losses, 1), np.repeat(1.0E-6, past_losses.shape[0]))
+                else:
+                    feed_dict[loss_scalings_placeholder] = loss_factors
                 loss_fetch = sess.run([loss_tot], feed_dict=feed_dict)
                 val_loss += loss_fetch[0]
 
@@ -939,7 +957,7 @@ def get_checkpoint_dir(args):
     if not os.path.exists(tbdir):
         os.makedirs(tbdir)
     runs_dir = os.listdir(tbdir)
-    if args.continue_training == "True":
+    if args.continue_training == "True" or args.continue_training == "Last":
         tbdir = tbdir + "/" + "run_" + str(len(runs_dir) - 1)
     else:
         tbdir = tbdir + "/" + "run_" + str(len(runs_dir))

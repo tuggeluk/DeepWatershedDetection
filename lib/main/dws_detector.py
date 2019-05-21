@@ -40,7 +40,7 @@ class DWSDetector:
         self.used_heads.sort()
         # for now:
         #self.used_heads = ['stamp_class', 'stamp_bbox', 'stamp_energy']
-        self.used_heads = ['stamp_class', 'stamp_energy', 'stamp_bbox']
+        #self.used_heads = ['stamp_class', 'stamp_energy', 'stamp_bbox']
         #self.used_heads = ['stamp_bbox', 'stamp_class', 'stamp_energy']
         #self.used_heads = ['stamp_bbox', 'stamp_energy', 'stamp_class']
         #self.used_heads = ['stamp_energy', 'stamp_class', 'stamp_bbox']
@@ -100,7 +100,7 @@ class DWSDetector:
                 fetch_list.append(self.network_heads[pair][head[0]][head[1]][-1])
 
         #fetch_list = self.network_heads[0]["stamp_energy"]["softmax"]
-        img_test = np.stack((img[:,:,:,0], img[:,:,:,1], img[:,:,:,2]), -1)
+        #img_test = np.stack((img[:,:,:,0], img[:,:,:,1], img[:,:,:,2]), -1)
 
         preds = self.tf_session.run([fetch_list], feed_dict={self.input: img})
         preds = preds[0]
@@ -119,9 +119,8 @@ class DWSDetector:
                 i += 1
 
 
-        #dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
-        #save_images(canv, dws_list, True, False, self.counter)
         i = 0
+        paired_detect = []
         for pair in range(self.config.paired_data):
             pred_dict = {}
             for head in self.used_heads_loss:
@@ -133,107 +132,119 @@ class DWSDetector:
                     pred_dict["stamp_bbox"] = preds[i]
                 i += 1
             dws_list = perform_dws(pred_dict, cutoff, min_ccoponent_size,self.config)
-
-
+            paired_detect.append(dws_list)
 
         self.counter += 1
-        dws_list = []
 
-        return dws_list
+        return paired_detect
 
 
-def get_images(data, gt_boxes=None, gt=False, text=False):
-    """
-    Utility function which draws the bounding boxes from both the inference and ground truth, useful to do manual inspection of results
-    arguments:
-        data - the image in ndarray format.
-        boxes - boxes which we want to draw in the image.
-        gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
-        text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
-    returns:
-        im_input - the image with the results of the detection.
-        im_gt - None if gt is set to False, the image with the drawn ground truth if set to True.
-    """
-    if data.shape[-1] == 1:
-        data = data.squeeze(-1)
+    def get_images(self, data, predict_boxes=None, gt_boxes= None, text=False):
+        """
+        Utility function which draws the bounding boxes from both the inference and ground truth, useful to do manual inspection of results
+        arguments:
+            data - the image in ndarray format.
+            boxes - boxes which we want to draw in the image.
+            gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
+            text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
+        returns:
+            im_input - the image with the results of the detection.
+            im_gt - None if gt is set to False, the image with the drawn ground truth if set to True.
+        """
+        if data.shape[-1] == 1:
+            data = data.squeeze(-1)
 
-    from PIL import ImageDraw
-    im_input = Image.fromarray(data[0].astype("uint8"))
-    im_gt = None
+        if data.shape[-1] > 3:
+            data = np.stack([data, data, data],-1)
 
-    if gt:
-        im_gt = Image.fromarray(data[0].astype("uint8"))
-        draw = ImageDraw.Draw(im_gt)
+        from PIL import ImageDraw
+
+        im_pred = Image.fromarray(data.astype("uint8"))
+
+        draw = ImageDraw.Draw(im_pred)
         # overlay GT boxes
-        for row in gt_boxes:
+        for row in predict_boxes:
             # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
-            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
+            draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="red")
 
-    if text:
-        draw = ImageDraw.Draw(im_gt)
-        # overlay GT boxes
-        for row in gt_boxes:
-            draw.text((row[2], row[3]), str(row[4]), fill="red")
+        if gt_boxes is not None:
+            # overlay GT boxes
+            for row in gt_boxes:
+                # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
+                draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline="green")
 
-    return im_input, im_gt
+        if text:
+            draw = ImageDraw.Draw(im_pred)
+            # overlay GT boxes
+            for row in gt_boxes:
+                draw.text((row[2], row[3]), str(row[4]), fill="red")
 
-
-def show_images(data, gt_boxes=None, gt=False, text=False):
-    """
-    Utility functions which shows the results of get_images in the display window.
-    arguments:
-        data - the image in ndarray format.
-        boxes - boxes which we want to draw in the image.
-        gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
-        text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
-    returns:
-        None
-    """
-    im_input, im_gt = get_images(data, gt_boxes, gt, text)
-    im_input.show()
-    im_gt.show()
+        return im_pred
 
 
-def save_images(data, preds, gt_boxes=None, gt=False, text=False, counter=0):
-    """
-    Utility function which saves the results of get_images.
-    arguments:
-        data - the image in ndarray format.
-        boxes - boxes which we want to draw in the image.
-        gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
-        text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
-        counter - each image is given a name starting from 0.png, 1.png, ..., num_images.png
-    returns:
-        None
-    """
-    im_input, im_gt = get_images(data, gt_boxes, gt, text)
-
-    im_input.save(preds.root_dir + "/output_images/inference/" + 'input' + str(counter)+ '.png')
-    im_gt.save(preds.root_dir + "/output_images/inference/" + 'gt' + str(counter) +'.png')
-
-    return
+    def show_images(self, data, gt_boxes=None, gt=False, text=False):
+        """
+        Utility functions which shows the results of get_images in the display window.
+        arguments:
+            data - the image in ndarray format.
+            boxes - boxes which we want to draw in the image.
+            gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
+            text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
+        returns:
+            None
+        """
+        im_input, im_gt = self.get_images(data, gt_boxes, gt, text)
+        im_input.show()
+        im_gt.show()
 
 
-def save_debug_panes(pred_energy, pred_class, pred_bbox,preds, counter=0):
-    """
-    Utility function which saves the output panes from the Network directly as images
-    arguments:
-        pred_energy - energy map prediction
-        pred_class - class map prediction
-        pred_bbox - bounding box map prediction
-        counter - each image is given a name starting from 0.png, 1.png, ..., num_images.png
-    returns:
-        None
-    """
-    panes_list = [[pred_energy, "stamp_energy", "softmax"],
-    [pred_class, "stamp_class", "softmax"],
-    [pred_bbox, "stamp_bbox", "softmax"]]
+    def save_images(self, config, data, predict_boxes, gt_boxes=None, text=False):
+        """
+        Utility function which saves the results of get_images.
+        arguments:
+            data - the image in ndarray format.
+            boxes - boxes which we want to draw in the image.
+            gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
+            text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
+            counter - each image is given a name starting from 0.png, 1.png, ..., num_images.png
+        returns:
+            None
+        """
 
-    for pane in panes_list:
-        pan_vis = fcn_groundtruth.color_map(pane[0], {"stamp_func": [pane[1]], "stamp_args": {"loss": pane[2]}})
-        im = Image.fromarray(pan_vis[0])
-        im.save(preds.root_dir + "/output_images/inference/" + pane[1] + str(counter) + '.png')
+        if config.paired_data > 1:
+            for i in range(config.paired_data):
+                im_pred = self.get_images(data[:, :, i], predict_boxes[i], gt_boxes, text)
+
+                im_pred.save(config.root_dir + "/output_images/inference/" + 'prediction' + str(self.counter) + "_" + str(i) + '.png')
+
+        else:
+            im_pred = self.get_images(data, predict_boxes, gt_boxes, text)
+
+            im_pred.save(config.root_dir + "/output_images/inference/" + 'prediction' + str(self.counter) + '.png')
+
+        return
 
 
-    return
+    def save_debug_panes(self, pred_energy, pred_class, pred_bbox,preds, counter=0):
+        """
+        Utility function which saves the output panes from the Network directly as images
+        arguments:
+            pred_energy - energy map prediction
+            pred_class - class map prediction
+            pred_bbox - bounding box map prediction
+            counter - each image is given a name starting from 0.png, 1.png, ..., num_images.png
+        returns:
+            None
+        """
+        panes_list = [[pred_energy, "stamp_energy", "softmax"],
+        [pred_class, "stamp_class", "softmax"],
+        [pred_bbox, "stamp_bbox", "softmax"]]
+
+        for pane in panes_list:
+            pan_vis = fcn_groundtruth.color_map(pane[0], {"stamp_func": [pane[1]], "stamp_args": {"loss": pane[2]}})
+            im = Image.fromarray(pan_vis[0])
+            im.save(preds.root_dir + "/output_images/inference/" + pane[1] + str(counter) + '.png')
+
+
+        return
 

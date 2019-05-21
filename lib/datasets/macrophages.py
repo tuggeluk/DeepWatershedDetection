@@ -38,7 +38,7 @@ class macrophages(imdb):
     #self._split_path = os.path.join(self._devkit_path, 'train_val_test')
     # no fixed split randomly according to size
     self._val_proportion = 0.1
-    self._classes = list(["background", "FG"])
+    self._classes = list(["__background__", "FG"])
     self._semseg_classes = [0, 255]
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
@@ -221,8 +221,8 @@ class macrophages(imdb):
                else self._comp_id)
     return comp_id
 
-  def _get_voc_results_file_template(self):
-    filename = self._get_comp_id() + '_det_' + self._image_set + '_{:s}.txt'
+  def _get_voc_results_file_template(self,pair):
+    filename = self._get_comp_id() + '_det_' + self._image_set + '_' + str(pair) + '_{:s}.txt'
     path = os.path.join(
       self._devkit_path,
       'results',
@@ -231,14 +231,18 @@ class macrophages(imdb):
       filename)
     return path
 
-  def _write_voc_results_file(self, all_boxes):
+  def _write_voc_results_file(self, all_boxes, pair):
    for cls_ind, cls in enumerate(self.classes):
       if cls == '__background__':
         continue
       print('Writing {} VOC results file'.format(cls))
-      filename = self._get_voc_results_file_template().format(cls)
+      filename = self._get_voc_results_file_template(pair).format(cls)
+      # maybe create directory
+      os.makedirs(os.path.dirname(filename), exist_ok = True)
       with open(filename, 'wt') as f:
         for im_ind, index in enumerate(self.image_index):
+          if pair == 1:
+            index = index.replace("DAPI","mCherry")
           dets = all_boxes[cls_ind][im_ind]
           if dets == []:
             continue
@@ -249,17 +253,8 @@ class macrophages(imdb):
                            dets[k, 0] + 1, dets[k, 1] + 1,
                            dets[k, 2] + 1, dets[k, 3] + 1))
 
-  def _do_python_eval(self, output_dir='output', path=None):
-    annopath = os.path.join(
-      self._devkit_path,
-      'segmentation_detection',
-      'xml_annotations',
-      '{:s}.txt')
-    imagesetfile = os.path.join(
-      self._devkit_path,
-      'train_val_test',
-      self._image_set + '.txt')
-    cachedir = os.path.join(self._devkit_path, 'annotations_cache')
+  def _do_python_eval(self, output_dir='output', path=None, pair = 0):
+
     # The PASCAL VOC metric changed in 2010
     use_07_metric = True if int(self._year) < 2010 else False
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
@@ -272,9 +267,9 @@ class macrophages(imdb):
       for i, cls in enumerate(self._classes):
         if cls == '__background__':
           continue
-        filename = self._get_voc_results_file_template().format(cls)
+        filename = self._get_voc_results_file_template(pair).format(cls)
         rec, prec, ap = voc_eval(
-          filename, annopath, imagesetfile, cls, cachedir, ovthresh=ovthresh,
+          filename, self.roidb, pair, cls, i, ovthresh=ovthresh,
           use_07_metric=use_07_metric)
         aps += [ap]
         print(('AP for {} = {:.4f}'.format(cls, ap)))
@@ -285,7 +280,7 @@ class macrophages(imdb):
       print('Results:')
       # open the file where we want to save the results
       if path is not None:
-        res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
+        res_file = open(os.path.join(path, 'res-' + str(ovthresh) + '.txt'),"w+")
         len_ap = len(aps)
         sum_aps = 0
         present = 0
@@ -326,16 +321,16 @@ class macrophages(imdb):
     print(('Running:\n{}'.format(cmd)))
     status = subprocess.call(cmd, shell=True)
 
-  def evaluate_detections(self, all_boxes, output_dir, path=None):
-    self._write_voc_results_file(all_boxes)
-    self._do_python_eval(output_dir, path)
+  def evaluate_detections(self, all_boxes, output_dir, path=None, pair=0):
+    self._write_voc_results_file(all_boxes, pair)
+    self._do_python_eval(output_dir, path, pair)
     if self.config['matlab_eval']:
       self._do_matlab_eval(output_dir)
     if self.config['cleanup']:
       for cls in self._classes:
         if cls == '__background__':
           continue
-        filename = self._get_voc_results_file_template().format(cls)
+        filename = self._get_voc_results_file_template(pair).format(cls)
         os.remove(filename)
 
   def competition_mode(self, on):

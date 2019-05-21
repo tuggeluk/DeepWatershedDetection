@@ -49,6 +49,69 @@ def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None):
         print("boxes")
     else:
         print("boxes")
+        # "fatten" the detected components using a cc analysis at cutoff 0
+        binar_energy_0 = (dws_energy > 0) * 255
+        retval_0, labels_0 = cv2.connectedComponents(binar_energy_0.astype(np.uint8))
+        # iterate over cc_0 components
+        for i in range(1, retval_0):
+            support = np.unique(labels[labels_0 == i])
+            # remove bg
+            support = support[support != 0]
+            # remove unusported components
+            if len(support) > 0:
+                # do nothing for support 0
+                # replace pure components
+                if len(support) == 1:
+                    labels[labels_0 == i] = support[0]
+                # deal with fused components
+                else:
+                    print(support)
+
+                    coords_min = np.min(np.where(labels_0 == i), -1)
+                    coords_max = np.max(np.where(labels_0 == i), -1)
+
+                    patch = labels[coords_min[0]:coords_max[0], coords_min[1]:coords_max[1]]
+                    dist_list = list()
+                    for sup_ele in support:
+                        dist_map = ((patch == sup_ele)-1)*-1E6
+                        for direct in [1, -1, 2, -2]:
+                            shape = dist_map.shape[np.abs(direct)-1]
+                            if np.sign(direct) == 1:
+                                rng = range(1, shape)
+                            else:
+                                rng = range(shape-2, -1, -1)
+
+                            for ind in rng:
+                                if np.abs(direct) == 1:
+                                    dist_map[ind,:] = np.min(np.stack((dist_map[ind,:], dist_map[ind-np.sign(direct),:]+1),-1),-1)
+                                else:
+                                    dist_map[:,ind] = np.min(np.stack((dist_map[:,ind], dist_map[:,ind-np.sign(direct)]+1),-1),-1)
+                        dist_list.append(dist_map)
+                    dist_map = np.stack(dist_list, -1)
+                    min_dist = np.argmin(dist_map, -1)
+                    new_blobs = support[min_dist]
+                    update_pix = labels_0[coords_min[0]:coords_max[0], coords_min[1]:coords_max[1]] != 0
+
+                    # goal pane
+                    labels[coords_min[0]:coords_max[0], coords_min[1]:coords_max[1]][update_pix] = new_blobs[update_pix]
+
+
+        print("axis estimation")
+        # from PIL import Image
+        # Image.fromarray(labels.astype(np.uint8)*3).save("cc_fat.jpg")
+        if config.bbox_angle == "estimated":
+            print("estimate angle")
+        else:
+            est_angle = 0
+
+        for i in np.unique(labels)[np.unique(labels)!=0]:
+            coords_min = np.min(np.where(labels == i), -1)
+            coords_max = np.max(np.where(labels == i), -1)
+                            # xmin, ymin, xmax, ymax, class
+            bbox_list.append([coords_min[1], coords_min[0], coords_max[1], coords_max[0], classes[i-1]])
+
+
+
 
     # class_map = np.squeeze(class_map)
     # bbox_map = np.squeeze(bbox_map)

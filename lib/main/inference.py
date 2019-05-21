@@ -25,7 +25,7 @@ def main(parsed, model_dir, do_debug= False):
         all_boxes = test_net(False, parsed, do_debug)
 
 
-def test_net(net, imdb, parsed, path, debug=False):
+def test_net(net, imdb, parsed, path, debug=False, show_imgs=False):
     """
     This function does inference on the images
     Parameters:
@@ -35,10 +35,13 @@ def test_net(net, imdb, parsed, path, debug=False):
         path - the path (string format) for the location of the net
         debug - set it to true if the inference has been already done, and you just want to load the values. Used for debugging purposes.
     """
-    output_dir = ""
+    output_dir = os.path.join(parsed.out_dir, parsed.test_set)
     num_images = len(imdb.image_index)
-    all_boxes = [[[] for _ in range(num_images)]
-                 for _ in range(imdb.num_classes)]
+    all_boxes = [[[[] for _ in range(num_images)]
+                 for _ in range(imdb.num_classes)] for _ in range(parsed.paired_data)]
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     det_file = os.path.join(output_dir, 'detections.pkl')
 
@@ -72,17 +75,21 @@ def test_net(net, imdb, parsed, path, debug=False):
             if im.shape[0]*im.shape[1]>3837*2713:
                 continue
 
-            boxes = net.classify_img(im, 7, 4)
+            boxes = net.classify_img(im, 15, 4)
+            if show_imgs:
+                net.save_images(parsed, im, boxes, None, False)
+
+            # degenerate?
             if len(boxes) > 800:
                 boxes = []
-            no_objects = len(boxes)
-            for j in range(len(boxes)):
-                # invert scaling for Boxes
-                boxes[j] = np.array(boxes[j])
-                boxes[j][:-1] = (boxes[j][:-1] * (1 / parsed.scaling)).astype(np.int)
+            for pa in range(parsed.paired_data):
+                for j in range(len(boxes[pa])):
+                    # invert scaling for Boxes
+                    boxes[pa][j] = np.array(boxes[pa][j])
+                    boxes[pa][j][:-1] = (boxes[pa][j][:-1] * (1 / parsed.scale_list[0])).astype(np.int)
 
-                class_of_symbol = boxes[j][4]
-                all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
+                    class_of_symbol = boxes[pa][j][4].astype(np.int)
+                    all_boxes[pa][class_of_symbol][i].append(np.array(boxes[pa][j]))
             end_time = time.time()
             total_time.append(end_time - start_time)
         print(total_time)
@@ -93,19 +100,20 @@ def test_net(net, imdb, parsed, path, debug=False):
         # convert to np array
         for i1 in range(len(all_boxes)):
             for i2 in range(len(all_boxes[i1])):
-                all_boxes[i1][i2] = np.asarray(all_boxes[i1][i2])
+                    for i3 in range(len(all_boxes[i1][i2])):
+                        all_boxes[i1][i2][i3] = np.asarray(all_boxes[i1][i2][i3])
 
         # inspect all_boxes variable
         with open(det_file, 'wb') as f:
             pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 
     else:
-        pdb.set_trace()
         with open(det_file, "rb") as f:
             all_boxes = pickle.load(f)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir, path)
+    for i1 in range(len(all_boxes)):
+        imdb.evaluate_detections(all_boxes[i1], output_dir+"/"+str(i1), path, i1)
     return all_boxes
 
 
