@@ -73,14 +73,14 @@ def main():
     parser.add_argument("--batch_size", type=int, default=2,
                         help="batch size for training")
 
-    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint True/False/Last")
-    parser.add_argument("--pretrain_lvl", type=str, default="class",
+    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint True/False/Last")
+    parser.add_argument("--pretrain_lvl", type=str, default="no",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a numb er (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 10e-3  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient = 25e-3  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
 

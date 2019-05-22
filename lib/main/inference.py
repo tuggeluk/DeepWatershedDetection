@@ -75,7 +75,7 @@ def test_net(net, imdb, parsed, path, debug=False, show_imgs=False):
             if im.shape[0]*im.shape[1]>3837*2713:
                 continue
 
-            boxes = net.classify_img(im, 15, 4)
+            boxes = net.classify_img(im, 7, 10)
             if show_imgs:
                 net.save_images(parsed, im, boxes, None, False)
 

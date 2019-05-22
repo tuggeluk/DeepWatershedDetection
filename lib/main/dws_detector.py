@@ -88,8 +88,8 @@ class DWSDetector:
         # canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
 
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
-        import pickle
-        feed_train = pickle.load(open("feed_dict_train.pickle","rb"))
+        #import pickle
+        #feed_train = pickle.load(open("feed_dict_train.pickle","rb"))
 
         # create fetch list
         print("create fetch list")

@@ -7,7 +7,7 @@ from utils.ufarray import *
 import numpy as np
 import cv2
 
-def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None):
+def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None,  fatten_cutoff= 1):
     bbox_list = []
 
     dws_energy = np.squeeze(predict_dict["stamp_energy"])
@@ -50,7 +50,7 @@ def perform_dws(predict_dict,cutoff=0,min_ccoponent_size=0, config=None):
     else:
         print("boxes")
         # "fatten" the detected components using a cc analysis at cutoff 0
-        binar_energy_0 = (dws_energy > 0) * 255
+        binar_energy_0 = (dws_energy > fatten_cutoff) * 255
         retval_0, labels_0 = cv2.connectedComponents(binar_energy_0.astype(np.uint8))
         # iterate over cc_0 components
         for i in range(1, retval_0):

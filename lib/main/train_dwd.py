@@ -264,15 +264,15 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         var_list = [var for var in tf.trainable_variables()]
         loss_L2 = tf.add_n([tf.nn.l2_loss(v) for v in var_list
                             if 'bias' not in v.name]) * args.regularization_coefficient
-        loss_tot += loss_L2
+        loss_tot_reg = loss_tot + loss_L2
         optimizer_type = args.optim
         if args.optim == 'rmsprop':
-            optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot,
+            optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot_reg,
                                                                                                       var_list=var_list)
         elif args.optim == 'adam':
-            optim = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss_tot, var_list=var_list)
+            optim = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss_tot_reg, var_list=var_list)
         else:
-            optim = tf.train.MomentumOptimizer(learning_rate=args.learning_rate, momentum=0.9).minimize(loss_tot,
+            optim = tf.train.MomentumOptimizer(learning_rate=args.learning_rate, momentum=0.9).minimize(loss_tot_reg,
                                                                                                         va_list=var_list)
     opt_inizializers = [var.initializer for var in tf.global_variables() if "combined_opt" + str(0) in var.name]
     sess.run(opt_inizializers)
@@ -339,6 +339,8 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         fetch_list = list()
         fetch_list.append(optim)
         fetch_list.append(loss_tot)
+        fetch_list.append(loss_tot_reg)
+        #fetch_list.append(loss_L2)
         for preped_a in preped_assigns:
             fetch_list.append(preped_a[0])
         fetches = sess.run(fetch_list, feed_dict=feed_dict)
@@ -348,8 +350,9 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
             past_losses[:, -1] = fetches[-past_losses.shape[0]:]  # add latest loss
 
         if itr % args.print_interval == 0 or itr == 1:
-            print("loss at itr: " + str(itr) + " at: "+ str(datetime.datetime.now()))
-            print(fetches[1])
+            print("loss unregularized at  itr: " + str(itr) + " at: "+ str(datetime.datetime.now())+":"+str(fetches[1]))
+            print("loss regularized at  itr: " + str(itr) + " at: " + str(datetime.datetime.now()) + ":" + str(fetches[2]))
+
             if rm_length is not None:
                 print(past_losses)
 
@@ -357,7 +360,7 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
 
             post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_dict, itr, sess, writer, blob)
 
-        if itr % args.validation_loss_task == 0:
+        if itr % args.validation_loss_task == 0 or itr == 1:
             # approximate validation loss
             val_loss = 0
             for i in range(args.validation_loss_task_nr_batch):
