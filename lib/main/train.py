@@ -70,7 +70,7 @@ def main():
     parser.add_argument("--prefetch_size", type=int, default=40, help="number of batches stored in one chunk")
 
 
-    parser.add_argument("--batch_size", type=int, default=2,
+    parser.add_argument("--batch_size", type=int, default=3,
                         help="batch size for training")
 
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint True/False/Last")
@@ -78,11 +78,16 @@ def main():
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a numb er (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
-    optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
+    optimizer = 'adam' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient = 25e-3  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
-    parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
-                        help="Value for regularization parameter")
+    regularization_coefficient_downsamp = 0.02  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+
+    parser.add_argument("--regularization_coefficient_downsamp", type=float, default=regularization_coefficient_downsamp,
+                        help="For downsampling/feature learning")
+    regularization_coefficient_upsamp = 0.01  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    parser.add_argument("--regularization_coefficient_upsamp", type=float, default=regularization_coefficient_upsamp,
+                        help="For upsampling/energy mask reconstruction")
+
 
     dataset = "macrophages_2019_train"
     if dataset == "DeepScores_2017_debug":
@@ -157,13 +162,21 @@ def main():
     parser.add_argument("--semseg_ind", type=list, default=[], help="ignore, will be overwritten by program")
 
 
-    parser.add_argument('--model', type=str, default="RefineNet-Res101",
+    parser.add_argument('--model', type=str, default="RefineNet-Res50",
                         help="Base model -  Currently supports: RefineNet-Res50, RefineNet-Res101, RefineNet-Res152"
                              "                                  UNet")
 
     parser.add_argument('--training_help',  type=list, default=[None], help="sample gt into imput / currently unused")
 
-    parser.add_argument('--individual_upsamp', type=str, default="sub_task", help="use individual refine-Net heads per task (No,task,sub_task)")
+    # each element (list) creates a sperate upsampling network
+    # group all (sub) tasks in the according list
+    # 0_1 means assign:0, sub_task:1
+    upsamp_config = [
+                     ["0_0", "1_0", "2_0"], # one head per subtask
+                     ["0_1", "1_1", "2_1"]
+    ]
+    parser.add_argument('--individual_upsamp', type=list, default="upsamp_config", help="how many different ubsampling nets to use")
+
     parser.add_argument('--sparse_heads', type=str, default="True", help="only initialize used heads (True/False)")
 
 
@@ -173,27 +186,38 @@ def main():
                             # energy markers
                             {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
+                             'stamp_args': {'marker_dim': [16, 16], 'size_percentage': 1, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"},
                              'balance_mask': 'fg_bg_balanced', # by_class, by_object, fg_bg_balanced, mask_bg, None
                              'balance_coef': 0.25,  # % of loss given to background
-                             'use_obj_seg': True, # use object segmentation if available
+                             'use_obj_seg': False, # use object segmentation if available
+                             'use_obj_seg_cached': False
+                             },
+
+                            # energy markers - semseg
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
+                             'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
+                             'stamp_args': {'marker_dim': [16, 16], 'size_percentage': 1, "shape": "oval",
+                                            "loss": "softmax", "energy_shape": "linear"},
+                             'balance_mask': 'fg_bg_balanced',  # by_class, by_object, fg_bg_balanced, mask_bg, None
+                             'balance_coef': 0.25,  # % of loss given to background
+                             'use_obj_seg': True,  # use object segmentation if available
                              'use_obj_seg_cached': True
                              },
 
-                            # # class markers
-                            {'ds_factors': [1],  'downsample_marker': True, 'overlap_solution': 'nearest',
-                             'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval",
-                                            "class_resolution": "class", "loss": "softmax"},
-                             'balance_mask': 'mask_bg',
-                             'use_sem_seg': True # use semantic segmentation if avialable
-                             },
+                            # # # class markers
+                            # {'ds_factors': [1],  'downsample_marker': True, 'overlap_solution': 'nearest',
+                            #  'stamp_func': 'stamp_class', 'layer_loss_aggregate': 'avg',
+                            #  'stamp_args': {'marker_dim': [12, 12], 'size_percentage': 1, "shape": "oval",
+                            #                 "class_resolution": "class", "loss": "softmax"},
+                            #  'balance_mask': 'mask_bg',
+                            #  'use_sem_seg': True # use semantic segmentation if avialable
+                            #  },
 
                             # bbox markers
                             {'ds_factors': [1],  'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
-                             'stamp_args': {'marker_dim': None, 'size_percentage': 1, "shape": "oval", "loss": "reg"},
+                             'stamp_args': {'marker_dim': [8, 8], 'size_percentage': 1, "shape": "oval", "loss": "reg"},
                              'balance_mask': 'mask_bg'
                              }
 
@@ -221,12 +245,12 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,2], "loss_factors": [1,0], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": None, "" "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,2], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": None, "" "Itrs": Itrs_combined},
                                  #{"assigns": [0,2], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0, 'Itrs_class': Itrs1, 'Itrs_bb': Itrs2, 'Itrs_energy2': Itrs0_1, 'Itrs_combined': Itrs_combined,
-		 'optimizer': optimizer, 'regularization_coefficient': regularization_coefficient}
+		 'optimizer': optimizer, 'regularization_coefficient_downsamp': regularization_coefficient_downsamp, "regularization_coefficient_upsamp":regularization_coefficient_upsamp},
     parser.add_argument("--dict_info", type=dict, default=dict_info, help="a dictionary containing information about some of the hyperparameters")
     parsed = parser.parse_known_args()
     dwd.main(parsed)

@@ -259,12 +259,17 @@ def execute_combined_assign(args, data_layer, training_help, orig_assign, preped
         else:
             loss_tot += preped_assigns[i][0] * loss_scalings_placeholder[i]
 
-    # init optimizer
-    with tf.variable_scope("combined_opt" + str(0), reuse=tf.AUTO_REUSE):
-        var_list = [var for var in tf.trainable_variables()]
-        loss_L2 = tf.add_n([tf.nn.l2_loss(v) for v in var_list
-                            if 'bias' not in v.name]) * args.regularization_coefficient
-        loss_tot_reg = loss_tot + loss_L2
+    # init optimizer -- make sure optimizer is fresh
+    with tf.variable_scope("combined_opt" + str(0), reuse=False):
+        var_list = [var for var in tf.trainable_variables() if "BatchNorm" not in var.name and "bias" not in var.name]
+
+        # maybe exclude shortcuts from regularization
+        var_list_res = [var for var in var_list if "resnet_" in var.name]
+        var_list_not_res = [var for var in var_list if "resnet_" not in var.name]
+        loss_L2_downsam = tf.add_n([tf.nn.l2_loss(v) for v in var_list_res]) * args.regularization_coefficient_downsamp
+        loss_L2_upsam = tf.add_n([tf.nn.l2_loss(v) for v in var_list_not_res]) * args.regularization_coefficient_upsamp
+
+        loss_tot_reg = loss_tot + loss_L2_downsam + loss_L2_upsam
         optimizer_type = args.optim
         if args.optim == 'rmsprop':
             optim = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, decay=0.995).minimize(loss_tot_reg,
@@ -696,9 +701,12 @@ def load_feed_dict(data_layer, args, assign, training_help, input_ph, preped_ass
         for index_sb, (gt_sb, mask_sb) in enumerate(zip(gt_placeholders, mask_placeholders)):
             # iterate over downsampling
             for index_ds, (gt_ds, mask_ds) in enumerate(zip(gt_sb, mask_sb)):
-                # concat over batch axis
-                feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign" + str(i1)]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
-                feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign" + str(i1)]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+                try:
+                    # concat over batch axis
+                    feed_dict[gt_ds] = np.concatenate([batch_ele[index_sb]["assign" + str(i1)]["gt_map" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+                    feed_dict[mask_ds] = np.stack([batch_ele[index_sb]["assign" + str(i1)]["mask" + str(len(gt_sb) - 1 - index_ds)] for batch_ele in blob], 0)
+                except:
+                    print("hoyeasdf")
 
     return feed_dict, blob
 

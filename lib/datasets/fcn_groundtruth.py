@@ -118,7 +118,9 @@ def get_partial_marker(canvas_shape, coords, mark):
         return None, None
 
     # if marker has bigger size than coords
-    size_offsets = np.asarray(mark.shape[0:2])-[crop_coords[3]-crop_coords[1],crop_coords[2]-crop_coords[0]]
+    size_offsets = np.asarray(mark.shape[0:2])-[crop_coords[3]-crop_coords[1], crop_coords[2]-crop_coords[0]]
+    if np.min(size_offsets) < 0:
+        print("asdf")
     # if sum(size_offsets == [0,0])<2:
     #     1==1
 
@@ -223,7 +225,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
     sampled_size = (int(size[1]*samp_factor), int(size[2]*samp_factor))
 
-    sampled_gt = [[x[0]*samp_factor, x[1]] for x in gt if x is not None]
+    sampled_gt = [[x[0]*samp_factor, x[1], x[2]*samp_factor] for x in gt if x is not None]
 
 
     #init canvas
@@ -246,6 +248,9 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
         # plt.plot(bbox[0][0::2], bbox[0][1::2])
         # plt.show()
         try:
+            stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes, args)
+            stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
+
             stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes, args)
             stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
 
@@ -353,7 +358,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
 
 def ds_shapes_unet(in_shape,args):
     #layers, filter_size, pool_size = args
-    layers, filter_size, pool_size = 5,3,2
+    layers, filter_size, pool_size = 4,3,2
     size = np.array(in_shape)
     sizes = []
     for layer in range(0, layers):
@@ -526,6 +531,7 @@ def stamp_energy(bbox, assign, nr_classes,args):
 
     else:
         marker_size = assign["marker_dim"]
+        bbox[0] = bbox[2]
 
     # transpose marker size bc of wierd bbox definition
     marker_size = np.asarray(marker_size)[[1,0]]
@@ -533,14 +539,14 @@ def stamp_energy(bbox, assign, nr_classes,args):
         return None, None
 
 
-    coords_offset = np.round(((np.max(bbox[0][0::2])-np.min(bbox[0][0::2]),
-                              np.max(bbox[0][1::2]) - np.min(bbox[0][1::2])) - np.asarray(marker_size))*0.5)
+    coords_offset = np.round(((np.max(bbox[0][0::2])- (np.min(bbox[0][0::2])),
+                              np.max(bbox[0][1::2]) - (np.min(bbox[0][1::2]))) - np.asarray(marker_size))*0.5)
 
     topleft = np.round([np.min(bbox[0][0::2])+coords_offset[0],np.min(bbox[0][1::2])+coords_offset[1]]).astype(np.int)
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
-    marker = get_energy_marker(args, marker_size, bbox, assign["shape"], assign["size_percentage"])
+    marker = get_energy_marker(args, marker_size, bbox, assign["shape"], assign["size_percentage"],assign["marker_dim"])
 
     try:
         # apply shape function
@@ -570,98 +576,106 @@ def stamp_energy(bbox, assign, nr_classes,args):
     return marker, coords
 
 
-def get_energy_marker(args,size, bbox=None, shape="oval", size_percentage=1):
+def get_energy_marker(args, size, bbox=None, shape="oval", size_percentage=1, assigned_marker_dim = None):
 
     bbox_local = copy.deepcopy(bbox)
     try:
-        # left hand side
-        left_side_map = {"[1 1]": [-1,1], "[ 1 -1]": [1,1], "[-1 -1]":[1,-1], "[-1  1]": [-1,-1],
-                         "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
+        if assigned_marker_dim is None:
+            # left hand side
+            left_side_map = {"[1 1]": [-1,1], "[ 1 -1]": [1,1], "[-1 -1]":[1,-1], "[-1  1]": [-1,-1],
+                             "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
 
-        # normalize points to x-min, y-min
+            # normalize points to x-min, y-min
 
-        bbox_local[0][1::2] = bbox_local[0][1::2] - np.min(bbox_local[0][1::2])
-        bbox_local[0][0::2] = bbox_local[0][0::2] - np.min(bbox_local[0][0::2])
-        # compute full size and shrink using cv2
-        bbox_local[0] = (bbox_local[0] * size_percentage).astype(np.int)
+            bbox_local[0][1::2] = bbox_local[0][1::2] - np.min(bbox_local[0][1::2])
+            bbox_local[0][0::2] = bbox_local[0][0::2] - np.min(bbox_local[0][0::2])
+            # compute full size and shrink using cv2
+            bbox_local[0] = (bbox_local[0] * size_percentage).astype(np.int)
 
-        xv, yv = np.meshgrid(range(np.max(bbox_local[0][0::2])), range(np.max(bbox_local[0][1::2])), sparse=False, indexing='ij')
+            xv, yv = np.meshgrid(range(np.max(bbox_local[0][0::2])), range(np.max(bbox_local[0][1::2])), sparse=False, indexing='ij')
 
-        inside = np.ones(xv.shape)
-        min_dist = np.ones(xv.shape) * 1E10
-        for point in range(int(len(bbox_local[0]) / 2)):
-            dp = 2*point
-            p = bbox_local[0][dp:dp + 2]
+            inside = np.ones(xv.shape)
+            min_dist = np.ones(xv.shape) * 1E10
+            for point in range(int(len(bbox_local[0]) / 2)):
+                dp = 2*point
+                p = bbox_local[0][dp:dp + 2]
 
-            dp = 2*(point+1)
-            if dp == len(bbox_local[0]):
-                dp = 0
-            p1 = bbox_local[0][dp:dp + 2]
+                dp = 2*(point+1)
+                if dp == len(bbox_local[0]):
+                    dp = 0
+                p1 = bbox_local[0][dp:dp + 2]
 
-            u = p1-p
-            u_len = np.dot(u,u)
+                u = p1-p
+                u_len = np.dot(u,u)
 
-            v = [xv, yv] - np.expand_dims(np.expand_dims(p, -1), -1)
-             # u dot v / u_len
-            gamma = (u[0]*v[0] + u[1]*v[1])/u_len
-            proj = (v - [(gamma*u[0]), (gamma*u[1])])
-            proj[abs(proj) < 10e-10] = 0
+                v = [xv, yv] - np.expand_dims(np.expand_dims(p, -1), -1)
+                 # u dot v / u_len
+                gamma = (u[0]*v[0] + u[1]*v[1])/u_len
+                proj = (v - [(gamma*u[0]), (gamma*u[1])])
+                proj[abs(proj) < 10e-10] = 0
 
-            signs = left_side_map[str(np.sign(u))]
-            inside = np.min((inside,np.sign(proj[0]) == signs[0],np.sign(proj[1]) == signs[1] ),0)
-            min_dist = np.min((min_dist, np.linalg.norm(proj,2,0)),0)
-        #Image.fromarray((((distance_maps[1][0] + distance_maps[1][1]) > 0) * 255).astype(np.uint8)).save("test.png")
+                signs = left_side_map[str(np.sign(u))]
+                inside = np.min((inside,np.sign(proj[0]) == signs[0],np.sign(proj[1]) == signs[1] ),0)
+                min_dist = np.min((min_dist, np.linalg.norm(proj,2,0)),0)
+            #Image.fromarray((((distance_maps[1][0] + distance_maps[1][1]) > 0) * 255).astype(np.uint8)).save("test.png")
 
-        min_dist[inside == 0] = 0
+            min_dist[inside == 0] = 0
 
-        # debug energy stamp
-        # y_coords, x_coords = np.where(min_dist == 0)
-        # y_counts = np.unique(y_coords, return_counts = True)
-        # x_counts = np.unique(x_coords, return_counts=True)
-        # if np.sum(y_counts[1] == min_dist.shape[1]) + np.sum(x_counts[1] == min_dist.shape[0]) > 2:
-        #     print("debug this stamp")
-        #     bbox_local = copy.deepcopy(bbox)
-        #     # left hand side
-        #     left_side_map = {"[1 1]": [-1, 1], "[ 1 -1]": [1, 1], "[-1 -1]": [1, -1], "[-1  1]": [-1, -1],
-        #                      "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
-        #
-        #     # normalize points to x-min, y-min
-        #
-        #     bbox_local[0][1::2] = bbox_local[0][1::2] - np.min(bbox_local[0][1::2])
-        #     bbox_local[0][0::2] = bbox_local[0][0::2] - np.min(bbox_local[0][0::2])
-        #     # compute full size and shrink using cv2
-        #     bbox_local[0] = (bbox_local[0] * size_percentage).astype(np.int)
-        #
-        #     xv, yv = np.meshgrid(range(np.max(bbox_local[0][0::2])), range(np.max(bbox_local[0][1::2])), sparse=False, indexing='ij')
-        #
-        #     inside = np.ones(xv.shape)
-        #     min_dist = np.ones(xv.shape) * 1E10
-        #     for point in range(int(len(bbox_local[0]) / 2)):
-        #         dp = 2 * point
-        #         p = bbox_local[0][dp:dp + 2]
-        #
-        #         dp = 2 * (point + 1)
-        #         if dp == len(bbox_local[0]):
-        #             dp = 0
-        #         p1 = bbox_local[0][dp:dp + 2]
-        #
-        #         u = p1 - p
-        #         u_len = np.dot(u, u)
-        #
-        #         v = [xv, yv] - np.expand_dims(np.expand_dims(p, -1), -1)
-        #         # u dot v / u_len
-        #         gamma = (u[0] * v[0] + u[1] * v[1]) / u_len
-        #         proj = (v - [(gamma * u[0]), (gamma * u[1])])
-        #         proj[abs(proj) < 10e-10] = 0
-        #
-        #         signs = left_side_map[str(np.sign(u))]
-        #         inside = np.min((inside, np.sign(proj[0]) == signs[0], np.sign(proj[1]) == signs[1]), 0)
-        #         min_dist = np.min((min_dist, np.linalg.norm(proj, 2, 0)), 0)
-        #     # Image.fromarray((((distance_maps[1][0] + distance_maps[1][1]) > 0) * 255).astype(np.uint8)).save("test.png")
-        #
-        #     min_dist[inside == 0] = 0
+            # debug energy stamp
+            # y_coords, x_coords = np.where(min_dist == 0)
+            # y_counts = np.unique(y_coords, return_counts = True)
+            # x_counts = np.unique(x_coords, return_counts=True)
+            # if np.sum(y_counts[1] == min_dist.shape[1]) + np.sum(x_counts[1] == min_dist.shape[0]) > 2:
+            #     print("debug this stamp")
+            #     bbox_local = copy.deepcopy(bbox)
+            #     # left hand side
+            #     left_side_map = {"[1 1]": [-1, 1], "[ 1 -1]": [1, 1], "[-1 -1]": [1, -1], "[-1  1]": [-1, -1],
+            #                      "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
+            #
+            #     # normalize points to x-min, y-min
+            #
+            #     bbox_local[0][1::2] = bbox_local[0][1::2] - np.min(bbox_local[0][1::2])
+            #     bbox_local[0][0::2] = bbox_local[0][0::2] - np.min(bbox_local[0][0::2])
+            #     # compute full size and shrink using cv2
+            #     bbox_local[0] = (bbox_local[0] * size_percentage).astype(np.int)
+            #
+            #     xv, yv = np.meshgrid(range(np.max(bbox_local[0][0::2])), range(np.max(bbox_local[0][1::2])), sparse=False, indexing='ij')
+            #
+            #     inside = np.ones(xv.shape)
+            #     min_dist = np.ones(xv.shape) * 1E10
+            #     for point in range(int(len(bbox_local[0]) / 2)):
+            #         dp = 2 * point
+            #         p = bbox_local[0][dp:dp + 2]
+            #
+            #         dp = 2 * (point + 1)
+            #         if dp == len(bbox_local[0]):
+            #             dp = 0
+            #         p1 = bbox_local[0][dp:dp + 2]
+            #
+            #         u = p1 - p
+            #         u_len = np.dot(u, u)
+            #
+            #         v = [xv, yv] - np.expand_dims(np.expand_dims(p, -1), -1)
+            #         # u dot v / u_len
+            #         gamma = (u[0] * v[0] + u[1] * v[1]) / u_len
+            #         proj = (v - [(gamma * u[0]), (gamma * u[1])])
+            #         proj[abs(proj) < 10e-10] = 0
+            #
+            #         signs = left_side_map[str(np.sign(u))]
+            #         inside = np.min((inside, np.sign(proj[0]) == signs[0], np.sign(proj[1]) == signs[1]), 0)
+            #         min_dist = np.min((min_dist, np.linalg.norm(proj, 2, 0)), 0)
+            #     # Image.fromarray((((distance_maps[1][0] + distance_maps[1][1]) > 0) * 255).astype(np.uint8)).save("test.png")
+            #
+            #     min_dist[inside == 0] = 0
+        else:
+            inside = np.ones(assigned_marker_dim)
+            min_dist = np.stack([np.array(range(1,assigned_marker_dim[0]+1))]*assigned_marker_dim[1])
+            min_dist = np.min(np.stack([min_dist, np.rot90(min_dist), np.rot90(min_dist, 2), np.rot90(min_dist, 3)]), 0)
+            xv, yv = np.meshgrid(range(np.max(assigned_marker_dim[0])), range(np.max(assigned_marker_dim[1])), sparse=False, indexing='ij')
+
         if shape == "oval":
             center = np.average(np.where(inside == 1),1)
+
             center_dist = np.sqrt(np.square((xv - center[0])) + np.square((yv - center[1])))
             center_dist = 1 - (center_dist / np.max(center_dist))
 
@@ -809,7 +823,7 @@ def stamp_bbox(bbox, assign, nr_classes, args):
               topleft[0]+marker_size[0],topleft[1]+marker_size[1]]
 
     # piggy back on energy marker
-    marker = get_energy_marker(args,marker_size, bbox, assign["shape"], assign["size_percentage"])
+    marker = get_energy_marker(args,marker_size, bbox, assign["shape"], assign["size_percentage"], assign["marker_dim"])
 
     # expand marker and multiply by bbox  size
     marker = np.expand_dims(marker,-1)

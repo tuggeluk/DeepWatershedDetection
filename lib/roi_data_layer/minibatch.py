@@ -92,7 +92,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                 gt_inds = np.where(roidb_subele['gt_classes'] != 0 & np.all(roidb_subele['gt_overlaps'].toarray() > -1.0, axis=1))[0]
 
             #gt_boxes = np.empty((len(gt_inds), 9), dtype=np.float32)
-            gt_boxes = [[[None],None] for i in range(len(gt_inds))]
+            gt_boxes = [[[None],None,[None]] for i in range(len(gt_inds))]
             # translate all bboxes in 4 point path format
             if "boxes_full" in roidb_subele.keys():
                 roidb_subele["boxes"] = roidb_subele["boxes_full"]
@@ -111,7 +111,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
             #gt_boxes[:, 8] = roidb_subele['gt_classes'][gt_inds]
 
             for ix, ele in enumerate(roidb_subele['gt_classes'][gt_inds]):
-                gt_boxes[ix][1]= ele
+                gt_boxes[ix][1] = ele
 
             if args.crop == "True":
                 debug_plots = False
@@ -120,6 +120,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
 
                 for ix, ele in enumerate(roidb_subele['boxes'][gt_inds, :]):
                     gt_boxes[ix][0] = ele * scalings[0]
+                    gt_boxes[ix][2] = ele * scalings[0]
 
                 left_side_map = {"[1 1]": [-1, 1], "[ 1 -1]": [1, 1], "[-1 -1]": [1, -1], "[-1  1]": [-1, -1],
                                  "[0 1]": [-1, 0], "[1 0]": [0, 1], "[ 0 -1]": [1, 0], "[-1  0]": [0, -1]}
@@ -325,6 +326,9 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                     gt_boxes[ix][0][0::2] = gt_boxes[ix][0][0::2] - scalings[1][1]
                     gt_boxes[ix][0][1::2] = gt_boxes[ix][0][1::2] - scalings[1][0]
 
+                    gt_boxes[ix][2][0::2] = gt_boxes[ix][2][0::2] - scalings[1][1]
+                    gt_boxes[ix][2][1::2] = gt_boxes[ix][2][1::2] - scalings[1][0]
+
                     # try:
                     #     stamp, coords = assign[0]["stamp_func"][1](gt_boxes[ix], assign[0]["stamp_args"], args.nr_classes[0])
                     # except Exception as e:
@@ -525,7 +529,7 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                         # one-hot encode
                         if assign[i1]["stamp_args"]["loss"] == "softmax":
                             canv_downsamp = np.round(canv_downsamp).astype(np.int32)
-                            canv_downsamp = np.eye(int(np.max(canv_downsamp))+1)[canv_downsamp[:, :]]
+                            canv_downsamp = np.eye(args.max_energy)[canv_downsamp[:, :]]
                         else:
                             canv_downsamp = np.expand_dims(canv_downsamp, -1)
 
@@ -638,11 +642,25 @@ def get_minibatch(roidb, args, assign, helper, ignore_symbols=0, visualize=0, au
                         fg_map[fg_map != 0] = 1
 
                         fg_copy = np.copy(fg_map).astype("float64")
+
+                        # "smush out" in four direction
+                        nr_pix = 3
+                        backdrop = np.zeros(np.array(fg_copy.shape) + np.array([0, 2, 2]) * nr_pix)
+                        backdrop[0,nr_pix:-nr_pix,nr_pix:-nr_pix] = fg_copy[0]
+
+
+                        for ax,sign in ((1,1),(2,1),(1,-1),(1,-1),(2,-1),(2,-1),(1,1),(1,1)):
+                            backdrop = np.roll(backdrop, nr_pix*sign, ax)
+                            fg_copy[0] = backdrop[0,nr_pix:-nr_pix,nr_pix:-nr_pix] + fg_copy[0]
+
+                        fg_copy[fg_copy != 0] = 1
+                        #Image.fromarray((fg_copy[0]*255).astype(np.uint8)).save("smushedDasdfddd_weights.jpg")
                         # weigh each position by the inverse of its size
-                        unique_counts = np.unique(fg_map, return_counts=1)
+                        unique_counts = np.unique(fg_copy, return_counts=1)
+
 
                         for ele in range(len(unique_counts[0])):
-                            fg_copy[fg_map == unique_counts[0][ele]] = sum(unique_counts[1])/unique_counts[1][ele]
+                            fg_copy[fg_copy == unique_counts[0][ele]] = sum(unique_counts[1])/unique_counts[1][ele]
 
                         blob["assign" + str(i1)]["mask" + str(i2)] = np.expand_dims(fg_copy[0], -1)
 
