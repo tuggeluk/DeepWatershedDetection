@@ -134,7 +134,7 @@ def MultiResolutionFusion(high_inputs=None,low_inputs=None,n_filters=256):
         return tf.add(rcu_low, rcu_high)
 
 
-def RefineBlock(high_inputs=None,low_inputs=None):
+def RefineBlock(high_inputs=None, low_inputs=None, filters=256):
     """
     A RefineNet Block which combines together the ResidualConvUnits,
     fuses the feature maps using MultiResolutionFusion, and then gets
@@ -150,32 +150,32 @@ def RefineBlock(high_inputs=None,low_inputs=None):
     """
 
     if high_inputs is None: # block 4
-        rcu_low_1= ResidualConvUnit(low_inputs, n_filters=256)
-        rcu_low_2 = ResidualConvUnit(low_inputs, n_filters=256)
+        rcu_low_1= ResidualConvUnit(low_inputs, n_filters=filters)
+        rcu_low_2 = ResidualConvUnit(low_inputs, n_filters=filters)
         rcu_low = [rcu_low_1, rcu_low_2]
 
-        fuse = MultiResolutionFusion(high_inputs=None, low_inputs=rcu_low, n_filters=256)
-        fuse_pooling = ChainedResidualPooling(fuse, n_filters=256)
-        output = ResidualConvUnit(fuse_pooling, n_filters=256)
+        fuse = MultiResolutionFusion(high_inputs=None, low_inputs=rcu_low, n_filters=filters)
+        fuse_pooling = ChainedResidualPooling(fuse, n_filters=filters)
+        output = ResidualConvUnit(fuse_pooling, n_filters=filters)
         return output
     else:
-        rcu_low_1 = ResidualConvUnit(low_inputs, n_filters=256)
-        rcu_low_2 = ResidualConvUnit(low_inputs, n_filters=256)
+        rcu_low_1 = ResidualConvUnit(low_inputs, n_filters=filters)
+        rcu_low_2 = ResidualConvUnit(low_inputs, n_filters=filters)
         rcu_low = [rcu_low_1, rcu_low_2]
 
-        rcu_high_1 = ResidualConvUnit(high_inputs, n_filters=256)
-        rcu_high_2 = ResidualConvUnit(high_inputs, n_filters=256)
+        rcu_high_1 = ResidualConvUnit(high_inputs, n_filters=filters)
+        rcu_high_2 = ResidualConvUnit(high_inputs, n_filters=filters)
         rcu_high = [rcu_high_1, rcu_high_2]
 
-        fuse = MultiResolutionFusion(rcu_high, rcu_low,n_filters=256)
-        fuse_pooling = ChainedResidualPooling(fuse, n_filters=256)
-        output = ResidualConvUnit(fuse_pooling, n_filters=256)
+        fuse = MultiResolutionFusion(rcu_high, rcu_low,n_filters=filters)
+        fuse_pooling = ChainedResidualPooling(fuse, n_filters=filters)
+        output = ResidualConvUnit(fuse_pooling, n_filters=filters)
         return output
 
 
 
 def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', weight_decay=1e-5, is_training=True, upscaling_method="bilinear", pretrained_dir="models",substract_mean = True,
-                    individual_upsamp="False", paired_mode=1, used_heads=None, sparse_heads="False"):
+                    individual_upsamp="False", n_filters=256):
     """
     Builds the RefineNet model. 
 
@@ -190,111 +190,49 @@ def build_refinenet(inputs, num_classes= None, preset_model='RefineNet-Res101', 
     # if substract_mean:
     #     inputs = mean_image_subtraction(inputs)
 
-
     if preset_model == 'RefineNet-Res50':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
-            logits, end_points = resnet_v1.resnet_v1_50(inputs, is_training=is_training, scope='resnet_v1_50')
+            logits, end_points = resnet_v1.resnet_v1_50(inputs, is_training=is_training, scope='downsampling/resnet_v1_50')
             # RefineNet requires pre-trained ResNet weights
-            init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_50.ckpt'), slim.get_model_variables('resnet_v1_50'))
+            init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_50.ckpt'), slim.get_model_variables('downsampling/resnet_v1_50'))
     elif preset_model == 'RefineNet-Res101':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
-            logits, end_points = resnet_v1.resnet_v1_101(inputs, is_training=is_training, scope='resnet_v1_101')
+            logits, end_points = resnet_v1.resnet_v1_101(inputs, is_training=is_training, scope='downsampling/resnet_v1_101')
             # RefineNet requires pre-trained ResNet weights
-            init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_101.ckpt'), slim.get_model_variables('resnet_v1_101'))
+            init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_101.ckpt'), slim.get_model_variables('downsampling/resnet_v1_101'))
     elif preset_model == 'RefineNet-Res152':
         with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
-            logits, end_points = resnet_v1.resnet_v1_152(inputs, is_training=is_training, scope='resnet_v1_152')
+            logits, end_points = resnet_v1.resnet_v1_152(inputs, is_training=is_training, scope='downsampling/resnet_v1_152')
             # RefineNet requires pre-trained ResNet weights
-            init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_152.ckpt'), slim.get_model_variables('resnet_v1_152'))
+            init_fn = slim.assign_from_checkpoint_fn(os.path.join(pretrained_dir, 'resnet_v1_152.ckpt'), slim.get_model_variables('downsampling/resnet_v1_152'))
     else:
-    	raise ValueError("Unsupported ResNet model '%s'. This function only supports ResNet 101 and ResNet 152" % (preset_model))
+        raise ValueError("Unsupported ResNet model '%s'. This function only supports ResNet 101 and ResNet 152" % (preset_model))
 
-    
-    net_name = list(end_points.keys())[0].split("/")[0]
-    if used_heads is None or sparse_heads == "False":
-        us_stages = ["stamp_energy", "stamp_directions", "stamp_class", "stamp_bbox", "stamp_semseg"]
-    else:
-        us_stages = used_heads
+    with tf.variable_scope('upsampling'):
 
-    if individual_upsamp == "sub_task":
-        f = [end_points['pool5'], end_points['pool4'],
-             end_points['pool3'], end_points['pool2']]
-        g_outer_list = list()
-        for sub_b in range(paired_mode):
-            g_list = dict()
-            for stage in us_stages:
-                g = [None, None, None, None]
-                h = [None, None, None, None]
-
-                for i in range(4):
-                    h[i] = slim.conv2d(f[i], 256, 1)
-
-                g[0] = RefineBlock(high_inputs=None, low_inputs=h[0])
-                g[1] = RefineBlock(g[0], h[1])
-                g[2] = RefineBlock(g[1], h[2])
-                g[3] = RefineBlock(g[2], h[3])
-
-                g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
-
-                g_list[stage] = g
-            g_outer_list.append(g_list)
-
-        return g_outer_list, init_fn
-
-    elif individual_upsamp == "task":
         f = [end_points['pool5'], end_points['pool4'],
              end_points['pool3'], end_points['pool2']]
 
-        g_list = dict()
-        for stage in us_stages:
+        g_list = list()
+        for sub_b in individual_upsamp:
+
             g = [None, None, None, None]
             h = [None, None, None, None]
 
             for i in range(4):
-                h[i] = slim.conv2d(f[i], 256, 1)
+                h[i] = slim.conv2d(f[i], n_filters, 1)
 
-            g[0] = RefineBlock(high_inputs=None, low_inputs=h[0])
-            g[1] = RefineBlock(g[0], h[1])
-            g[2] = RefineBlock(g[1], h[2])
-            g[3] = RefineBlock(g[2], h[3])
+            g[0] = RefineBlock(high_inputs=None, low_inputs=h[0], filters=n_filters)
+            g[1] = RefineBlock(g[0], h[1], filters=n_filters)
+            g[2] = RefineBlock(g[1], h[2], filters=n_filters)
+            g[3] = RefineBlock(g[2], h[3], filters=n_filters)
 
             g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
 
-            g_list[stage] = g
+            g_list.append(g)
 
         return g_list, init_fn
-    else:
-        f = [end_points['pool5'], end_points['pool4'],
-             end_points['pool3'], end_points['pool2']]
 
-        g = [None, None, None, None]
-        h = [None, None, None, None]
-
-        for i in range(4):
-            h[i] = slim.conv2d(f[i], 256, 1)
-
-        g[0] = RefineBlock(high_inputs=None, low_inputs=h[0])
-        g[1] = RefineBlock(g[0], h[1])
-        g[2] = RefineBlock(g[1], h[2])
-        g[3] = RefineBlock(g[2], h[3])
-
-        g[3] = Upsampling(g[3], tf.shape(inputs)[1], tf.shape(inputs)[2])
-
-        # if upscaling_method.lower() == "conv":
-        #     net = ConvUpscaleBlock(net, 256, kernel_size=[3, 3], scale=2)
-        #     net = ConvBlock(net, 256)
-        #     net = ConvUpscaleBlock(net, 128, kernel_size=[3, 3], scale=2)
-        #     net = ConvBlock(net, 128)
-        #     net = ConvUpscaleBlock(net, 64, kernel_size=[3, 3], scale=2)
-        #     net = ConvBlock(net, 64)
-        # elif upscaling_method.lower() == "bilinear":
-        #     net = Upsampling(net, label_size)
-
-        if num_classes is not None:
-            net = slim.conv2d(g[3], num_classes, [1, 1], activation_fn=None, scope='logits')
-            return net, init_fn
-        else:
-            return g, init_fn
 
 
 def mean_image_subtraction(inputs, means=[123.68, 116.78, 103.94]):

@@ -105,15 +105,10 @@ def main(parsed):
         input = feed_head
 
     print("Initializing Model:" + args.model)
-    used_heads = set()
-    for _,assign in enumerate(args.training_assignements):
-        used_heads.add(assign["stamp_func"][0])
-    used_heads = list(used_heads)
-    used_heads.sort()
     # model has all possible output heads (even if unused) to ensure saving and loading goes smoothly
     network_heads, init_fn = build_dwd_net(
-        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy, substract_mean=False,
-        individual_upsamp = args.individual_upsamp, paired_mode=args.paired_data, used_heads=used_heads, sparse_heads=args.sparse_heads)
+        input, model=args.model, num_classes=nr_classes, pretrained_dir=resnet_dir, max_energy=args.max_energy,
+        individual_upsamp = args.individual_upsamp, assigns=args.training_assignements, substract_mean=False, n_filters=args.n_filters)
 
     # use just one image summary OP for all tasks
     # train
@@ -138,9 +133,9 @@ def main(parsed):
 
     # initialize tasks
     preped_assign = []
-    for assign in args.training_assignements:
+    for aid, assign in enumerate(args.training_assignements):
         [loss, optim, gt_placeholders, scalar_summary_op,
-         mask_placholders] = initialize_assignement(assign, imdb, network_heads, sess, data_layer, input, args)
+         mask_placholders] = initialize_assignement(aid, assign, imdb, network_heads, sess, data_layer, input, args)
         preped_assign.append(
             [loss, optim, gt_placeholders, scalar_summary_op, images_summary_op, images_placeholders, mask_placholders])
 
@@ -413,13 +408,13 @@ def post_assign_to_tensorboard(orig_assign, preped_assigns, network_heads, feed_
         #     network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
         #     in
         #     range(len(assign["ds_factors"]))]
-        for nw_heads_sub_b in network_heads:
-            nr_feature_maps = len(nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
 
-            [fetch_list.append(
-                nw_heads_sub_b[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps - (x + 1)]) for x
-                in
-                range(len(assign["ds_factors"]))]
+        for nw_head_key in network_heads.keys():
+            if i == int(nw_head_key.split("_")[0]):
+                nr_feature_maps = len(network_heads[nw_head_key])
+
+                [fetch_list.append(network_heads[nw_head_key][nr_feature_maps - (x + 1)]) for x
+                    in range(len(assign["ds_factors"]))]
 
 
         summary = sess.run(fetch_list, feed_dict=feed_dict)
@@ -478,8 +473,8 @@ def focal_loss(prediction_tensor, target_tensor, weights=None, alpha=0.25, gamma
     # return tf.reduce_mean(per_entry_cross_ent)
 
 
-def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input, args):
-    gt_placeholders = get_gt_placeholders(assign, imdb, args.paired_data,args.nr_classes[0],args)
+def initialize_assignement(aid, assign, imdb, network_heads, sess, data_layer, input, args):
+    gt_placeholders = get_gt_placeholders(assign, imdb, args.paired_data, args.nr_classes[0], args)
 
     loss_mask_placeholders = []
     for pair_nr in range(args.paired_data):
@@ -489,6 +484,7 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
     pair_contrib_loss = []
     for pair_nr in range(args.paired_data):
         debug_fetch = dict()
+        s_task_id = str(aid)+"_"+str(pair_nr)
         if assign["stamp_func"][0] == "stamp_directions":
             loss_components = []
             for x in range(len(assign["ds_factors"])):
@@ -503,7 +499,7 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
                 mask = tf.squeeze(split1 > 0, -1)
                 debug_fetch[str(x)]["mask"] = mask
 
-                masked_pred = tf.boolean_mask(network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][x], mask)
+                masked_pred = tf.boolean_mask(network_heads[s_task_id][x], mask)
                 debug_fetch[str(x)]["masked_pred"] = masked_pred
 
                 masked_gt = tf.boolean_mask(gt_placeholders[x], mask)
@@ -526,11 +522,11 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
 
                 loss_components.append(acos_inner)
         else:
-            nr_feature_maps = len(network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]])
+            nr_feature_maps = len(network_heads[s_task_id])
             nr_ds_factors = len(assign["ds_factors"])
             if assign["stamp_args"]["loss"] == "softmax":
                 loss_components = [tf.nn.softmax_cross_entropy_with_logits(
-                    logits=network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                    logits=network_heads[s_task_id][
                         nr_feature_maps - nr_ds_factors + x],
                     labels=gt_placeholders[pair_nr][x], dim=-1) for x in range(nr_ds_factors)]
                 # loss_components = [focal_loss(prediction_tensor=network_heads[assign["stamp_func"][0]][assign["stamp_args"]["loss"]][nr_feature_maps-nr_ds_factors+x],
@@ -538,13 +534,13 @@ def initialize_assignement(assign, imdb, network_heads, sess, data_layer, input,
 
 
                 for x in range(nr_ds_factors):
-                    debug_fetch["logits_" + str(x)] = network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                    debug_fetch["logits_" + str(x)] = network_heads[s_task_id][
                         nr_feature_maps - nr_ds_factors + x]
                     debug_fetch["labels" + str(x)] = gt_placeholders[pair_nr][x]
                 debug_fetch["loss_components_softmax"] = loss_components
             else:
                 loss_components = [tf.losses.mean_squared_error(
-                    predictions=network_heads[pair_nr][assign["stamp_func"][0]][assign["stamp_args"]["loss"]][
+                    predictions=network_heads[s_task_id][
                         nr_feature_maps - nr_ds_factors + x],
                     labels=gt_placeholders[pair_nr][x], reduction="none") for x in range(nr_ds_factors)]
                 debug_fetch["loss_components_mse"] = loss_components

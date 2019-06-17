@@ -53,7 +53,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of  the image")
-        parser.add_argument("--max_edge", type=int, default=256*3,
+        parser.add_argument("--max_edge", type=int, default=256*4,
                             help="if there is no cropping - scale such that  the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -80,7 +80,7 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'adam' # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
-    regularization_coefficient_downsamp = 0.02  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
+    regularization_coefficient_downsamp = 0.4  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
 
     parser.add_argument("--regularization_coefficient_downsamp", type=float, default=regularization_coefficient_downsamp,
                         help="For downsampling/feature learning")
@@ -172,10 +172,25 @@ def main():
     # group all (sub) tasks in the according list
     # 0_1 means assign:0, sub_task:1
     upsamp_config = [
-                     ["0_0", "1_0", "2_0"], # one head per subtask
-                     ["0_1", "1_1", "2_1"]
+                     ["0_0", "1_0", "2_0",
+                      "0_1", "1_1", "2_1"]# one head
     ]
-    parser.add_argument('--individual_upsamp', type=list, default="upsamp_config", help="how many different ubsampling nets to use")
+
+    # upsamp_config = [
+    #                  ["0_0", "1_0", "2_0"], # one head per subtask
+    #                  ["0_1", "1_1", "2_1"]
+    # ]
+
+    # upsamp_config = [
+    #                  ["0_0", "0_1"], # one head per loss type
+    #                  ["1_0", "1_1"],
+    #                  ["2_0", "2_1"],
+    # ]
+
+
+    parser.add_argument('--individual_upsamp', type=list, default=upsamp_config, help="how many different ubsampling nets to use")
+
+    parser.add_argument('--n_filters', type=int, default=32, help="number of filters in refinenet-upsampling blocks")
 
     parser.add_argument('--sparse_heads', type=str, default="True", help="only initialize used heads (True/False)")
 
@@ -245,7 +260,7 @@ def main():
 
     # when assigned in both overrides stuff defined in assign
     parser.add_argument('--combined_assignements', type=list,
-                        default=[{"assigns": [0,1,2], "loss_factors": [2,2], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": None, "" "Itrs": Itrs_combined},
+                        default=[{"assigns": [0,1,2], "loss_factors": [2,2,5], "pair_balancing":[[3,1],[1,1]],   "Running_Mean_Length": None, "" "Itrs": Itrs_combined},
                                  #{"assigns": [0,2], "loss_factors": [2,1],   "Running_Mean_Length": 5, "Itrs": Itrs_combined},
                                  ],help="configure how groundtruth is built, see datasets.fcn_groundtruth")
     
