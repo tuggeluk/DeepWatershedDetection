@@ -92,9 +92,14 @@ class deep_scores(imdb):
       allowed_names = f.readlines()
 
     allowed_names = [x.strip() for x in allowed_names]
+    # strip number.
+    allowed_names = [x.split(",")[1] for x in allowed_names]
+
+
 
     # strip extension
     images = [x[:-4] for x in images]
+
 
     # intersection of existing and allowed files
     image_index = list(set(allowed_names).intersection(images))
