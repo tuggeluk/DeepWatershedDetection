@@ -17,6 +17,7 @@ __sets = {}
 from datasets.pascal_voc import pascal_voc
 from datasets.coco import coco
 from datasets.deep_scores import deep_scores
+from datasets.deep_scoresV2 import deep_scoresV2
 from datasets.deep_scores_300dpi import deep_scores_300dpi
 from datasets.musicma import musicma
 
@@ -31,6 +32,12 @@ for year in ['2017']:
   for split in ['train', 'val', 'test', 'debug','train100','train10000', 'test100']:
     name = 'DeepScores_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: deep_scores(split, year))
+
+# Set up DeepScores dataset
+for year in ['2020']:
+  for split in ['train', 'val']:
+    name = 'DeepScoresV2_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: deep_scoresV2(split, year))
 
 # Set up DeepScores_300dpi dataset
 for year in ['2017']:

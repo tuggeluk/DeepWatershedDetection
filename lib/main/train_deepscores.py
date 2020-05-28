@@ -60,11 +60,16 @@ def main():
     regularization_coefficient = 0  # rnd(3, 6) # gets a number (log uniformly) on interval 10^(-3) to 10^(-6)
     parser.add_argument("--regularization_coefficient", type=float, default=regularization_coefficient,
                         help="Value for regularization parameter")
-    dataset = "DeepScores_2017_train"
+    dataset = "DeepScoresV2_2020_train"
     if dataset == "DeepScores_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_2017_train", help="DeepScores, voc or coco")
         parser.add_argument("--dataset_validation", type=str, default="DeepScores_2017_train",
                             help="DeepScores, voc, coco or no - validation set")
+    elif dataset == "DeepScoresV2_2020_train":
+        parser.add_argument("--dataset", type=str, default="DeepScoresV2_2020_train",
+                            help="DeepScoresV2, voc or coco")
+        parser.add_argument("--dataset_validation", type=str, default="DeepScoresV2_2020_val",
+                            help="DeepScoresV2, voc, coco or no - validation set")
     elif dataset == "DeepScores_300dpi_2017_train":
         parser.add_argument("--dataset", type=str, default="DeepScores_300dpi_2017_train",
                             help="DeepScores, voc or coco")
