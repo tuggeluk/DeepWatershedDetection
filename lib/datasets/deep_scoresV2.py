@@ -140,6 +140,7 @@ class deep_scoresV2(imdb):
     format.
     """
 
+
     anns = self.o.get_anns(img_id=index)
     boxes = anns['a_bbox']
     boxes = np.round(np.stack(boxes.to_numpy())).astype(np.uint16)
