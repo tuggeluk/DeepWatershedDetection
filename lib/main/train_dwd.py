@@ -606,7 +606,7 @@ def get_checkpoint_dir(args):
         os.makedirs(tbdir)
     runs_dir = os.listdir(tbdir)
     if args.continue_training == "True":
-        tbdir = tbdir + "/" + str(len(runs_dir) - 1)
+        tbdir = tbdir + "/" + "run_" + str(len(runs_dir) - 1)
     else:
         tbdir = tbdir + "/" + "run_" + str(len(runs_dir))
         os.makedirs(tbdir)
