@@ -158,9 +158,9 @@ class deep_scoresV2(imdb):
       overlaps[ind, gt_classes[ind]-1] = 1.0
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
-
+    max(gt_classes)
     return {'boxes': boxes,
-            'gt_classes': gt_classes,
+            'gt_classes': gt_classes-1, # make zero relative
             'gt_overlaps': overlaps,
             'flipped': False,
             'seg_areas': seg_areas}

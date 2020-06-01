@@ -118,16 +118,16 @@ def main():
         5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 0, "help": 0, "Itrs": 10000},
-                            {"assign": 1, "help": 0, "Itrs": 10000},
-                            {"assign": 2, "help": 0, "Itrs": 10000},
-                            {"assign": 0, "help": 0, "Itrs": 10000}
+                            {"assign": 1, "help": 0, "Itrs": 1},
+                            {"assign": 1, "help": 0, "Itrs": 1},
+                            {"assign": 2, "help": 0, "Itrs": 1},
+                            {"assign": 0, "help": 0, "Itrs": 1}
 
                         ], help="configure how assignements get repeated")
 
     parser.add_argument('--combined_assignements', type=list,
                         default=[
-                            {"assigns": [0, 1, 2], "loss_factors": [2, 1, 1], "Running_Mean_Length": 5, "Itrs": 100000}],
+                            {"assigns": [0, 1, 2], "loss_factors": [2, 1, 1], "Running_Mean_Length": 5, "Itrs": 1}],
                         help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
     dict_info = {'augmentation': augmentation_type, 'learning_rate': learning_rate, 'Itrs_energy': Itrs0,
