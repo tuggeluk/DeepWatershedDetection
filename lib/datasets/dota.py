@@ -21,22 +21,22 @@ import pickle
 import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
+from datasets.voc_eval import parse_rec_dota
 from main.config import cfg
 import random
 import math
-import sys
 
 
-class deep_scores_300dpi(imdb):
+class dota(imdb):
   def __init__(self, image_set, year, devkit_path=None):
-    imdb.__init__(self, 'DeepScores_300dpi' + year + '_' + image_set)
+    imdb.__init__(self, 'Dota' + year + '_' + image_set)
     self._year = year
     self._image_set = image_set
     self._devkit_path = self._get_default_path() if devkit_path is None \
       else devkit_path
     self._data_path = os.path.join(self._devkit_path, 'segmentation_detection')
     self._split_path = os.path.join(self._devkit_path, 'train_val_test')
-    self._classes = list(pa.read_csv(self._devkit_path + "/DeepScores_classification/class_names.csv", header=None)[1])
+    self._classes = list(pa.read_csv(self._devkit_path + "/Dota_classification/class_names.csv", header=None)[1])
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._image_ext = '.png'
@@ -106,7 +106,7 @@ class deep_scores_300dpi(imdb):
     """
     Return the default path where PASCAL VOC is expected to be installed.
     """
-    return os.path.join(cfg.DATA_DIR, 'DeepScores_300dpi_' + self._year)
+    return os.path.join(cfg.DATA_DIR, 'Dota_' + self._year)
 
   def gt_roidb(self):
     """
@@ -133,7 +133,7 @@ class deep_scores_300dpi(imdb):
     return gt_roidb
 
   def rpn_roidb(self):
-    if int(self._year) == 2017 or self._image_set != 'debug':
+    if int(self._year) == 2018 or self._image_set != 'debug':
       gt_roidb = self.gt_roidb()
       rpn_roidb = self._load_rpn_roidb(gt_roidb)
       roidb = imdb.merge_roidbs(gt_roidb, rpn_roidb)
@@ -156,9 +156,8 @@ class deep_scores_300dpi(imdb):
     Load image and bounding boxes info from XML file in the PASCAL VOC
     format.
     """
-    filename = os.path.join(self._data_path, 'xml_annotations', index + '.xml')
-    tree = ET.parse(filename)
-    objs = tree.findall('object')
+    filename = os.path.join(self._data_path, 'xml_annotations', index + '.txt')
+    objs = parse_rec_dota(filename)
     num_objs = len(objs)
 
     boxes = np.zeros((num_objs, 4), dtype=np.uint16)
@@ -167,18 +166,12 @@ class deep_scores_300dpi(imdb):
     # "Seg" area for pascal is just the box area
     seg_areas = np.zeros((num_objs), dtype=np.float32)
 
-    size = tree.find("size")
-    height = float(size.find("height").text)
-    width = float(size.find("width").text)
-    # Load object bounding boxes into a data frame.
     for ix, obj in enumerate(objs):
-      bbox = obj.find('bndbox')
-      # Pixel indexes should already be 0 bases
-      x1 = np.floor(float(bbox.find('xmin').text)*width)
-      y1 = np.floor(float(bbox.find('ymin').text)*height)
-      x2 = np.floor(float(bbox.find('xmax').text)*width)
-      y2 = np.floor(float(bbox.find('ymax').text)*height)
-      cls = self._class_to_ind[obj.find('name').text]#.lower().strip()]
+      x1 = objs[ix]['bbox'][0]
+      y1 = objs[ix]['bbox'][1]
+      x2 = objs[ix]['bbox'][2]
+      y2 = objs[ix]['bbox'][3]
+      cls = self._class_to_ind[objs[ix]['name'].lower().strip()]
       boxes[ix, :] = [x1, y1, x2, y2]
       gt_classes[ix] = cls
       overlaps[ix, cls] = 1.0
@@ -192,6 +185,7 @@ class deep_scores_300dpi(imdb):
             'flipped': False,
             'seg_areas': seg_areas}
 
+
   def _get_comp_id(self):
     comp_id = (self._comp_id + '_' + self._salt if self.config['use_salt']
                else self._comp_id)
@@ -202,7 +196,7 @@ class deep_scores_300dpi(imdb):
     path = os.path.join(
       self._devkit_path,
       'results',
-      'musical' + self._year,
+      'dota' + self._year,
       'Main',
       filename)
     return path
@@ -230,7 +224,7 @@ class deep_scores_300dpi(imdb):
       self._devkit_path,
       'segmentation_detection',
       'xml_annotations',
-      '{:s}.xml')
+      '{:s}.txt')
     imagesetfile = os.path.join(
       self._devkit_path,
       'train_val_test',
@@ -241,13 +235,12 @@ class deep_scores_300dpi(imdb):
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
     if not os.path.isdir(output_dir):
       os.mkdir(output_dir)
+
     ovthresh_list = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     for ovthresh in ovthresh_list:
-      res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
       aps = []
-      sum_aps, present = 0, 0
       for i, cls in enumerate(self._classes):
-        if cls in ['clef15', 'noteheadDoubleWholeSmall', 'flag64thUp', 'articTenutoBelow', 'rest64th', 'flag8thDownSmall', 'restHBar', 'caesura', 'restLonga', 'restMaxima', 'rest32nd', 'dynamicRinforzando2', 'noteheadWholeSmall', 'dynamicPPP', 'flag128thUp', 'flag64thDown', 'articStaccatissimoAbove', 'articStaccatissimoBelow', 'restDoubleWhole', 'noteheadDoubleWhole', 'articMarcatoBelow', 'fingering5', 'fingering4', 'fingering1', 'fingering0', 'fingering3', 'fingering2', 'timeSig9', 'timeSig5', 'timeSig0', 'flag128thDown', 'timeSig16', 'timeSig12', 'dynamicPPPPP', 'rest128th', 'dynamicFortePiano', 'flag32ndUp', 'noteheadHalfSmall', 'flag8thUpSmall', 'articMarcatoAbove']:
+        if cls == '__background__':
           continue
         filename = self._get_voc_results_file_template().format(cls)
         rec, prec, ap = voc_eval(
@@ -257,19 +250,27 @@ class deep_scores_300dpi(imdb):
         print(('AP for {} = {:.4f}'.format(cls, ap)))
         with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
           pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
-        if math.isnan(ap):
-          res_file.write(cls + " " + str(0) + "\n")
-        else:
-          res_file.write(cls + " " + '{:.3f}'.format(ap) + "\n")
-          sum_aps += ap
-        present += 1
-      res_file.write('\n\n\n')
-      res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
-      res_file.close()
-
       print(('Mean AP = {:.4f}'.format(np.mean(aps))))
       print('~~~~~~~~')
       print('Results:')
+      # open the file where we want to save the results
+      if path is not None:
+        res_file = open(os.path.join('/DeepWatershedDetection' + path, 'res-' + str(ovthresh) + '.txt'),"w+")
+        len_ap = len(aps)
+        sum_aps = 0
+        present = 0
+        for i in range(len_ap):
+          print(('{:.3f}'.format(aps[i])))
+          if math.isnan(aps[i]):
+            res_file.write(str(0) + "\n")
+          else:
+            res_file.write(('{:.3f}'.format(aps[i])) + "\n")
+            sum_aps += aps[i]
+          present += 1
+        res_file.write('\n\n\n')
+        res_file.write("Mean Average Precision: " + str(sum_aps / float(present)))
+        res_file.close()
+
       print(('{:.3f}'.format(np.mean(aps))))
     print('~~~~~~~~')
     print('')
@@ -279,7 +280,6 @@ class deep_scores_300dpi(imdb):
     print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
     print('-- Thanks, The Management')
     print('--------------------------------------------------------------')
-
 
   def _do_matlab_eval(self, output_dir='output'):
     print('-----------------------------------------------------')
@@ -319,6 +319,6 @@ class deep_scores_300dpi(imdb):
 
 if __name__ == '__main__':
 
-  d = deep_scores_300dpi('trainval', '2017')
+  d = dota('trainval', '2018')
   res = d.roidb
 

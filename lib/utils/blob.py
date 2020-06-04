@@ -31,13 +31,10 @@ def im_list_to_blob(ims):
   return blob
 
 
-def prep_im_for_blob(im, pixel_means, global_scale, args):
+def prep_im_for_blob(im, global_scale, args):
   """Mean subtract and scale an image for use in a blob."""
   im = im.astype(np.float32, copy=False)
 
-  # substract mean
-  if args.substract_mean == "True":
-    im -= pixel_means
 
   # do global scaling
   im = cv2.resize(im, None, None, fx=global_scale, fy=global_scale,

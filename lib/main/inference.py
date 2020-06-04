@@ -4,77 +4,137 @@ import cv2
 import pickle as cPickle
 from PIL import Image
 import sys
-
+sys.path.insert(0, '/DeepWatershedDetection/lib')
+sys.path.insert(0, os.path.dirname(__file__)[:-4])
+import pdb
 from datasets.factory import get_imdb
 from main.dws_detector import DWSDetector
 from main.config import cfg
 import argparse
+import time
 
 
 def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
-    path = "experiments/music/pretrain_lvl_semseg/RefineNet-Res101/run_11"
-    net = DWSDetector(imdb, path)
-    all_boxes = test_net(net, imdb, parsed, path)
-    # all_boxes = test_net(None, imdb, parsed)
+    if parsed.dataset == 'DeepScores':
+        path = os.path.join("/experiments/music/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+    elif parsed.dataset == "DeepScores_300dpi":
+        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/", parsed.net_type, parsed.net_id)
+    elif parsed.dataset == "MUSCIMA":
+        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+    elif parsed.dataset == "Dota":
+        path = os.path.join("/experiments/realistic/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+    elif parsed.dataset == "VOC":
+        path = os.path.join("/experiments/realistic/pretrain_lvl_class", parsed.net_type, parsed.net_id)
+    if not parsed.debug:
+        net = DWSDetector(imdb=imdb, path=path, pa=parsed, individual_upsamp=parsed.individual_upsamp)
+
+        all_boxes = test_net(net, imdb, parsed, path)
+    else:
+        all_boxes = test_net(False, imdb, parsed, path, parsed.debug)
 
 
-def test_net(net, imdb, parsed, path):
+def test_net(net, imdb, parsed, path, debug=False):
+    """
+    This function does inference on the images
+    Parameters:
+        net - the net we use for the inference
+        imdb - the dataset made into compatible form
+        parsed - parameters passed from the argparser
+        path - the path (string format) for the location of the net
+        debug - set it to true if the inference has been already done, and you just want to load the values. Used for debugging purposes.
+    """
     output_dir = cfg.OUT_DIR
     num_images = len(imdb.image_index)
-    # all detections are collected into:
-    # all_boxes[cls][image] = N x 5 array of detections in
-    # (x1, y1, x2, y2, class)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(imdb.num_classes)]
-    # output_dir = get_output_dir(imdb, output_dir)
-    # timers
+
     det_file = os.path.join(output_dir, 'detections.pkl')
 
     print(num_images)
-    for i in range(num_images):
-        if i % 500 == 0:
-            print(i)
 
-        im = Image.open(imdb.image_path_at(i)).convert('L')
-        im = np.asanyarray(im)
-        im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-        if im.shape[0] * im.shape[1] > 3837 * 2713:
-            continue
+    total_time = []
+    if not debug:
+        for i in range(num_images):
+            start_time = time.time()
+            if i%500 == 0:
+                print(i)
+            if "realistic" not in path:
+                im = Image.open(imdb.image_path_at(i)).convert('L')
+            else:
+                im = Image.open(imdb.image_path_at(i))
+            im = np.asanyarray(im)
+            im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
+            if im.shape[0]*im.shape[1]>3837*2713:
+                continue
 
-        boxes = net.classify_img(im, 1, 4)
+            boxes = net.classify_img(im, 1, 4)
+            if len(boxes) > 800:
+                boxes = []
+            no_objects = len(boxes)
+            for j in range(len(boxes)):
+                # invert scaling for Boxes
+                boxes[j] = np.array(boxes[j])
+                boxes[j][:-1] = (boxes[j][:-1] * (1 / parsed.scaling)).astype(np.int)
 
-        if len(boxes) > 800:
-            boxes = []
-        no_objects = len(boxes)
-        for j in range(len(boxes)):
-            # invert scaling for Boxes
-            boxes[j] = np.array(boxes[j])
-            boxes[j][:-1] = (boxes[j][:-1] * (1 / parsed.scaling)).astype(np.int)
+                class_of_symbol = boxes[j][4]
+                all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
+            end_time = time.time()
+            total_time.append(end_time - start_time)
+        print(total_time)
+        sum_time = 0
+        for t in total_time: sum_time += t
+        print(sum_time)
 
-            class_of_symbol = boxes[j][4]
-            all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
+        # convert to np array
+        for i1 in range(len(all_boxes)):
+            for i2 in range(len(all_boxes[i1])):
+                all_boxes[i1][i2] = np.asarray(all_boxes[i1][i2])
 
-    # convert to np array
-    for i1 in range(len(all_boxes)):
-        for i2 in range(len(all_boxes[i1])):
-            all_boxes[i1][i2] = np.asarray(all_boxes[i1][i2])
+        # inspect all_boxes variable
+        with open(det_file, 'wb') as f:
+            cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
-    # inspect all_boxes variable
-    with open(det_file, 'wb') as f:
-        cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+    else:
+        pdb.set_trace()
+        with open(det_file, "rb") as f:
+            all_boxes = cPickle.load(f)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir, path)
     return all_boxes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=0.5, help="scale factor applied to images after loading")
-    parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_val", help="dataset to perform inference on")
+    parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
+    dataset = 'DeepScores'
+    if dataset == 'MUSCIMA':
+        parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
+    elif dataset == 'DeepScores':
+        parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
+    elif dataset == 'DeepScores_300dpi':
+        parser.add_argument("--dataset", type=str, default='DeepScores_300dpi', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--test_set", type=str, default="DeepScores_300dpi_2017_val", help="dataset to perform inference on, we use val for evaluation, test can be used only visually")
+    elif dataset == 'Dota':
+        parser.add_argument("--dataset", type=str, default='Dota', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--test_set", type=str, default="Dota_2018_debug", help="dataset to perform inference on")
+    elif dataset == 'VOC':
+        parser.add_argument("--dataset", type=str, default='VOC', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
+        parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
+    parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of resnet used (RefineNet-Res152/101)")
+    parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
 
-    # configure output heads used ---> have to match trained model
+    parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
+    parser.add_argument("--energy_loss", type=str, default="softmax", help="type of the energy loss")
+    parser.add_argument("--class_loss", type=str, default="softmax", help="type of the class loss")
+    parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
+    parser.add_argument("--debug", type=bool, default=False, help="if set to True, it is in debug mode, and instead of running the images on the net, it only evaluates from a previous run")
+
+
     parsed = parser.parse_known_args()
     main(parsed)
+

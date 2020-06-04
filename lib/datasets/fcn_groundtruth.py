@@ -108,7 +108,7 @@ def get_partial_marker(canvas_shape, coords, mark):
     crop_coords[[0,2]] = np.minimum(crop_coords[[0,2]], canvas_shape[1]-1)
 
     # if a dimension collapses kill element
-    if crop_coords[0] == crop_coords[1] or crop_coords[2]==crop_coords[3]:
+    if crop_coords[0] == crop_coords[2] or crop_coords[1]==crop_coords[3]:
         return None, None
 
     # if marker has bigger size than coords
@@ -235,8 +235,23 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     for bbox in sampled_gt:
         stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
         stamp, coords = get_partial_marker(canvas.shape,coords,stamp)
+
         if stamp is None:
+            print("skipping element")
+            stamp, coords = objectness_settings["stamp_func"][1](bbox, objectness_settings["stamp_args"], nr_classes)
+            stamp, coords = get_partial_marker(canvas.shape, coords, stamp)
+            print(bbox)
             continue #skip this element
+
+        if objectness_settings["stamp_args"]["loss"] == "softmax":
+            stamp_zeros = stamp[:, :, 0] == 1
+            stamp_zeros = np.expand_dims(stamp_zeros,-1).astype("int")
+            stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
+
+        else:
+            stamp_zeros = stamp == 0
+            stamp_zeros = stamp_zeros.astype("int")
+            stamp = stamp * ((stamp_zeros*-1)+1) + canvas[coords[1]:coords[3], coords[0]:coords[2]] * stamp_zeros
 
         if objectness_settings["overlap_solution"] == "max":
             if objectness_settings["stamp_args"]["loss"]=="softmax":
@@ -245,7 +260,7 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
             else:
                 canvas[coords[1]:coords[3], coords[0]:coords[2]] = np.expand_dims(np.max(np.concatenate([canvas[coords[1]:coords[3], coords[0]:coords[2]], stamp],-1),-1),-1)
         elif objectness_settings["overlap_solution"] == "no":
-            canvas[coords[1]:coords[3],coords[0]:coords[2]] = stamp
+            canvas[coords[1]:coords[3], coords[0]:coords[2]] = stamp
         elif objectness_settings["overlap_solution"] == "nearest":
             closest_mask = get_closest_mask(coords, used_coords)
             if objectness_settings["stamp_args"]["loss"] == "softmax":
@@ -273,9 +288,11 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
     if objectness_settings["downsample_marker"]:
         if objectness_settings["stamp_args"]["loss"] == "softmax":
             sm_dim = canvas.shape[-1]
-            canvas_un_oh = np.argmax(canvas, -1)
+            canvas_un_oh = np.argmax(canvas, -1).astype("uint8")
+
             for x in objectness_settings["ds_factors"][1:]:
-                resized = np.round(cv2.resize(canvas_un_oh, None, None, 1.0/x, 1.0/x, cv2.INTER_NEAREST))
+                shape = (int(np.ceil(float(canvas_un_oh.shape[1]) / x)), int(np.ceil(float(canvas_un_oh.shape[0]) / x)))
+                resized = np.round(cv2.resize(canvas_un_oh, shape, cv2.INTER_NEAREST))
                 resized_oh = np.eye(sm_dim)[resized[:,:]]
                 maps_list.append(np.expand_dims(resized_oh,0))
         else:
@@ -286,7 +303,8 @@ def get_markers(size, gt, nr_classes, objectness_settings, downsample_ind = 0, m
                 #         rez_l = []
                 #         rez_l.append()
                 # else:
-                resized = cv2.resize(canvas, None, None, 1.0 / x, 1.0 / x, cv2.INTER_NEAREST)
+                shape = (int(np.ceil(float(canvas.shape[1]) / x)), int(np.ceil(float(canvas.shape[0]) / x)))
+                resized = cv2.resize(canvas, shape, cv2.INTER_NEAREST)
                 if len(resized.shape) < len(canvas.shape):
                     maps_list.append(np.expand_dims(np.expand_dims(resized, -1),0))
                 else:
@@ -415,6 +433,11 @@ def get_direction_marker(size, shape, hole):
 
     return marker
 
+def stamp_semseg(bbox,args,nr_classes):
+    if bbox is None:
+        return nr_classes
+
+    print("not implemented")
 
 def stamp_energy(bbox,args,nr_classes):
 
@@ -551,6 +574,9 @@ def stamp_class(bbox, args, nr_classes):
               topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
 
 
+    # transpose bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1, 0]]
+
     # piggy back on energy marker
     marker = get_energy_marker(marker_size, args["shape"])
 
@@ -601,6 +627,8 @@ def stamp_bbox(bbox, args, nr_classes):
     coords = [topleft[0],topleft[1],
               topleft[0]+marker_size[1],topleft[1]+marker_size[0]]
 
+    # transpose bc of wierd bbox definition
+    marker_size = np.asarray(marker_size)[[1, 0]]
 
     # piggy back on energy marker
     marker = get_energy_marker(marker_size, args["shape"])
@@ -688,7 +716,7 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
     # add mean
     #image += cfg.PIXEL_MEANS[0][0][[0,1,2]]
     if len(image.shape)==3 and  image.shape[2]>=3:
-        image = image[:,:,[2,1,0]] # Switch to rgb
+        # image = image[:,:,[2,1,0]] # Switch to rgb
         im = Image.fromarray(image.astype("uint8"))
     else:
         im = Image.fromarray(np.squeeze(image.astype("uint8"),-1))
@@ -709,7 +737,7 @@ def overlayed_image(image,gt_boxes,pred_boxes,fill=False,show=False):
         for row in pred_boxes:
             draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill=fill[1], outline=outline[1])
     if show:
-        im.save(sys.argv[0][:-24] + "inp.png")
+        im.save(sys.argv[0][:-17] + "inp.png")
         im.show()
     return np.asarray(im).astype("uint8")
 
