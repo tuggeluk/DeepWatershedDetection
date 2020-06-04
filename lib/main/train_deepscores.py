@@ -53,7 +53,7 @@ def main():
     parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="semseg",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
-    learning_rate = 5e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
+    learning_rate = 5e-5  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Learning rate for the Optimizer")
     optimizer = 'rmsprop'  # at the moment it supports only 'adam', 'rmsprop' and 'momentum'
     parser.add_argument("--optim", type=str, default=optimizer, help="type of the optimizer")
@@ -96,7 +96,7 @@ def main():
     parser.add_argument('--training_assignements', type=list,
                         default=[
                             # energy markers
-                            {'ds_factors': [1, 8, 16, 32], 'downsample_marker': True, 'overlap_solution': 'max',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg', 'mask_zeros': False,
                              'stamp_args': {'marker_dim': (17, 17), 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "linear"}},
@@ -118,10 +118,10 @@ def main():
         5000, 10000), ran.randint(5000, 30000)
     parser.add_argument('--do_assign', type=list,
                         default=[
-                            {"assign": 1, "help": 0, "Itrs": 1},
-                            {"assign": 1, "help": 0, "Itrs": 1},
-                            {"assign": 2, "help": 0, "Itrs": 1},
-                            {"assign": 0, "help": 0, "Itrs": 1}
+                            {"assign": 0, "help": 0, "Itrs": 20000},
+                            {"assign": 1, "help": 0, "Itrs": 20000},
+                            {"assign": 2, "help": 0, "Itrs": 20000},
+                            {"assign": 0, "help": 0, "Itrs": 20000}
 
                         ], help="configure how assignements get repeated")
 
