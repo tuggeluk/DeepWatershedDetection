@@ -643,6 +643,12 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     #TODO get actual predictions
     input_pred = overlayed_image(blob["data"][0], gt_boxes=None, pred_boxes=blob["gt_boxes"][0])
 
+    # stack if image has only one channel
+    if len(input_gt.shape) == 2 or input_gt.shape[-1] == 1:
+        input_gt = np.stack((input_gt, input_gt, input_gt), -1)
+    if len(input_pred.shape) == 2 or input_pred.shape[-1] == 1:
+        input_pred = np.stack((input_pred, input_pred, input_pred), -1)
+
     # concat inputs
     conc = np.concatenate((input_gt, np.zeros((input_gt.shape[0],pix_spacer,3)).astype("uint8"), input_pred), axis = 1)
     # im = Image.fromarray(conc)

@@ -467,7 +467,7 @@ def stamp_energy(bbox,args,nr_classes):
         # use bbox size
 
         # determine marker size
-        marker_size = (int(args["size_percentage"]*(bbox[3]-bbox[1])),int(args["size_percentage"]*(bbox[2]-bbox[0])))
+        marker_size = (int(np.ceil(args["size_percentage"]*(bbox[3]-bbox[1]))),int(np.ceil(args["size_percentage"]*(bbox[2]-bbox[0]))))
 
     else:
         marker_size = args["marker_dim"]
