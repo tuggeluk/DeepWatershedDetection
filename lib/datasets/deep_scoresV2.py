@@ -38,10 +38,15 @@ class deep_scoresV2(imdb):
 
     self._data_path = self._devkit_path + "/images"
 
+    self.blacklist = ["staff"]
+
     self.o = OBBAnns(self._devkit_path+'/deepscores_oriented_train.json')
     self.o.load_annotations()
 
+    self.blacklist_index = [k for (k, v) in self.o.get_cats().items() if v["name"] in self.blacklist]
+
     self._classes = [v["name"] for (k, v) in self.o.get_cats().items() if v["annotation_set"] == 'deepscores']
+
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
 
@@ -145,9 +150,13 @@ class deep_scoresV2(imdb):
     boxes = anns['a_bbox']
     boxes = np.round(np.stack(boxes.to_numpy())).astype(np.uint16)
 
-    num_objs = boxes.shape[0]
-
     gt_classes = np.squeeze(np.stack(anns['cat_id'].to_numpy()).astype(np.int32))
+
+    blacklisted_anns = [x not in self.blacklist_index for x in gt_classes]
+    boxes = boxes[blacklisted_anns]
+    gt_classes = gt_classes[blacklisted_anns]
+
+    num_objs = boxes.shape[0]
     overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
 
     # "Seg" area for pascal is just the box area

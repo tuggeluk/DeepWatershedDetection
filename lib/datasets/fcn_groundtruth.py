@@ -487,12 +487,16 @@ def stamp_energy(bbox,args,nr_classes):
         1==1 # do nothing
     elif args["energy_shape"] == "root":
         marker = np.sqrt(marker)
-        marker = marker/np.max(marker)* (cfg.TRAIN.MAX_ENERGY-1)
+        marker = marker/np.max(marker) * (cfg.TRAIN.MAX_ENERGY-1)
     elif args["energy_shape"] == "quadratic":
         marker = np.square(marker)
         marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY-1)
 
     if args["loss"]== "softmax":
+        # extra safety
+        marker[marker < 0] = 0
+        marker[marker > cfg.TRAIN.MAX_ENERGY] = cfg.TRAIN.MAX_ENERGY
+
         marker = np.round(marker).astype(np.int32)
         marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
         # turn into one-hot softmax targets
@@ -530,7 +534,7 @@ def get_energy_marker(size, shape):
         y_coords = np.array(range(size[0]))+0.5
         x_coords = np.array(range(size[1]))+0.5
         coords_grid = np.stack(np.meshgrid(y_coords, x_coords))
-
+        coords_grid[coords_grid < 1] = 1
         marker = np.sqrt(np.square((coords_grid[0] - center[0])/(size[0])) + np.square((coords_grid[1] - center[1])/(size[1])))
         largest = max(marker[int(center[1]),0],marker[0,int(center[0])])
         marker = 1-(marker / float(np.max(largest)))

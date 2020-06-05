@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=960,
+        parser.add_argument("--max_edge", type=int, default=2500,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -113,7 +113,7 @@ def main():
                             #  },
 
                             # energy markers
-                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'max',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'max',
                              'stamp_func': 'stamp_energy', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': None, 'size_percentage': 0.8, "shape": "oval",
                                             "loss": "softmax", "energy_shape": "quadratic"},
@@ -128,7 +128,7 @@ def main():
                              },
 
                             # bbox markers
-                            {'ds_factors': [1, 8], 'downsample_marker': True, 'overlap_solution': 'nearest',
+                            {'ds_factors': [1], 'downsample_marker': True, 'overlap_solution': 'nearest',
                              'stamp_func': 'stamp_bbox', 'layer_loss_aggregate': 'avg',
                              'stamp_args': {'marker_dim': [16,16], 'size_percentage': 1, "shape": "oval", "loss": "reg"},
                              'balance_mask': 'mask_bg'
@@ -137,7 +137,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10, 10, 10, 10, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10000, 10000, 10000, 10000, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
