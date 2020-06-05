@@ -691,7 +691,7 @@ def get_stitched_tensorboard_image(assign, gt_visuals, map_visuals, blob, itr):
     add_info = Image.fromarray(np.ones((50, conc.shape[1],3), dtype="uint8")*255)
 
     draw = ImageDraw.Draw(add_info)
-    font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf", 18)
+    font = ImageFont.load_default()
     draw.text((2, 2), "Iteration Nr: " + str(itr), (0, 0, 0), font=font)
     add_info = np.asarray(add_info).astype("uint8")
     #add_info.save(sys.argv[0][:-17] + "add_info.png")

@@ -137,7 +137,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 1000000, 10, 10, 10, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10, 10, 10, 10, 1000000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
