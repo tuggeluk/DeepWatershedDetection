@@ -493,11 +493,10 @@ def stamp_energy(bbox,args,nr_classes):
         marker = marker / np.max(marker) * (cfg.TRAIN.MAX_ENERGY-1)
 
     if args["loss"]== "softmax":
+        marker = np.round(marker).astype(np.int32)
         # extra safety
         marker[marker < 0] = 0
         marker[marker > cfg.TRAIN.MAX_ENERGY] = cfg.TRAIN.MAX_ENERGY
-
-        marker = np.round(marker).astype(np.int32)
         marker = np.eye(cfg.TRAIN.MAX_ENERGY)[marker[:, :]]
         # turn into one-hot softmax targets
     else:
