@@ -40,15 +40,17 @@ class deep_scoresV2(imdb):
 
     self.blacklist = ["staff"]
 
-    self.o = OBBAnns(self._devkit_path+'/deepscores_oriented_train.json')
+    self.o = OBBAnns(self._devkit_path+'/deepscores_train.json')
     self.o.load_annotations()
+    print(self.o.annotation_sets)
+    self.o.set_annotation_set_filter(['deepscores'])
+    self.o.set_class_blacklist(self.blacklist)
 
-    self.blacklist_index = [k for (k, v) in self.o.get_cats().items() if v["name"] in self.blacklist]
-
-    self._classes = [v["name"] for (k, v) in self.o.get_cats().items() if v["annotation_set"] == 'deepscores']
-
+    self._classes = [v["name"] for (k, v) in self.o.get_cats().items()]
+    self._class_ids = [k for (k, v) in self.o.get_cats().items()]
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
+    self._class_ids_to_ind = dict(list(zip(self._class_ids, list(range(self.num_classes)))))
 
     self._image_index = self._load_image_set_index()
 
@@ -151,10 +153,10 @@ class deep_scoresV2(imdb):
     boxes = np.round(np.stack(boxes.to_numpy())).astype(np.uint16)
 
     gt_classes = np.squeeze(np.stack(anns['cat_id'].to_numpy()).astype(np.int32))
-
-    blacklisted_anns = [x not in self.blacklist_index for x in gt_classes]
-    boxes = boxes[blacklisted_anns]
-    gt_classes = gt_classes[blacklisted_anns]
+    gt_classes = np.array(list(map(self._class_ids_to_ind.get, gt_classes)))
+    #blacklisted_anns = [x not in self.blacklist_index for x in gt_classes]
+    #boxes = boxes[blacklisted_anns]
+    #gt_classes = gt_classes[blacklisted_anns]
 
     num_objs = boxes.shape[0]
     overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
@@ -164,12 +166,12 @@ class deep_scoresV2(imdb):
 
     for ind in range(boxes.shape[0]):
       seg_areas = (boxes[ind,2]-boxes[ind,0]+1) *(boxes[ind,3]-boxes[ind,1]+1)
-      overlaps[ind, gt_classes[ind]-1] = 1.0
+      overlaps[ind, gt_classes[ind]] = 1.0
 
     overlaps = scipy.sparse.csr_matrix(overlaps)
     max(gt_classes)
     return {'boxes': boxes,
-            'gt_classes': gt_classes-1, # make zero relative
+            'gt_classes': gt_classes,
             'gt_overlaps': overlaps,
             'flipped': False,
             'seg_areas': seg_areas}

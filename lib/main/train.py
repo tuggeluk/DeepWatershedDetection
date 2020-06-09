@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=2500,
+        parser.add_argument("--max_edge", type=int, default=200,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -137,7 +137,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 10000, 10000, 10000, 10000, 1000000
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 3, 3, 3, 3, 3
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},
