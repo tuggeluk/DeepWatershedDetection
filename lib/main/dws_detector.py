@@ -69,18 +69,48 @@ class DWSDetector:
             canv = np.expand_dims(canv, 0)
 
         canv[0, 0:img.shape[1], 0:img.shape[2]] = img[0]
-
+        print(canv.shape)
+        print(canv.shape[1]*canv.shape[2])
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
 
-        pred_energy, pred_class, pred_bbox = self.tf_session.run(
-            [self.network_heads["stamp_energy"][self.energy_loss][-1],
-             self.network_heads["stamp_class"][self.class_loss][-1],
-             self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: canv})
+        max_input_pix = 2995200
+        overlap_pix = 100
+        slice_height = int(np.ceil(max_input_pix/canv.shape[2]/160.0))*160
+        effective_slice_height = slice_height-overlap_pix
+        nr_slices = int(np.ceil(canv.shape[1]/effective_slice_height))
+
+        def clip_append(existing_pred, new_pred, overlap_pix, ind, nr_slices):
+            half_overlap = int(overlap_pix/2)
+            if ind == 0:
+                # only clip end
+                new_pred = new_pred[:,:-half_overlap,:,:]
+            elif ind == nr_slices-1:
+                # only clip start
+                new_pred = new_pred[:, half_overlap:-half_overlap, :, :]
+            else:
+                # clip both
+                new_pred = new_pred[:, half_overlap:, :, :]
+
+            if existing_pred is None:
+                return new_pred
+            else:
+                return np.concatenate((existing_pred,new_pred),1)
+
+        pred_energy, pred_class, pred_bbox = [None]*3
+        for i in range(nr_slices):
+            in_slice = canv[:,effective_slice_height*i:min(effective_slice_height*i+slice_height, canv.shape[1]),:,:]
+            slice_pred_energy, slice_pred_class, slice_pred_bbox = self.tf_session.run(
+                [self.network_heads["stamp_energy"][self.energy_loss][-1],
+                 self.network_heads["stamp_class"][self.class_loss][-1],
+                 self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: in_slice})
+            pred_energy = clip_append(pred_energy, slice_pred_energy, overlap_pix, i, nr_slices)
+            pred_class = clip_append(pred_class, slice_pred_class, overlap_pix, i, nr_slices)
+            pred_bbox = clip_append(pred_bbox, slice_pred_bbox, overlap_pix, i, nr_slices)
 
 
-        #save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
+        save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
-
+        print("forward pass done")
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
 
@@ -97,6 +127,11 @@ class DWSDetector:
         self.counter += 1
 
         return dws_list
+
+    def sliced_forward(self, canv, max_input_pix = 2995200):
+
+        return
+
 
 
 def get_images(data, gt_boxes=None, gt=False, text=False):
