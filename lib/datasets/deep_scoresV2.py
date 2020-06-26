@@ -9,20 +9,14 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import pandas as pa
 from datasets.imdb import imdb
-import datasets.ds_utils as ds_utils
-import xml.etree.ElementTree as ET
 import numpy as np
 import scipy.sparse
-import scipy.io as sio
-import utils.bbox
 import pickle
 import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
 from main.config import cfg
-import random
 import math
 from obb_anns import OBBAnns
 
@@ -38,9 +32,10 @@ class deep_scoresV2(imdb):
 
     self._data_path = self._devkit_path + "/images"
 
-    self.blacklist = ["staff"]
+    self.blacklist = ["staff",'legerLine']
 
-    self.o = OBBAnns(self._devkit_path+'/deepscores_train.json')
+
+    self.o = OBBAnns(self._devkit_path+'/deepscores_'+image_set+'.json')
     self.o.load_annotations()
     print(self.o.annotation_sets)
     self.o.set_annotation_set_filter(['deepscores'])

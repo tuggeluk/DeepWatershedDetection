@@ -11,20 +11,15 @@ from __future__ import print_function
 import os
 import pandas as pa
 from datasets.imdb import imdb
-import datasets.ds_utils as ds_utils
 import xml.etree.ElementTree as ET
 import numpy as np
 import scipy.sparse
-import scipy.io as sio
-import utils.bbox
 import pickle
 import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
 from main.config import cfg
-import random
 import math
-import sys
 
 
 class deep_scores_300dpi(imdb):

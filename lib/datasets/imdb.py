@@ -9,7 +9,7 @@ from __future__ import division
 from __future__ import print_function
 
 import sys
-sys.path.insert(0, '/cluster/home/elez/DeepWatershedDetection/lib')
+sys.path.insert(0, '/opt/project/lib/utils')
 import os
 import os.path as osp
 import PIL

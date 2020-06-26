@@ -32,7 +32,7 @@ def main():
     elif augmentation_type == 'up' or augmentation_type == 'none':
         parser.add_argument("--augmentation_type", type=str, default=augmentation_type,
                             help="Augment synthetic data at the top of the image")
-        parser.add_argument("--max_edge", type=int, default=200,
+        parser.add_argument("--max_edge", type=int, default=1000,
                             help="if there is no cropping - scale such that the longest edge has this size / if there is cropping crop to max_edge * max_edge")
     parser.add_argument("--use_flipped", type=str, default="False",
                         help="wether or not to append Horizontally flipped images")
@@ -48,7 +48,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1,
                         help="batch size for training")  # code only works with batchsize 1!
 
-    parser.add_argument("--continue_training", type=str, default="False", help="load checkpoint")
+    parser.add_argument("--continue_training", type=str, default="True", help="load checkpoint")
     parser.add_argument("--pretrain_lvl", type=str, default="class",
                         help="What kind of pretraining to use: no,class,semseg, DeepScores_to_300dpi")
     learning_rate = 1e-4  # rnd(3, 5) # gets a number (log uniformly) on interval 10^(-3) to 10^(-5)
@@ -89,7 +89,7 @@ def main():
 
     parser.add_argument("--print_interval", type=int, default=200,
                         help="after how many iterations the loss is printed to console")
-    parser.add_argument("--tensorboard_interval", type=int, default=1,
+    parser.add_argument("--tensorboard_interval", type=int, default=200,
                         help="after how many iterations is tensorboard updated")
     parser.add_argument("--save_interval", type=int, default=2000,
                         help="after how many iterations are the weights saved")
@@ -137,7 +137,7 @@ def main():
                         ], help="configure how groundtruth is built, see datasets.fcn_groundtruth")
 
 
-    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 3, 3, 3, 3, 3
+    Itrs0, Itrs1, Itrs2, Itrs0_1, Itrs_combined = 0, 0, 0, 0, 100000
     parser.add_argument('--do_assign', type=list,
                         default=[
                             {"assign": 0, "help": 0, "Itrs": Itrs0},

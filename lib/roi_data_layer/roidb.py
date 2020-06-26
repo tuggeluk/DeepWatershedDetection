@@ -11,9 +11,6 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-from main.config import cfg
-from main.bbox_transform import bbox_transform
-from utils.bbox import bbox_overlaps
 import PIL
 
 def prepare_roidb(imdb):

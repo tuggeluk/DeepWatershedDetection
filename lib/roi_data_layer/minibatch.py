@@ -15,10 +15,9 @@ import os
 import pickle
 import numpy as np
 import numpy.random as npr
-import cv2
 from main.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
-from datasets.fcn_groundtruth import get_markers, stamp_class
+from datasets.fcn_groundtruth import get_markers
 import sys
 from roi_data_layer.sample_images_for_augmentation import RandomImageSampler
 from PIL import Image

@@ -18,15 +18,17 @@ def main(parsed):
     parsed = parsed[0]
     imdb = get_imdb(parsed.test_set)
     if parsed.dataset == 'DeepScores':
-        path = os.path.join("/experiments/music/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+        path = os.path.join("experiments/music/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+    elif parsed.dataset == "DeepScoresV2":
+        path = os.path.join("experiments/music/pretrain_lvl_class/", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "DeepScores_300dpi":
-        path = os.path.join("/experiments/music/pretrain_lvl_DeepScores_to_300dpi/", parsed.net_type, parsed.net_id)
+        path = os.path.join("experiments/music/pretrain_lvl_DeepScores_to_300dpi/", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "MUSCIMA":
-        path = os.path.join("/experiments/music_handwritten/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+        path = os.path.join("experiments/music_handwritten/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "Dota":
-        path = os.path.join("/experiments/realistic/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
+        path = os.path.join("experiments/realistic/pretrain_lvl_semseg", parsed.net_type, parsed.net_id)
     elif parsed.dataset == "VOC":
-        path = os.path.join("/experiments/realistic/pretrain_lvl_class", parsed.net_type, parsed.net_id)
+        path = os.path.join("experiments/realistic/pretrain_lvl_class", parsed.net_type, parsed.net_id)
     if not parsed.debug:
         net = DWSDetector(imdb=imdb, path=path, pa=parsed, individual_upsamp=parsed.individual_upsamp)
 
@@ -108,11 +110,14 @@ def test_net(net, imdb, parsed, path, debug=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scaling", type=int, default=.5, help="scale factor applied to images after loading")
-    dataset = 'DeepScores'
+    parser.add_argument("--scaling", type=int, default=1, help="scale factor applied to images after loading")
+    dataset = 'DeepScoresV2'
     if dataset == 'MUSCIMA':
         parser.add_argument("--dataset", type=str, default='MUSCIMA', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="MUSICMA++_2017_test", help="dataset to perform inference on")
+    elif dataset == 'DeepScoresV2':
+        parser.add_argument("--dataset", type=str, default='DeepScoresV2', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
+        parser.add_argument("--test_set", type=str, default="DeepScoresV2_2020_val", help="dataset to perform inference on")
     elif dataset == 'DeepScores':
         parser.add_argument("--dataset", type=str, default='DeepScores', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota")
         parser.add_argument("--test_set", type=str, default="DeepScores_2017_test", help="dataset to perform inference on")
@@ -125,7 +130,7 @@ if __name__ == '__main__':
     elif dataset == 'VOC':
         parser.add_argument("--dataset", type=str, default='VOC', help="name of the dataset: DeepScores, DeepScores_300dpi, MUSCIMA, Dota, VOC")
         parser.add_argument("--test_set", type=str, default="voc_2012_train", help="dataset to perform inference on, voc_2012_val/voc_2012_train")
-    parser.add_argument("--net_type", type=str, default="RefineNet-Res152", help="type of resnet used (RefineNet-Res152/101)")
+    parser.add_argument("--net_type", type=str, default="RefineNet-Res101", help="type of resnet used (RefineNet-Res152/101)")
     parser.add_argument("--net_id", type=str, default="run_0", help="the id of the net you want to perform inference on")
 
     parser.add_argument("--saved_net", type=str, default="backbone", help="name (not type) of the net, typically set to backbone")
@@ -134,6 +139,7 @@ if __name__ == '__main__':
     parser.add_argument("--bbox_loss", type=str, default="reg", help="type of the bounding boxes loss, must be reg aka regression")
     parser.add_argument("--debug", type=bool, default=False, help="if set to True, it is in debug mode, and instead of running the images on the net, it only evaluates from a previous run")
 
+    parser.add_argument("--individual_upsamp", type=str, default="True", help="is the network built with individual upsamp heads")
 
     parsed = parser.parse_known_args()
     main(parsed)

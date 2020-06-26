@@ -10,20 +10,18 @@ from models.dwd_net import build_dwd_net
 
 from datasets.factory import get_imdb
 from tensorflow.contrib import slim
-from utils.safe_softmax_wrapper import safe_softmax_cross_entropy_with_logits
 import roi_data_layer.roidb as rdl_roidb
 from roi_data_layer.layer import RoIDataLayer
 from utils.prefetch_wrapper import PrefetchWrapper
 from tensorflow.python.ops import array_ops
 import pickle
-import pdb
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
 
 
 from datasets.fcn_groundtruth import stamp_class, stamp_directions, stamp_energy, stamp_bbox, stamp_semseg, \
-    try_all_assign, get_gt_visuals, get_map_visuals, overlayed_image
+    get_gt_visuals, get_map_visuals, overlayed_image
 
 nr_classes = None
 store_dict = True

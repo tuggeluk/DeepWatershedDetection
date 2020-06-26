@@ -12,18 +12,13 @@ import pdb
 import os
 import pandas as pa
 from datasets.imdb import imdb
-import datasets.ds_utils as ds_utils
-import xml.etree.ElementTree as ET
 import numpy as np
 import scipy.sparse
-import scipy.io as sio
-import utils.bbox
 import pickle
 import subprocess
 import uuid
 from datasets.voc_eval import voc_eval
 from main.config import cfg
-import random
 from datasets.voc_eval import parse_rec
 import math
 
