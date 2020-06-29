@@ -700,7 +700,7 @@ def color_map(img_map, assign,show=False):
         img_map = np.concatenate([img_map, np.zeros(img_map.shape[:-1]+(1,))],-1)
         colored_map = img_map.astype(np.uint8)
     if assign["stamp_func"][0] == "stamp_bbox":
-        size_map = np.sqrt(np.maximum(img_map[:,:,0]*img_map[:,:,1],0))
+        size_map = np.sqrt(np.maximum(img_map[:,:,:,0]*img_map[:,:,:,1],0))
         size_map = size_map/np.max(size_map)*255
         colored_map = size_map.astype(np.uint8)
         # make colored map have last dim 3

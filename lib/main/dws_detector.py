@@ -73,23 +73,23 @@ class DWSDetector:
         print(canv.shape[1]*canv.shape[2])
         #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
 
-        max_input_pix = 2995200
-        overlap_pix = 100
+        max_input_pix = 2500000
+        overlap_pix = 200
         slice_height = int(np.ceil(max_input_pix/canv.shape[2]/160.0))*160
         effective_slice_height = slice_height-overlap_pix
         nr_slices = int(np.ceil(canv.shape[1]/effective_slice_height))
 
-        def clip_append(existing_pred, new_pred, overlap_pix, ind, nr_slices):
+        def clip_append(existing_pred,new_pred, overlap_pix, ind, nr_slices):
             half_overlap = int(overlap_pix/2)
             if ind == 0:
                 # only clip end
                 new_pred = new_pred[:,:-half_overlap,:,:]
             elif ind == nr_slices-1:
                 # only clip start
-                new_pred = new_pred[:, half_overlap:-half_overlap, :, :]
+                new_pred = new_pred[:, half_overlap:, :, :]
             else:
                 # clip both
-                new_pred = new_pred[:, half_overlap:, :, :]
+                new_pred = new_pred[:, half_overlap:-half_overlap, :, :]
 
             if existing_pred is None:
                 return new_pred
@@ -98,18 +98,21 @@ class DWSDetector:
 
         pred_energy, pred_class, pred_bbox = [None]*3
         for i in range(nr_slices):
+            print(str(effective_slice_height*i)+" to "+str(min(effective_slice_height*i+slice_height, canv.shape[1])))
             in_slice = canv[:,effective_slice_height*i:min(effective_slice_height*i+slice_height, canv.shape[1]),:,:]
             slice_pred_energy, slice_pred_class, slice_pred_bbox = self.tf_session.run(
                 [self.network_heads["stamp_energy"][self.energy_loss][-1],
                  self.network_heads["stamp_class"][self.class_loss][-1],
                  self.network_heads["stamp_bbox"][self.bbox_loss][-1]], feed_dict={self.input: in_slice})
-            pred_energy = clip_append(pred_energy, slice_pred_energy, overlap_pix, i, nr_slices)
-            pred_class = clip_append(pred_class, slice_pred_class, overlap_pix, i, nr_slices)
-            pred_bbox = clip_append(pred_bbox, slice_pred_bbox, overlap_pix, i, nr_slices)
+            print(in_slice.shape)
+            print(i)
+            pred_energy = clip_append(pred_energy,slice_pred_energy, overlap_pix, i, nr_slices)
+            pred_class = clip_append(pred_class,slice_pred_class, overlap_pix, i, nr_slices)
+            pred_bbox = clip_append(pred_bbox,slice_pred_bbox, overlap_pix, i, nr_slices)
 
 
         save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
-        #Image.fromarray(canv[0]).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+        Image.fromarray(np.squeeze(canv[0])).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
         print("forward pass done")
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
@@ -121,8 +124,8 @@ class DWSDetector:
             pred_bbox = np.argmax(pred_bbox, axis=3)
 
 
-        dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size)
-        #save_images(canv, dws_list, True, False, self.counter)
+        dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size, store_ccomp_img=True, cfg=cfg, counter=self.counter)
+        save_images(canv, dws_list, True, False, self.counter)
 
         self.counter += 1
 

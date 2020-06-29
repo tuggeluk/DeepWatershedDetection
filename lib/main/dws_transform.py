@@ -1,11 +1,11 @@
 from PIL import Image
-
+import cv2
 import random
 from itertools import product
 from utils.ufarray import *
 import numpy as np
 
-def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, return_ccomp_img = False):
+def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, return_ccomp_img = False, store_ccomp_img=False,cfg=None,counter=0):
     bbox_list = []
 
     dws_energy = np.squeeze(dws_energy)
@@ -13,10 +13,21 @@ def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, r
     bbox_map = np.squeeze(bbox_map)
 
     # Treshhold and binarize dws energy
-    binar_energy = (dws_energy <= cutoff) * 255
+    binar_energy = dws_energy.copy()
+    binar_energy[binar_energy <= cutoff] = 0
+    binar_energy[binar_energy > cutoff] = 255
 
+    ret, markers = cv2.connectedComponents(binar_energy.astype(np.uint8), connectivity=8)
+    #Image.fromarray(markers.astype(np.uint8)).show()
+    #cv2_img = Image.fromarray(markers.astype(np.uint8))
+    #cv2_img.save(cfg.ROOT_DIR + "/output_images/inference/"+"cv2out.png")
+    # TODO replace old ccomp with cv2
     # get connected components
     labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
+
+    if store_ccomp_img:
+        out_img.save(cfg.ROOT_DIR + "/output_images/inference/" + 'ccomp' + str(counter) + '.png')
+
     # invert labels dict
     labels_inv = {}
     for k, v in labels.items():

@@ -60,6 +60,7 @@ def test_net(net, imdb, parsed, path, debug=False):
     if not debug:
         for i in range(num_images):
             start_time = time.time()
+
             if i%500 == 0:
                 print(i)
             if "realistic" not in path:
@@ -68,7 +69,10 @@ def test_net(net, imdb, parsed, path, debug=False):
                 im = Image.open(imdb.image_path_at(i))
             im = np.asanyarray(im)
             im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
-            if im.shape[0]*im.shape[1]>3837*2713:
+            # if im.shape[0]*im.shape[1]>3837*2713:
+            #     continue
+            if max(im.shape)>5000:
+                print("Image at: "+imdb.image_path_at(i)+ "is too large and cannot be processed")
                 continue
 
             boxes = net.classify_img(im, 1, 4)
