@@ -112,7 +112,7 @@ class DWSDetector:
 
 
         save_debug_panes(pred_energy, pred_class, pred_bbox,self.counter)
-        Image.fromarray(np.squeeze(canv[0])).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
+        #Image.fromarray(np.squeeze(canv[0])).save(cfg.ROOT_DIR + "/output_images/" + "debug"+ 'input' + '.png')
         print("forward pass done")
         if self.energy_loss == "softmax":
             pred_energy = np.argmax(pred_energy, axis=3)
@@ -125,7 +125,7 @@ class DWSDetector:
 
 
         dws_list = perform_dws(pred_energy, pred_class, pred_bbox, cutoff, min_ccoponent_size, store_ccomp_img=True, cfg=cfg, counter=self.counter)
-        save_images(canv, dws_list, True, False, self.counter)
+        #save_images(canv, dws_list, True, False, self.counter)
 
         self.counter += 1
 
@@ -162,7 +162,7 @@ def get_images(data, gt_boxes=None, gt=False, text=False):
         # overlay GT boxes
         for row in gt_boxes:
             # cv2.rectangle(im_input, (row[0], row[1], row[2], row[3]), (0, 255, 0), 1)
-            draw.rectangle(((row[0], row[1]), (row[2], row[3])), fill="red")
+            draw.rectangle(((row[0], row[1]), (row[2], row[3])), outline=(12,123,220), width=3)
 
     if text:
         draw = ImageDraw.Draw(im_gt)
@@ -196,7 +196,7 @@ def save_images(data, gt_boxes=None, gt=False, text=False, counter=0):
         data - the image in ndarray format.
         boxes - boxes which we want to draw in the image.
         gt - set it to true if you want to also save the ground truth in addition to the results of the detector.
-        text - set it to trye if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
+        text - set it to try if you want to see also the classes of the classification/ground_truth in addition to bounding boxes.
         counter - each image is given a name starting from 0.png, 1.png, ..., num_images.png
     returns:
         None

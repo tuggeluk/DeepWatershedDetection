@@ -8,7 +8,7 @@ sys.path.insert(0, '/DeepWatershedDetection/lib')
 sys.path.insert(0, os.path.dirname(__file__)[:-4])
 import pdb
 from datasets.factory import get_imdb
-from main.dws_detector import DWSDetector
+from main.dws_detector import DWSDetector, get_images
 from main.config import cfg
 import argparse
 import time
@@ -49,8 +49,8 @@ def test_net(net, imdb, parsed, path, debug=False):
     """
     output_dir = cfg.OUT_DIR
     num_images = len(imdb.image_index)
-    all_boxes = [[[] for _ in range(num_images)]
-                 for _ in range(imdb.num_classes)]
+    all_boxes = [[[] for _ in range(imdb.num_classes)]
+                 for _ in range(num_images)]
 
     det_file = os.path.join(output_dir, 'detections.pkl')
 
@@ -59,9 +59,10 @@ def test_net(net, imdb, parsed, path, debug=False):
     total_time = []
     if not debug:
         for i in range(num_images):
+
             start_time = time.time()
 
-            if i%500 == 0:
+            if i % 500 == 0:
                 print(i)
             if "realistic" not in path:
                 im = Image.open(imdb.image_path_at(i)).convert('L')
@@ -71,21 +72,48 @@ def test_net(net, imdb, parsed, path, debug=False):
             im = cv2.resize(im, None, None, fx=parsed.scaling, fy=parsed.scaling, interpolation=cv2.INTER_LINEAR)
             # if im.shape[0]*im.shape[1]>3837*2713:
             #     continue
-            if max(im.shape)>5000:
-                print("Image at: "+imdb.image_path_at(i)+ "is too large and cannot be processed")
-                continue
+            if max(im.shape) > 5120:
+                print("Image at: "+imdb.image_path_at(i) + "is too large and will be scaled down")
+                re_scale = 5120/max(im.shape)
+                im = cv2.resize(im, None, None, fx=re_scale, fy=re_scale, interpolation=cv2.INTER_LINEAR)
+                final_scale = parsed.scaling*re_scale
 
-            boxes = net.classify_img(im, 1, 4)
-            if len(boxes) > 800:
+            else:
+                final_scale = parsed.scaling
+
+
+            boxes = net.classify_img(im, [7,1], 8)
+
+            if len(boxes) > 1500:
                 boxes = []
-            no_objects = len(boxes)
+
             for j in range(len(boxes)):
                 # invert scaling for Boxes
                 boxes[j] = np.array(boxes[j])
-                boxes[j][:-1] = (boxes[j][:-1] * (1 / parsed.scaling)).astype(np.int)
+                boxes[j][:-1] = (boxes[j][:-1] * (1 / final_scale)).astype(np.int)
 
                 class_of_symbol = boxes[j][4]
-                all_boxes[class_of_symbol][i].append(np.array(boxes[j]))
+                all_boxes[i][class_of_symbol].append(np.array(boxes[j]))
+
+            im = Image.open(imdb.image_path_at(i)).convert('RGB')
+            boxes_named =[]
+            for box in boxes:
+                box = list(box)
+                box[-1] = imdb._classes[box[-1]]
+                boxes_named.append(box)
+            non_annotated, detections = get_images(np.expand_dims(im,0), boxes_named, True, False)
+            detections.save(cfg.ROOT_DIR + "/output_images/inference/" + 'prediction' + str(net.counter) + '.png')
+
+            detections.show()
+            gt_boxes_named = []
+            for row in imdb.o.get_anns(i).iterrows():
+                box = row[1]['a_bbox']
+                box.append(imdb._classes[imdb._class_ids_to_ind[row[1]['cat_id'][0]]])
+                gt_boxes_named.append(box)
+            non_annotated, groundtruth = get_images(np.expand_dims(im, 0), gt_boxes_named, True, True)
+            groundtruth.save(cfg.ROOT_DIR + "/output_images/inference/" + 'gt' + str(net.counter)+ '.png')
+            groundtruth.show()
+
             end_time = time.time()
             total_time.append(end_time - start_time)
         print(total_time)
@@ -103,12 +131,12 @@ def test_net(net, imdb, parsed, path, debug=False):
             cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     else:
-        pdb.set_trace()
         with open(det_file, "rb") as f:
             all_boxes = cPickle.load(f)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir, path)
+    imdb.evaluate(all_boxes)
+    #imdb.evaluate_detections(all_boxes, output_dir, path)
     return all_boxes
 
 

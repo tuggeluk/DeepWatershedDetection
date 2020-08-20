@@ -19,6 +19,7 @@ from datasets.voc_eval import voc_eval
 from main.config import cfg
 import math
 from obb_anns import OBBAnns
+import json
 
 
 class deep_scoresV2(imdb):
@@ -32,7 +33,7 @@ class deep_scoresV2(imdb):
 
     self._data_path = self._devkit_path + "/images"
 
-    self.blacklist = ["staff",'legerLine']
+    self.blacklist = ["staff", 'legerLine']
 
 
     self.o = OBBAnns(self._devkit_path+'/deepscores_'+image_set+'.json')
@@ -46,8 +47,19 @@ class deep_scoresV2(imdb):
 
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._class_ids_to_ind = dict(list(zip(self._class_ids, list(range(self.num_classes)))))
+    self._ind_to_class_ids = {v: k for k, v in self._class_ids_to_ind.items()}
 
     self._image_index = self._load_image_set_index()
+
+    # self.cat_ids = list(self.o.get_cats().keys())
+    # self.cat2label = {
+    #   cat_id: i
+    #   for i, cat_id in enumerate(self.cat_ids)
+    # }
+    # self.label2cat = {v: k for k, v in self.cat2label.items()}
+    # self.CLASSES = tuple([v["name"] for (k, v) in self.o.get_cats().items()])
+    # self.img_ids = [id['id'] for id in self.o.img_info]
+
 
     self._image_ext = '.png'
 
@@ -182,7 +194,6 @@ class deep_scoresV2(imdb):
       self._devkit_path,
       'results',
       'musical' + self._year,
-      'Main',
       filename)
     return path
 
@@ -200,7 +211,7 @@ class deep_scoresV2(imdb):
           # the VOCdevkit expects 1-based indices
           for k in range(dets.shape[0]):
             f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                    format(index, dets[k, -1],
+                    format(str(index), dets[k, -1],
                            dets[k, 0] + 1, dets[k, 1] + 1,
                            dets[k, 2] + 1, dets[k, 3] + 1))
 
@@ -298,6 +309,92 @@ class deep_scoresV2(imdb):
     else:
       self.config['use_salt'] = True
       self.config['cleanup'] = True
+
+  def prepare_json_dict(self, results):
+      json_results = {"annotation_set": "deepscores", "proposals": []}
+      for idx in range(len(results)):
+          img_id = self._image_index[idx]
+          result = results[idx]
+          for label in range(len(result)):
+              bboxes = result[label]
+              for i in range(bboxes.shape[0]):
+                  data = dict()
+                  data['img_id'] = img_id
+                  data['bbox'] = [str(nr) for nr in bboxes[i][0:-1]]
+                  data['score'] = str(bboxes[i][-1])
+                  data['cat_id'] = self._ind_to_class_ids[label]
+                  json_results["proposals"].append(data)
+      return json_results
+
+  def write_results_json(self, results, filename=None):
+      if filename is None:
+          filename = "deepscores_results.json"
+      json_results = self.prepare_json_dict(results)
+
+      with open(filename, "w") as fo:
+          json.dump(json_results, fo)
+
+      return filename
+
+  def evaluate(self,
+               results,
+               metric='bbox',
+               logger=None,
+               jsonfile_prefix=None,
+               classwise=True,
+               proposal_nums=(100, 300, 1000),
+               iou_thrs=np.arange(0.5, 0.96, 0.05),
+               average_thrs=False,
+               store_pickle=True):
+      """Evaluation in COCO protocol.
+
+      Args:
+          results (list): Testing results of the dataset.
+          metric (str | list[str]): Metrics to be evaluated.
+          logger (logging.Logger | str | None): Logger used for printing
+              related information during evaluation. Default: None.
+          jsonfile_prefix (str | None): The prefix of json files. It includes
+              the file path and the prefix of filename, e.g., "a/b/prefix".
+              If not specified, a temp file will be created. Default: None.
+          classwise (bool): Whether to evaluating the AP for each class.
+          proposal_nums (Sequence[int]): Proposal number used for evaluating
+              recalls, such as recall@100, recall@1000.
+              Default: (100, 300, 1000).
+          iou_thrs (Sequence[float]): IoU threshold used for evaluating
+              recalls. If set to a list, the average recall of all IoUs will
+              also be computed. Default: 0.5.
+
+      Returns:
+          dict[str: float]
+      """
+
+      metrics = metric if isinstance(metric, list) else [metric]
+      allowed_metrics = ['bbox']
+      for metric in metrics:
+          if metric not in allowed_metrics:
+              raise KeyError(f'metric {metric} is not supported')
+
+      filename = self.write_results_json(results)
+
+      self.o.load_proposals(filename)
+      metric_results = self.o.calculate_metrics(iou_thrs=iou_thrs, classwise=classwise, average_thrs=average_thrs)
+
+      # import pickle
+      # with open('evaluation.pickle', 'rb') as input_file:
+      #     metric_results = pickle.load(input_file)
+
+      # add Name
+      metric_results = {self._classes[self._class_ids_to_ind[key]]: value for (key, value) in metric_results.items()}
+
+      # add occurences
+      occurences_by_class = self.o.get_class_occurences()
+      for (key, value) in metric_results.items():
+          value.update(no_occurences=occurences_by_class[key])
+
+      if store_pickle:
+          import pickle
+          pickle.dump(metric_results, open('evaluation_renamed.pickle', 'wb'))
+      return metric_results
 
 
 if __name__ == '__main__':

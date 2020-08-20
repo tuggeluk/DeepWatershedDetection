@@ -5,63 +5,90 @@ from itertools import product
 from utils.ufarray import *
 import numpy as np
 
-def perform_dws(dws_energy, class_map, bbox_map,cutoff=0,min_ccoponent_size=0, return_ccomp_img = False, store_ccomp_img=False,cfg=None,counter=0):
+def perform_dws(dws_energy, class_map, bbox_map,cutoff=[7,1],min_ccoponent_size=0, return_ccomp_img = False, store_ccomp_img=False,cfg=None,counter=0):
     bbox_list = []
 
     dws_energy = np.squeeze(dws_energy)
     class_map = np.squeeze(class_map)
     bbox_map = np.squeeze(bbox_map)
 
-    # Treshhold and binarize dws energy
-    binar_energy = dws_energy.copy()
-    binar_energy[binar_energy <= cutoff] = 0
-    binar_energy[binar_energy > cutoff] = 255
 
-    ret, markers = cv2.connectedComponents(binar_energy.astype(np.uint8), connectivity=8)
-    #Image.fromarray(markers.astype(np.uint8)).show()
-    #cv2_img = Image.fromarray(markers.astype(np.uint8))
-    #cv2_img.save(cfg.ROOT_DIR + "/output_images/inference/"+"cv2out.png")
-    # TODO replace old ccomp with cv2
-    # get connected components
-    labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
+    def merge_markers(base_marker, markers):
+        # merges markers form new (lower-cutoff) transform onto base marker if they have no overlap with any base marker
+        new_index = np.max(base_marker)+1
+        markers_new = markers.copy() # store copy for later
+        # offset new markers by 10K (assumes that each page has less than 10K symbols)
+        markers = markers * 1E5
+        # overlay with base marker
+        markers = markers + base_marker
+        #check for pure markers > 10k
+        tainted_ind = np.unique(np.floor(np.unique(markers)[np.unique(markers) % 1E5 > 0] / 1E5))
+        merge_inds = [x for x in np.unique(markers_new) if x not in tainted_ind and not x == 0]
+        print("merge down")
+        merge_pos = np.in1d(markers_new, merge_inds).reshape(markers_new.shape)
+        # merge down
+        base_marker[merge_pos] = markers_new[merge_pos]+new_index
+
+        return base_marker
+
+    base_marker = None
+    for cut in cutoff:
+        # Treshhold and binarize dws energy
+        binar_energy = dws_energy.copy()
+        binar_energy[binar_energy <= cut] = 0
+        binar_energy[binar_energy > cut] = 255
+
+        # asdf = cv2.watershed(binar_energy.astype(np.uint8))
+        ret, markers = cv2.connectedComponents(binar_energy.astype(np.uint8), connectivity=8)
+        # Image.fromarray(markers.astype(np.uint8)).show()
+        # cv2_img = Image.fromarray(markers.astype(np.uint8))
+        # cv2_img.save(cfg.ROOT_DIR + "/output_images/inference/"+"cv2out.png")
+
+        # get connected components
+        # labels, out_img = find_connected_comp(np.transpose(binar_energy)) # works with inverted indices
+        if base_marker is None:
+            base_marker = markers
+        else:
+            base_marker = merge_markers(base_marker, markers)
 
     if store_ccomp_img:
+        out_img = Image.fromarray(base_marker.astype(np.uint8))
         out_img.save(cfg.ROOT_DIR + "/output_images/inference/" + 'ccomp' + str(counter) + '.png')
 
     # invert labels dict
-    labels_inv = {}
-    for k, v in labels.items():
-        labels_inv[v] = labels_inv.get(v, [])
-        labels_inv[v].append(k)
+    # labels_inv = {}
+    # for k, v in labels.items():
+    #     labels_inv[v] = labels_inv.get(v, [])
+    #     labels_inv[v].append(k)
+
+    labels = np.unique(base_marker, return_counts=True)
+    filtered_labels = []
+    for ind, key in enumerate(labels[0]):
+        if key == 0:
+            continue
+        if labels[1][ind] > min_ccoponent_size:
+            filtered_labels.append(key)
 
 
-    # filter components that are too small
-    for key in list(labels_inv):
-        # print(key)
-        # print(len(labels_inv[key]))
-        if len(labels_inv[key]) < min_ccoponent_size:
-            del labels_inv[key]
+    for key in filtered_labels:
+        key_coords = np.where(base_marker == key)
+        # average off all coordinates as center
+        center = np.average(key_coords,1).astype(int)
 
+        # mayority vote for class
+        class_label = np.bincount(class_map[key_coords[0], key_coords[1]]).argmax()
 
-    for key in labels_inv.keys():
-        # add additional dict structure to each component and convert to numpy array
-        labels_inv[key] = dict(pixel_coords=np.asanyarray(labels_inv[key]))
-        # use average over all pixel coordinates
-        labels_inv[key]["center"] = np.average(labels_inv[key]["pixel_coords"],0).astype(int)
-        # mayority vote for class --> transposed
-        labels_inv[key]["class"] = np.bincount(class_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]]).argmax()
-        # average for box size --> transposed
+        # average for box size
         #labels_inv[key]["bbox_size"] = np.average(bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]],0).astype(int)
-        labels_inv[key]["bbox_size"] = np.amax(
-            bbox_map[labels_inv[key]["pixel_coords"][:, 1], labels_inv[key]["pixel_coords"][:, 0]], 0).astype(int)
+        bbox_size = np.amax(bbox_map[key_coords[0],key_coords[1]], 0).astype(int)
 
         # produce bbox element, append to list
         bbox = []
-        bbox.append(int(np.round(labels_inv[key]["center"][0] - (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmin
-        bbox.append(int(np.round(labels_inv[key]["center"][1] - (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymin
-        bbox.append(int(np.round(labels_inv[key]["center"][0] + (labels_inv[key]["bbox_size"][1]/2.0), 0))) # xmax
-        bbox.append(int(np.round(labels_inv[key]["center"][1] + (labels_inv[key]["bbox_size"][0]/2.0), 0))) # ymax
-        bbox.append(int(labels_inv[key]["class"]))
+        bbox.append(int(np.round(center[1] - (bbox_size[1]/2.0), 0))) # xmin
+        bbox.append(int(np.round(center[0] - (bbox_size[0]/2.0), 0))) # ymin
+        bbox.append(int(np.round(center[1] + (bbox_size[1]/2.0), 0))) # xmax
+        bbox.append(int(np.round(center[0] + (bbox_size[0]/2.0), 0))) # ymax
+        bbox.append(int(class_label))
         bbox_list.append(bbox)
 
     if return_ccomp_img:

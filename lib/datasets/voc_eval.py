@@ -175,8 +175,6 @@ def voc_eval(detpath,
   # assumes imagesetfile is a text file with each line an image name
   # cachedir caches the annotations in a pickle file
 
-  if classname == "notehead-full":
-    print("nh-full")
 
   # first load gt
   if not os.path.isdir(cachedir):
